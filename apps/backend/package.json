@@ -1,0 +1,36 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "build": "nest build",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.0.0",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.0",
+    "@nestjs/jwt": "^12.0.1",
+    "@nestjs/platform-express": "^12.0.0",
+    "@nestjs/swagger": "^12.0.1",
+    "@nestjs/typeorm": "^12.0.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@sentry/node": "^10.73.0",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/express": "^5.0.6",
+    "bcryptjs": "^3.0.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "express": "^5.2.1",
+    "pg": "^8.12.0",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/schematics": "^12.0.0",
+    "@nestjs/testing": "^12.0.0"
+  }
+}
