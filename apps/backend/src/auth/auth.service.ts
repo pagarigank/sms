@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
+import { MfaService } from './mfa.service';
 
 @Injectable()
 export class AuthService {
@@ -11,6 +12,7 @@ export class AuthService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private jwtService: JwtService,
+    private mfaService: MfaService,
   ) {}
 
   async register(data: { email: string; password: string; tenantId: string; phone?: string }) {
@@ -49,7 +51,60 @@ export class AuthService {
       throw new UnauthorizedException('Account is not active');
     }
 
+    // Check if MFA is required for this user
+    const mfaRequired = await this.mfaService.requiresMfa(user.id, user.tenantId);
+    const mfaEnabled = await this.mfaService.isMfaEnabled(user.id);
+
     await this.usersRepository.update(user.id, { lastLoginAt: new Date() });
+
+    // If MFA is required but not yet set up, return partial tokens
+    if (mfaRequired && !mfaEnabled) {
+      const tempToken = this.jwtService.sign(
+        { sub: user.id, tenantId: user.tenantId, mfaPending: true },
+        { expiresIn: '5m' }
+      );
+      return {
+        mfaRequired: true,
+        mfaSetupRequired: true,
+        tempToken,
+        user: { id: user.id, email: user.email, tenantId: user.tenantId },
+      };
+    }
+
+    // If MFA is enabled, require verification
+    if (mfaEnabled) {
+      const tempToken = this.jwtService.sign(
+        { sub: user.id, tenantId: user.tenantId, mfaPending: true },
+        { expiresIn: '5m' }
+      );
+      return {
+        mfaRequired: true,
+        mfaSetupRequired: false,
+        tempToken,
+        user: { id: user.id, email: user.email, tenantId: user.tenantId },
+      };
+    }
+
+    // No MFA required, generate full tokens
+    return this.generateTokens(user);
+  }
+
+  async verifyMfa(userId: string, token: string) {
+    const valid = await this.mfaService.verifyToken(userId, token);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid MFA token');
+    }
+
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Enable MFA if this is first-time setup
+    if (!user.mfaEnabled) {
+      await this.mfaService.enableMfa(userId);
+    }
+
     return this.generateTokens(user);
   }
 

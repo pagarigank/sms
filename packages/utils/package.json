@@ -12,5 +12,10 @@
     "@types/node": "^20",
     "typescript": "^5",
     "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "tailwind-merge": "^3.6.0"
   }
 }

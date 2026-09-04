@@ -10,15 +10,22 @@ import { Program } from './program.entity';
 import { Curriculum } from './curriculum.entity';
 import { Subject } from './subject.entity';
 import { CurriculumSubject } from './curriculum-subject.entity';
+import { GradingSystem } from './grading-system.entity';
+import { GradeComponent } from './grade-component.entity';
+import { HonorRollConfig } from './honor-roll-config.entity';
 import { AcademicService } from './academic.service';
 import { AcademicController } from './academic.controller';
+import { AcademicRolloverService } from '../common/academic-rollover.service';
 
-const ENTITIES = [EducationLevel, GradeLevel, SchoolYear, Term, Track, Strand, Program, Curriculum, Subject, CurriculumSubject];
+const ENTITIES = [
+  EducationLevel, GradeLevel, SchoolYear, Term, Track, Strand, Program,
+  Curriculum, Subject, CurriculumSubject, GradingSystem, GradeComponent, HonorRollConfig,
+];
 
 @Module({
   imports: [TypeOrmModule.forFeature(ENTITIES)],
   controllers: [AcademicController],
-  providers: [AcademicService],
-  exports: [AcademicService],
+  providers: [AcademicService, AcademicRolloverService],
+  exports: [AcademicService, AcademicRolloverService],
 })
 export class AcademicModule {}

@@ -12,7 +12,9 @@ import { ConfigEngineModule } from './config/config.module';
 import { FacilityModule } from './facility/facility.module';
 import { AcademicModule } from './academic/academic.module';
 import { GradingModule } from './academic/grading.module';
+import { SisModule } from './sis/sis.module';
 import { TenantContextMiddleware } from './common/tenant-context.middleware';
+import { OverrideResolverService } from './common/override-resolver.service';
 
 @Module({
   imports: [
@@ -45,9 +47,10 @@ import { TenantContextMiddleware } from './common/tenant-context.middleware';
     FacilityModule,
     AcademicModule,
     GradingModule,
+    SisModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [OverrideResolverService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

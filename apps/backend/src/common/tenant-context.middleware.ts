@@ -1,24 +1,25 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class TenantContextMiddleware implements NestMiddleware {
-  use(req: Request, _res: Response, next: NextFunction) {
-    // Extract tenant from JWT payload (set by JwtAuthGuard) or from header
-    const user = (req as any).user;
-    const tenantId = user?.tenantId || req.headers['x-tenant-id'] as string;
+  constructor(private dataSource: DataSource) {}
 
-    if (!tenantId) {
-      throw new UnauthorizedException('Missing tenant context');
-    }
+  async use(req: Request, res: Response, next: NextFunction) {
+    // Extract tenant_id from JWT token or header
+    const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'] as string;
 
-    // Attach tenant context to request for downstream use
-    (req as any).tenantId = tenantId;
-
-    // Branch ID from query param or header (optional, for branch-scoped access)
-    const branchId = req.headers['x-branch-id'] as string || req.query.branchId as string;
-    if (branchId) {
-      (req as any).branchId = branchId;
+    if (tenantId) {
+      // Set the Postgres session variable for Row-Level Security
+      const queryRunner = this.dataSource.createQueryRunner();
+      try {
+        await queryRunner.query(`SET LOCAL app.current_tenant_id = '${tenantId}'`);
+        // Store tenantId on request for downstream use
+        (req as any).tenantId = tenantId;
+      } finally {
+        await queryRunner.release();
+      }
     }
 
     next();

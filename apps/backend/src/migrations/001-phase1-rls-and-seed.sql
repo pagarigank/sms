@@ -291,51 +291,70 @@ CREATE POLICY tenant_isolation_honor_roll_configs ON honor_roll_configs
   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
 -- ============================================================
--- Phase 4 (future): SIS / Enrollment RLS
+-- Phase 4: SIS / Enrollment RLS (ACTIVE)
 -- ============================================================
--- These tables will be created by TypeORM synchronize.
--- Uncomment after Phase 4 implementation.
 
--- ALTER TABLE students ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_students ON students
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_students ON students
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE guardians ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_guardians ON guardians
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE guardians ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_guardians ON guardians
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE student_guardians ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_student_guardians ON student_guardians
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE student_guardians ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_student_guardians ON student_guardians
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_enrollments ON enrollments
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_enrollments ON enrollments
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE sections ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_sections ON sections
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE sections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_sections ON sections
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE enrollment_holds ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_enrollment_holds ON enrollment_holds
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE enrollment_holds ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_enrollment_holds ON enrollment_holds
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE student_documents ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_student_documents ON student_documents
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE student_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_student_documents ON student_documents
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE student_section_assignments ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_student_section_assignments ON student_section_assignments
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE student_section_assignments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_student_section_assignments ON student_section_assignments
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE promotion_decisions ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_promotion_decisions ON promotion_decisions
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE promotion_decisions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_promotion_decisions ON promotion_decisions
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE student_transfers ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_student_transfers ON student_transfers
---   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+ALTER TABLE student_transfers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_student_transfers ON student_transfers
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
--- ALTER TABLE student_merge_audit ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY tenant_isolation_student_merge_audit ON student_merge_audit
+ALTER TABLE student_merge_audit ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_student_merge_audit ON student_merge_audit
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+ALTER TABLE behavior_incidents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_behavior_incidents ON behavior_incidents
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+ALTER TABLE health_records ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_health_records ON health_records
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+ALTER TABLE applicant_stage_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_applicant_stage_configs ON applicant_stage_configs
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+ALTER TABLE applicant_stage_transitions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_applicant_stage_transitions ON applicant_stage_transitions
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+
+ALTER TABLE section_assignment_rules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_section_assignment_rules ON section_assignment_rules
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid)
 --   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);

@@ -1,0 +1,13 @@
+export { ApiClient } from './client';
+export type { ApiClientConfig, ApiResponse, PaginatedResponse } from './types';
+export * from './types';
+export * from './endpoints/auth';
+export * from './endpoints/tenants';
+export * from './endpoints/branches';
+export * from './endpoints/departments';
+export * from './endpoints/users';
+export * from './endpoints/iam';
+export * from './endpoints/facility';
+export * from './endpoints/academic';
+export * from './endpoints/grading';
+export * from './endpoints/config';
