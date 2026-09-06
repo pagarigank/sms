@@ -1,13 +1,14 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Request, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Request, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { MfaService } from './mfa.service';
 import { GuardianAuthService } from './guardian-auth.service';
 import { ImpersonationService } from './impersonation.service';
+import { ImpersonationGrant } from './impersonation.types';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @ApiTags('Authentication')
-@Controller('api/v1/auth')
+@Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -27,8 +28,17 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Staff login' })
-  login(@Body() body: { email: string; password: string; tenantId: string }) {
-    return this.authService.login(body);
+  login(@Body() body: { email: string; password: string; tenantId?: string }, @Request() req: any) {
+    return this.authService.login(body, {
+      ipAddress: req.ip ?? req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @Get('tenant-lookup')
+  @ApiOperation({ summary: 'Resolve tenant by slug (public, pre-auth)' })
+  lookupTenant(@Query('slug') slug: string) {
+    return this.authService.lookupTenantBySlug(slug);
   }
 
   // === MFA ===
@@ -36,8 +46,11 @@ export class AuthController {
   @Post('mfa/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify MFA token' })
-  verifyMfa(@Body() body: { userId: string; token: string }) {
-    return this.authService.verifyMfa(body.userId, body.token);
+  verifyMfa(@Body() body: { userId: string; token: string }, @Request() req: any) {
+    return this.authService.verifyMfa(body.userId, body.token, {
+      ipAddress: req.ip ?? req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('mfa/setup')
@@ -83,7 +96,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Request impersonation (requires approval)' })
-  requestImpersonation(@Request() req: any, @Body() body: { targetTenantId: string; reason: string }) {
+  requestImpersonation(@Request() req: any, @Body() body: { targetTenantId: string; reason: string }): Promise<import('./impersonation.types').ImpersonationGrant> {
     return this.impersonationService.requestImpersonation(req.user.id, body.targetTenantId, body.reason);
   }
 
@@ -91,7 +104,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Break-glass impersonation (emergency)' })
-  breakGlass(@Request() req: any, @Body() body: { targetTenantId: string; reason: string }) {
+  breakGlass(@Request() req: any, @Body() body: { targetTenantId: string; reason: string }): Promise<ImpersonationGrant> {
     return this.impersonationService.breakGlassImpersonation(req.user.id, body.targetTenantId, body.reason);
   }
 
@@ -113,8 +126,16 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'List active impersonation grants' })
-  getActiveGrants() {
+  getActiveGrants(): ImpersonationGrant[] {
     return this.impersonationService.getActiveGrants();
+  }
+
+  @Get('me')
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current user profile + permissions' })
+  getMe(@Request() req: any) {
+    return this.authService.getMe(req.user.sub ?? req.user.id);
   }
 
   // === Token Management ===
@@ -124,5 +145,18 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token' })
   refresh(@Body() body: { refreshToken: string }) {
     return this.authService.refresh(body.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Log out — terminate current session (audit-recorded)' })
+  logout(
+    @Body() body: { accessToken: string },
+    @Request() req: any,
+  ) {
+    return this.authService.logout(body.accessToken, {
+      ipAddress: req.ip ?? req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
   }
 }

@@ -4,12 +4,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
+import { SessionService } from '../users/session.service';
 
 @Injectable()
 export class GuardianAuthService {
   constructor(
     @InjectRepository(User) private usersRepo: Repository<User>,
     private jwtService: JwtService,
+    private sessionService: SessionService,
   ) {}
 
   /**
@@ -36,6 +38,25 @@ export class GuardianAuthService {
 
     await this.usersRepo.update(user.id, { lastLoginAt: new Date() });
     return this.generateTokens(user, 'guardian');
+  }
+
+  /**
+   * Set session audit on the generated tokens. Caller passes request meta
+   * so we can capture IP/user-agent.
+   */
+  private recordSession(user: User, accessToken: string, expiresAt: Date, requestMeta?: { ipAddress?: string; userAgent?: string }) {
+    try {
+      this.sessionService.recordLogin({
+        userId: user.id,
+        tenantId: user.tenantId,
+        sessionTokenHash: this.sessionService.hashToken(accessToken),
+        ipAddress: requestMeta?.ipAddress,
+        userAgent: requestMeta?.userAgent,
+        expiresAt,
+      });
+    } catch (e: any) {
+      console.warn('[session-audit] guardian recordLogin failed:', e?.message);
+    }
   }
 
   /**
@@ -150,6 +171,9 @@ export class GuardianAuthService {
       { sub: user.id },
       { secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret', expiresIn: '30d' },
     );
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    this.recordSession(user, accessToken, expiresAt);
 
     return {
       accessToken,

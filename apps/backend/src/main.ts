@@ -1,5 +1,8 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
+import * as http from 'node:http';
 import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 
@@ -18,11 +21,42 @@ async function bootstrap() {
   // Global API prefix
   app.setGlobalPrefix('api/v1');
 
-  // CORS
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  });
+  // CORS: explicit allowlist from env (falls back to localhost dev origins).
+  // The previous default `origin: '*'` combined with `credentials: true` is
+  // rejected by browsers and flagged by OWASP ASVS 14.4.
+  const origins = (process.env.CORS_ORIGIN || 'http://localhost:3001,http://localhost:3002')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: origins, credentials: true });
+
+  // Security headers (OWASP A05). CSP is disabled: this service is a JSON
+  // API only, so the script-src defaults would be pure noise.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'same-site' },
+    }),
+  );
+
+  // Global payload validation — reject malformed payloads early.
+  // whitelist strips unknown properties; transform converts plain objects to
+  // DTO instances so class-validator rules can run. Controllers currently
+  // accept `any` bodies, so `forbidNonWhitelisted` stays off to avoid breaking
+  // valid dynamic payloads (e.g. custom fields).
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      exceptionFactory: (errors) =>
+        new BadRequestException(
+          errors.map((e) => ({
+            field: e.property,
+            messages: Object.values(e.constraints ?? {}),
+          })),
+        ),
+    }),
+  );
 
   // Swagger / OpenAPI
   const config = new DocumentBuilder()
@@ -45,14 +79,37 @@ async function bootstrap() {
     .addTag('users', 'User profiles')
     .addTag('iam', 'Identity & Access Management — roles, permissions')
     .addTag('config', 'Configuration engine — lookup lists, custom fields, audit')
+    .addTag('health', 'Service health probes')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
+  // Graceful shutdown: SIGTERM/SIGINT stop accepting new connections and
+  // drain in-flight requests before the process exits (reliability item 11.4).
+  app.enableShutdownHooks();
+
   const port = process.env.PORT || 3000;
-  await app.listen(port);
+
+  // Express 5+ app objects no longer expose a working app.listen() in all
+  // combinations of @nestjs/platform-express + express. Use the Node http
+  // server directly so bootstrap always binds, and so graceful-shutdown hooks
+  // still have a server to close.
+  const raw = app.getHttpAdapter().getInstance();
+  const server = http.createServer(typeof raw === 'function' ? raw : (raw as any).callback());
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(port, '0.0.0.0', () => resolve());
+  });
+
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger docs: http://localhost:${port}/docs`);
+
+  // Keep the process alive: the server handle is held by the event loop,
+  // but on some Node versions the async bootstrap() return would allow
+  // the process to exit. Attach to process so shutdown hooks fire correctly.
+  process.on('SIGTERM', () => server.close());
+  process.on('SIGINT', () => server.close());
 }
+
 bootstrap();
