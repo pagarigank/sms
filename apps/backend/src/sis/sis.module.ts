@@ -15,14 +15,17 @@ import { HealthRecord } from './health-record.entity';
 import { StudentMergeAudit } from './student-merge-audit.entity';
 import { ApplicantStageConfig } from './applicant-stage-config.entity';
 import { ApplicantStageTransition } from './applicant-stage-transition.entity';
+import { Applicant } from './applicant.entity';
 import { SectionAssignmentRule } from './section-assignment-rule.entity';
 import { SisService } from './sis.service';
 import { SisController } from './sis.controller';
 import { AdmissionsService } from './admissions.service';
 import { AdmissionsController } from './admissions.controller';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
+    BillingModule,
     TypeOrmModule.forFeature([
       Student,
       Guardian,
@@ -39,6 +42,7 @@ import { AdmissionsController } from './admissions.controller';
       StudentMergeAudit,
       ApplicantStageConfig,
       ApplicantStageTransition,
+      Applicant,
       SectionAssignmentRule,
     ]),
   ],

@@ -5,13 +5,13 @@ export class BehaviorIncident {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   studentId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   enrollmentId: string;
 
   @Column()
@@ -23,7 +23,7 @@ export class BehaviorIncident {
   @Column({ type: 'date' })
   incidentDate: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   incidentLocation: string;
 
   @Column({ nullable: true })

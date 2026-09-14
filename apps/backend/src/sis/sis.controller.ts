@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Request } from 'express';
 import { SisService } from './sis.service';
 
 @ApiTags('sis')
 @ApiBearerAuth('access-token')
-@Controller('api/v1/sis')
+@Controller('sis')
 export class SisController {
   constructor(private readonly sisService: SisService) {}
 
@@ -13,6 +14,23 @@ export class SisController {
   @ApiOperation({ summary: 'List all students for a tenant' })
   async findAllStudents(@Headers('x-tenant-id') tenantId: string, @Query('branchId') branchId?: string) {
     return this.sisService.findAllStudents(tenantId, branchId);
+  }
+
+  // Guardian portal: resolve "my children" from the authenticated user.
+  // MUST be declared before students/:id so 'my-children' is not captured
+  // as an :id parameter.
+  @Get('students/my-children')
+  @ApiOperation({ summary: 'Guardian portal: list the authenticated guardian\'s children' })
+  async findMyChildren(@Req() req: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.findChildrenOfGuardianUser(req.user?.sub ?? req.user?.id, tenantId);
+  }
+
+  // NOTE: must be declared BEFORE students/:id, otherwise 'duplicates'
+  // is captured as the :id parameter.
+  @Get('students/duplicates')
+  @ApiOperation({ summary: 'Find potential duplicate students (LRN or name+birthdate match)' })
+  async findDuplicates(@Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.findDuplicateStudents(tenantId);
   }
 
   @Get('students/:id')
@@ -37,12 +55,6 @@ export class SisController {
   @ApiOperation({ summary: 'Update student' })
   async updateStudent(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string, @Body() data: any) {
     return this.sisService.updateStudent(id, tenantId, data);
-  }
-
-  @Get('students/duplicates')
-  @ApiOperation({ summary: 'Find potential duplicate students (LRN or name+birthdate match)' })
-  async findDuplicates(@Headers('x-tenant-id') tenantId: string) {
-    return this.sisService.findDuplicateStudents(tenantId);
   }
 
   // === Guardians ===

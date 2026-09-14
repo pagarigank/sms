@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, QueryFailedError } from 'typeorm';
 import { EducationLevel } from '../education-levels/education-level.entity';
 import { GradeLevel } from './grade-level.entity';
 import { SchoolYear } from './school-year.entity';
@@ -27,9 +27,31 @@ export class AcademicService {
     @InjectRepository(CurriculumSubject) private currSubjectsRepo: Repository<CurriculumSubject>,
   ) {}
 
+  // --- Guarded mutation helpers (404 on missing, 409 on FK conflict) ---
+  private async updateGuarded(repo: Repository<any>, id: string, data: any, label: string) {
+    const res = await repo.update(id, data);
+    if (res.affected === 0) throw new NotFoundException(`${label} ${id} not found`);
+    return repo.findOneBy({ id });
+  }
+
+  private async deleteGuarded(repo: Repository<any>, id: string, label: string) {
+    try {
+      const res = await repo.delete(id);
+      if (res.affected === 0) throw new NotFoundException(`${label} ${id} not found`);
+    } catch (e) {
+      if (e instanceof NotFoundException) throw e;
+      if (e instanceof QueryFailedError) {
+        throw new ConflictException(`${label} ${id} is referenced by other records and cannot be deleted`);
+      }
+      throw e;
+    }
+  }
+
   // === Education Levels ===
   findEduLevels(tenantId: string) { return this.eduLevelsRepo.find({ where: { tenantId } }); }
   async createEduLevel(data: Partial<EducationLevel>) { return this.eduLevelsRepo.save(this.eduLevelsRepo.create(data)); }
+  updateEduLevel(id: string, data: Partial<EducationLevel>) { return this.updateGuarded(this.eduLevelsRepo, id, data, 'Education level'); }
+  removeEduLevel(id: string) { return this.deleteGuarded(this.eduLevelsRepo, id, 'Education level'); }
 
   // === Grade Levels ===
   findGradeLevels(tenantId: string, educationLevelId?: string) {
@@ -38,6 +60,8 @@ export class AcademicService {
     return this.gradeLevelsRepo.find({ where, order: { sortOrder: 'ASC' } });
   }
   async createGradeLevel(data: Partial<GradeLevel>) { return this.gradeLevelsRepo.save(this.gradeLevelsRepo.create(data)); }
+  updateGradeLevel(id: string, data: Partial<GradeLevel>) { return this.updateGuarded(this.gradeLevelsRepo, id, data, 'Grade level'); }
+  removeGradeLevel(id: string) { return this.deleteGuarded(this.gradeLevelsRepo, id, 'Grade level'); }
 
   // === School Years ===
   findSchoolYears(tenantId: string) { return this.schoolYearsRepo.find({ where: { tenantId } }); }
@@ -47,6 +71,14 @@ export class AcademicService {
     return sy;
   }
   async createSchoolYear(data: Partial<SchoolYear>) { return this.schoolYearsRepo.save(this.schoolYearsRepo.create(data)); }
+  updateSchoolYear(id: string, data: Partial<SchoolYear>) { return this.updateGuarded(this.schoolYearsRepo, id, data, 'School year'); }
+  removeSchoolYear(id: string) { return this.deleteGuarded(this.schoolYearsRepo, id, 'School year'); }
+  /** One active school year per tenant: demote the previous active to completed. */
+  async activateSchoolYear(id: string) {
+    const sy = await this.findOneSchoolYear(id);
+    await this.schoolYearsRepo.update({ tenantId: sy.tenantId, status: 'active' }, { status: 'completed' });
+    return this.updateGuarded(this.schoolYearsRepo, id, { status: 'active' }, 'School year');
+  }
 
   // === Terms ===
   findTerms(schoolYearId: string) { return this.termsRepo.find({ where: { schoolYearId }, order: { sequence: 'ASC' } }); }
@@ -55,6 +87,8 @@ export class AcademicService {
   // === Tracks (SHS) ===
   findTracks(tenantId: string) { return this.tracksRepo.find({ where: { tenantId } }); }
   async createTrack(data: Partial<Track>) { return this.tracksRepo.save(this.tracksRepo.create(data)); }
+  updateTrack(id: string, data: Partial<Track>) { return this.updateGuarded(this.tracksRepo, id, data, 'Track'); }
+  removeTrack(id: string) { return this.deleteGuarded(this.tracksRepo, id, 'Track'); }
 
   // === Strands (SHS) ===
   findStrands(tenantId: string, trackId?: string) {
@@ -63,10 +97,14 @@ export class AcademicService {
     return this.strandsRepo.find({ where });
   }
   async createStrand(data: Partial<Strand>) { return this.strandsRepo.save(this.strandsRepo.create(data)); }
+  updateStrand(id: string, data: Partial<Strand>) { return this.updateGuarded(this.strandsRepo, id, data, 'Strand'); }
+  removeStrand(id: string) { return this.deleteGuarded(this.strandsRepo, id, 'Strand'); }
 
   // === Programs (College) ===
   findPrograms(tenantId: string) { return this.programsRepo.find({ where: { tenantId } }); }
   async createProgram(data: Partial<Program>) { return this.programsRepo.save(this.programsRepo.create(data)); }
+  updateProgram(id: string, data: Partial<Program>) { return this.updateGuarded(this.programsRepo, id, data, 'Program'); }
+  removeProgram(id: string) { return this.deleteGuarded(this.programsRepo, id, 'Program'); }
 
   // === Subjects ===
   findSubjects(tenantId: string) { return this.subjectsRepo.find({ where: { tenantId } }); }
@@ -76,6 +114,8 @@ export class AcademicService {
     return s;
   }
   async createSubject(data: Partial<Subject>) { return this.subjectsRepo.save(this.subjectsRepo.create(data)); }
+  updateSubject(id: string, data: Partial<Subject>) { return this.updateGuarded(this.subjectsRepo, id, data, 'Subject'); }
+  removeSubject(id: string) { return this.deleteGuarded(this.subjectsRepo, id, 'Subject'); }
 
   // === Curricula ===
   findCurricula(tenantId: string, filters?: { schoolYearId?: string; educationLevelId?: string; branchId?: string }) {
@@ -95,6 +135,7 @@ export class AcademicService {
     await this.curriculaRepo.update(id, data);
     return this.findOneCurriculum(id);
   }
+  removeCurriculum(id: string) { return this.deleteGuarded(this.curriculaRepo, id, 'Curriculum'); }
 
   // === Curriculum Subjects ===
   findCurriculumSubjects(curriculumId: string) { return this.currSubjectsRepo.find({ where: { curriculumId }, order: { order: 'ASC' } }); }

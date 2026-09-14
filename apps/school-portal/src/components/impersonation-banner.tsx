@@ -19,16 +19,20 @@ export function ImpersonationBanner() {
   if (dismissed || activeGrants.length === 0) return null;
 
   return (
-    <div className="bg-yellow-500 text-white px-4 py-2 flex items-center justify-between">
-      <div className="flex items-center space-x-2">
-        <AlertTriangle className="h-5 w-5" />
+    <div
+      className="flex items-center justify-between border-b border-[hsl(var(--status-warning-ink))]/20 bg-[hsl(var(--status-warning-surface))] px-4 py-2 text-[hsl(var(--status-warning-ink))]"
+      role="status"
+    >
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-5 w-5 shrink-0" />
         <span className="text-sm font-medium">
-          Support impersonation active — Session is being monitored and logged.
+          Support impersonation active — this session is monitored and logged.
         </span>
       </div>
       <button
         onClick={() => setDismissed(true)}
-        className="text-white/80 hover:text-white"
+        className="rounded p-1 opacity-80 transition-opacity hover:opacity-100"
+        aria-label="Dismiss banner"
       >
         <X className="h-4 w-4" />
       </button>

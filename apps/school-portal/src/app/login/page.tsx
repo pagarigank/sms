@@ -1,84 +1,56 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { useAuthStore } from '@/lib/store';
+import { LoginForm, AuthShell } from '@sms/ui';
 import { apiClient } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  // Already signed in — go straight to the dashboard (run after hydration).
+  useEffect(() => {
+    if (token && user) router.replace('/dashboard');
+  }, [token, user, router]);
 
-    try {
-      const res = await apiClient.auth.login({ email, password });
-      setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.push('/dashboard');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed');
-    } finally {
-      setLoading(false);
-    }
+  if (token && user) return null;
+
+  const onSignIn = (data: { accessToken?: string; refreshToken?: string; user?: unknown }) => {
+    if (!data.accessToken || !data.refreshToken || !data.user) return;
+    setAuth(data.user as Parameters<typeof setAuth>[0], data.accessToken, data.refreshToken);
+    router.replace('/dashboard');
+  };
+
+  const onTenantLookup = async (slug: string) => {
+    const res = await apiClient.auth.tenantLookup(slug);
+    return { id: res.data.id, name: res.data.name };
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md space-y-8 rounded-lg border bg-white p-8 shadow-sm">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">SchoolSuite</h1>
-          <p className="mt-2 text-sm text-gray-600">School Administration Portal</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>
-          )}
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-      </div>
-    </div>
+    <AuthShell
+      eyebrow="School Administration"
+      headline="One portal for your whole campus."
+      description="Manage student records, enrollment, scheduling, and billing from a single, secure administration portal."
+      footer="SchoolSuite SMS · School Administration Portal"
+      mobileSubtitle="School Administration Portal"
+      features={[
+        'Multi-tenant school support',
+        'Audit-logged every action',
+        'OIDC + MFA ready',
+      ]}
+      hue={-12}
+    >
+      <LoginForm
+        showTenantStep
+        onTenantLookup={onTenantLookup}
+        onSignIn={onSignIn}
+        forgotPasswordUrl="/forgot-password"
+        apiClient={apiClient}
+      />
+    </AuthShell>
   );
 }

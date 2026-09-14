@@ -2,12 +2,19 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
+import { Badge } from '@sms/ui';
 
 export default function HonorRollPage() {
-  const { data: configs } = useQuery({
+  const { data: configs, isLoading } = useQuery({
     queryKey: ['honor-roll-configs'],
     queryFn: () => apiClient.grading.listHonorRollConfigs(),
   });
+
+  const { data: levels } = useQuery({
+    queryKey: ['education-levels', 'honor-roll'],
+    queryFn: () => apiClient.academic.listEducationLevels(),
+  });
+  const levelNames = new Map((levels?.data ?? []).map((l) => [l.id, l.name]));
 
   return (
     <div className="space-y-6">
@@ -28,22 +35,26 @@ export default function HonorRollPage() {
             </tr>
           </thead>
           <tbody>
-            {configs?.data?.map((hrc) => (
-              <tr key={hrc.id} className="border-b last:border-0 hover:bg-muted/50">
-                <td className="px-4 py-3 font-medium">{hrc.educationLevelId}</td>
-                <td className="px-4 py-3">{hrc.withHonorsThreshold}</td>
-                <td className="px-4 py-3">{hrc.withHighHonorsThreshold}</td>
-                <td className="px-4 py-3">{hrc.withHighestHonorsThreshold}</td>
-                <td className="px-4 py-3">
-                  {hrc.isActive ? (
-                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">Active</span>
-                  ) : (
-                    <span className="text-muted-foreground">Inactive</span>
-                  )}
-                </td>
-              </tr>
-            )) ?? (
+            {isLoading ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+            ) : (configs?.data ?? []).length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No honor roll configs found</td></tr>
+            ) : (
+              configs?.data?.map((hrc) => (
+                <tr key={hrc.id} className="border-b last:border-0 hover:bg-muted/50">
+                  <td className="px-4 py-3 font-medium">{levelNames.get(hrc.educationLevelId) ?? hrc.educationLevelId}</td>
+                  <td className="px-4 py-3">{hrc.withHonorsThreshold}</td>
+                  <td className="px-4 py-3">{hrc.withHighHonorsThreshold}</td>
+                  <td className="px-4 py-3">{hrc.withHighestHonorsThreshold}</td>
+                  <td className="px-4 py-3">
+                    {hrc.isActive ? (
+                      <Badge variant="success">Active</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Inactive</span>
+                    )}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 @ApiTags('Workflow Engine')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/workflow')
+@Controller('workflow')
 export class WorkflowController {
   constructor(private workflowService: WorkflowService) {}
 

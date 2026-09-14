@@ -5,28 +5,28 @@ export class StudentTransfer {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   studentId: string;
 
-  @Column()
+  @Column('uuid')
   fromBranchId: string;
 
-  @Column()
+  @Column('uuid')
   toBranchId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   fromSchoolYearId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   toSchoolYearId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   fromGradeLevelId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   toGradeLevelId: string;
 
   @Column({ nullable: true })

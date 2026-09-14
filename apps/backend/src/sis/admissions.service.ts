@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Applicant } from './applicant.entity';
 import { ApplicantStageConfig } from './applicant-stage-config.entity';
 import { ApplicantStageTransition } from './applicant-stage-transition.entity';
 import { SectionAssignmentRule } from './section-assignment-rule.entity';
@@ -10,6 +11,7 @@ import { Enrollment } from './enrollment.entity';
 @Injectable()
 export class AdmissionsService {
   constructor(
+    @InjectRepository(Applicant) private applicantsRepo: Repository<Applicant>,
     @InjectRepository(ApplicantStageConfig) private stagesRepo: Repository<ApplicantStageConfig>,
     @InjectRepository(ApplicantStageTransition) private transitionsRepo: Repository<ApplicantStageTransition>,
     @InjectRepository(SectionAssignmentRule) private rulesRepo: Repository<SectionAssignmentRule>,
@@ -46,6 +48,124 @@ export class AdmissionsService {
     return this.transitionsRepo.save(transition);
   }
 
+  // === Applicants (G-23) ===
+  async createApplicant(data: Partial<Applicant>) {
+    if (!data.firstName || !data.lastName) {
+      throw new BadRequestException('firstName and lastName are required');
+    }
+
+    // Resolve default stage if none provided
+    let stageId = data.stageId;
+    let status = data.status ?? 'new';
+    if (!stageId) {
+      const defaultStage = await this.stagesRepo.findOne({
+        where: { tenantId: data.tenantId, isDefault: true, isActive: true },
+      });
+      stageId = defaultStage?.id ?? null;
+      if (defaultStage) status = defaultStage.stageCode;
+    }
+
+    const applicant = this.applicantsRepo.create({ ...data, stageId, status });
+    return this.applicantsRepo.save(applicant);
+  }
+
+  async getApplicants(tenantId: string, status?: string) {
+    const where: any = { tenantId };
+    if (status) where.status = status;
+    return this.applicantsRepo.find({ where, order: { createdAt: 'DESC' } });
+  }
+
+  async findOneApplicant(id: string, tenantId: string) {
+    const applicant = await this.applicantsRepo.findOne({ where: { id, tenantId } });
+    if (!applicant) throw new NotFoundException(`Applicant ${id} not found`);
+    return applicant;
+  }
+
+  async updateApplicant(id: string, tenantId: string, data: Partial<Applicant>) {
+    const applicant = await this.findOneApplicant(id, tenantId);
+    Object.assign(applicant, data);
+    return this.applicantsRepo.save(applicant);
+  }
+
+  /**
+   * Move an applicant to another pipeline stage (Kanban drag).
+   * Validates the stage belongs to the tenant and syncs the status mirror.
+   */
+  async moveApplicantToStage(id: string, tenantId: string, stageId: string) {
+    const applicant = await this.findOneApplicant(id, tenantId);
+    const stage = await this.stagesRepo.findOne({ where: { id: stageId, tenantId } });
+    if (!stage) throw new NotFoundException(`Stage ${stageId} not found`);
+
+    applicant.stageId = stage.id;
+    applicant.status = stage.stageCode;
+    return this.applicantsRepo.save(applicant);
+  }
+
+  /**
+   * Convert an accepted applicant into a real Student (G-23 completion).
+   * Applicant is marked 'enrolled' and linked via metadata for traceability.
+   */
+  async convertApplicantToStudent(id: string, tenantId: string) {
+    const applicant = await this.findOneApplicant(id, tenantId);
+
+    // Guard against double conversion
+    const existing = await this.studentsRepo.findOne({
+      where: { tenantId, firstName: applicant.firstName, lastName: applicant.lastName },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        `A student named ${applicant.firstName} ${applicant.lastName} already exists (id ${existing.id})`,
+      );
+    }
+
+    const student = this.studentsRepo.create({
+      tenantId,
+      branchId: applicant.branchId ?? undefined,
+      firstName: applicant.firstName,
+      middleName: applicant.middleName ?? undefined,
+      lastName: applicant.lastName,
+      birthDate: applicant.birthDate ?? undefined,
+      sex: applicant.gender ?? undefined,
+      address: applicant.address ?? undefined,
+      status: 'active',
+      customFields: { convertedFromApplicantId: applicant.id },
+    });
+    const saved = await this.studentsRepo.save(student);
+
+    // Move applicant to the terminal 'enrolled' stage if configured
+    const enrolledStage = await this.stagesRepo.findOne({
+      where: { tenantId, stageCode: 'enrolled', isActive: true },
+    });
+    if (enrolledStage) {
+      applicant.stageId = enrolledStage.id;
+      applicant.status = enrolledStage.stageCode;
+      applicant.notes = [applicant.notes, `Converted to student ${saved.id}`].filter(Boolean).join(' | ');
+      await this.applicantsRepo.save(applicant);
+    }
+
+    return saved;
+  }
+
+  // === Pipeline Kanban ===
+  async getApplicantsByStage(tenantId: string) {
+    const stages = await this.getStageConfigs(tenantId);
+    const applicants = await this.applicantsRepo.find({ where: { tenantId }, order: { createdAt: 'DESC' } });
+
+    const pipeline: Record<string, Applicant[]> = {};
+    for (const stage of stages) pipeline[stage.stageCode] = [];
+
+    const fallbackStage = stages.find((s) => s.isDefault) ?? stages[0];
+    for (const applicant of applicants) {
+      const stage =
+        stages.find((s) => s.id === applicant.stageId) ??
+        stages.find((s) => s.stageCode === applicant.status) ??
+        fallbackStage;
+      if (stage && pipeline[stage.stageCode]) pipeline[stage.stageCode].push(applicant);
+    }
+
+    return { stages, pipeline };
+  }
+
   // === Section Assignment Rules ===
   async getSectionRules(tenantId: string, sectionId?: string) {
     const where: any = { tenantId };
@@ -65,43 +185,18 @@ export class AdmissionsService {
     return this.rulesRepo.save(rule);
   }
 
-  // === Applicant Pipeline (Kanban) ===
-  async getApplicantsByStage(tenantId: string) {
-    const stages = await this.getStageConfigs(tenantId);
-    const students = await this.studentsRepo.find({ where: { tenantId } });
-
-    // Group students by their enrollment status
-    const pipeline: Record<string, Student[]> = {};
-    for (const stage of stages) {
-      pipeline[stage.stageCode] = [];
-    }
-
-    // In a real implementation, applicants would have a current_stage_id field
-    // For now, use enrollment status as a proxy
-    for (const student of students) {
-      const stageCode = student.status === 'active' ? 'enrolled' : 'inquiry';
-      if (pipeline[stageCode]) {
-        pipeline[stageCode].push(student);
-      }
-    }
-
-    return { stages, pipeline };
-  }
-
   // === Bulk Import ===
   async bulkImportStudents(tenantId: string, records: Partial<Student>[]) {
     const results = { created: 0, skipped: 0, errors: [] as any[] };
 
     for (const record of records) {
       try {
-        // Validate LRN if provided
         if (record.lrn && !/^\d{12}$/.test(record.lrn)) {
           results.errors.push({ record, error: 'Invalid LRN format' });
           results.skipped++;
           continue;
         }
 
-        // Check for duplicate LRN
         if (record.lrn) {
           const existing = await this.studentsRepo.findOne({ where: { lrn: record.lrn, tenantId } });
           if (existing) {

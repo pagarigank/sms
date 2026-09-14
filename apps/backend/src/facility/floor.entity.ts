@@ -7,7 +7,7 @@ export class Floor {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
   @Column()

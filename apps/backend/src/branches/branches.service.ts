@@ -28,6 +28,15 @@ export class BranchesService {
     return this.branchesRepository.save(branch);
   }
 
+  async update(id: string, data: Partial<Branch>): Promise<Branch> {
+    const branch = await this.branchesRepository.findOneBy({ id });
+    if (!branch) {
+      throw new NotFoundException(`Branch with ID ${id} not found`);
+    }
+    Object.assign(branch, data);
+    return this.branchesRepository.save(branch);
+  }
+
   async remove(id: string): Promise<void> {
     const result = await this.branchesRepository.delete(id);
     if (result.affected === 0) {

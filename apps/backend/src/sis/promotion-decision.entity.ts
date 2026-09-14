@@ -5,25 +5,25 @@ export class PromotionDecision {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   studentId: string;
 
-  @Column()
+  @Column('uuid')
   enrollmentId: string;
 
-  @Column()
+  @Column('uuid')
   schoolYearId: string;
 
-  @Column()
+  @Column('uuid')
   gradeLevelId: string;
 
   @Column()
   decision: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   targetGradeLevelId: string;
 
   @Column({ nullable: true })

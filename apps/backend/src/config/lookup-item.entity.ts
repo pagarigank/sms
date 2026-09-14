@@ -5,10 +5,10 @@ export class LookupItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   lookupListId: string;
 
   @Column()

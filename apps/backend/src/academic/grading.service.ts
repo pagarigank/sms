@@ -28,6 +28,21 @@ export class GradingService {
     return gs;
   }
 
+  /**
+   * Partial update scoped to the caller's tenant (id is a global UUID, so the
+   * tenant guard prevents cross-tenant writes via the API).
+   */
+  async updateGradingSystem(id: string, tenantId: string, data: Partial<GradingSystem>) {
+    const gs = await this.gradingSystemsRepo.findOneBy({ id, tenantId });
+    if (!gs) throw new NotFoundException(`Grading system ${id} not found`);
+    // config merges rather than replaces, so partial config updates don't
+    // clobber unrelated keys (e.g. gradeScale vs future display options).
+    const { config, ...rest } = data;
+    Object.assign(gs, rest);
+    if (config) gs.config = { ...(gs.config ?? {}), ...config };
+    return this.gradingSystemsRepo.save(gs);
+  }
+
   async createGradingSystem(data: Partial<GradingSystem>) {
     // Enforce resolution rule: only one active per (tenant, education_level, school_year, branch)
     if (data.isActive !== false) {

@@ -5,25 +5,25 @@ export class CurriculumSubject {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   curriculumId: string;
 
-  @Column()
+  @Column('uuid')
   subjectId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   termId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   prerequisiteSubjectId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   coRequisiteSubjectId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   order: number;
 
   @Column({ nullable: true })

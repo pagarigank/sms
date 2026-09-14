@@ -6,7 +6,7 @@ export class Strand {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
   @Column({ nullable: true })

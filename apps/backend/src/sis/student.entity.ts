@@ -1,14 +1,15 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { EncryptedField } from '../common/encrypted-field';
 
 @Entity({ name: 'students' })
 export class Student {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   branchId: string;
 
   @Column({ nullable: true, unique: true })
@@ -53,7 +54,7 @@ export class Student {
   @Column({ nullable: true })
   govIdType: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, transformer: EncryptedField.transformer() })
   govIdNumber: string;
 
   @Column({ default: 'active' })

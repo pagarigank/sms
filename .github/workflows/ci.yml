@@ -37,6 +37,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: cd apps/backend && npx tsc --noEmit
 
+  contract-audit:
+    name: Contract Audit (portal→client→backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Pure Node script (fs + regex only) — no dependency install needed.
+      # Fails the build when a portal calls an api-client method that doesn't
+      # exist, or when an api-client path has no matching backend route.
+      - run: node scripts/contract-audit.js
+
   build:
     name: Build
     runs-on: ubuntu-latest

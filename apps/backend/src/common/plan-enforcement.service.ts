@@ -21,10 +21,10 @@ export class PlanEnforcementService {
     const plan = await this.plansRepo.findOne({ where: { id: tenant.planId } });
     if (!plan) throw new BadRequestException('Plan not found');
 
-    // Count current branches (this is simplified; in production, use a counter)
+    // Count current branches
     const branchCount = await this.tenantsRepo
       .createQueryBuilder('t')
-      .innerJoin('branches', 'b', 'b.tenant_id = t.id')
+      .innerJoin('branches', 'b', 'b."tenantId" = t.id')
       .where('t.id = :tenantId', { tenantId })
       .getCount();
 
@@ -47,7 +47,7 @@ export class PlanEnforcementService {
     // Count current students
     const studentCount = await this.tenantsRepo
       .createQueryBuilder('t')
-      .innerJoin('enrollments', 'e', 'e.tenant_id = t.id')
+      .innerJoin('enrollments', 'e', 'e."tenantId" = t.id')
       .where('t.id = :tenantId', { tenantId })
       .getCount();
 

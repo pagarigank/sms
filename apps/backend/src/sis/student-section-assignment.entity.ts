@@ -5,16 +5,16 @@ export class StudentSectionAssignment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   enrollmentId: string;
 
-  @Column()
+  @Column('uuid')
   sectionId: string;
 
-  @Column()
+  @Column('uuid')
   studentId: string;
 
   @Column({ default: true })

@@ -5,10 +5,10 @@ export class WorkflowInstance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   workflowDefinitionId: string;
 
   @Column()

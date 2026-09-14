@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like, In } from 'typeorm';
 import { Department } from './department.entity';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 
@@ -11,12 +11,19 @@ export class DepartmentsService {
     private departmentsRepository: Repository<Department>,
   ) {}
 
+  findAllFiltered(tenantId?: string, branchId?: string): Promise<Department[]> {
+    const where: any = {};
+    if (tenantId) where.tenantId = tenantId;
+    if (branchId) where.branchId = branchId;
+    return this.departmentsRepository.find({ where, relations: ['branch'] });
+  }
+
   findAll(): Promise<Department[]> {
-    return this.departmentsRepository.find();
+    return this.departmentsRepository.find({ relations: ['branch'] });
   }
 
   async findOne(id: string): Promise<Department> {
-    const dept = await this.departmentsRepository.findOneBy({ id });
+    const dept = await this.departmentsRepository.findOne({ where: { id }, relations: ['branch'] });
     if (!dept) {
       throw new NotFoundException(`Department with ID ${id} not found`);
     }
@@ -25,6 +32,22 @@ export class DepartmentsService {
 
   create(createDepartmentDto: CreateDepartmentDto): Promise<Department> {
     const dept = this.departmentsRepository.create(createDepartmentDto);
+    return this.departmentsRepository.save(dept);
+  }
+
+  async update(id: string, data: Partial<CreateDepartmentDto>): Promise<Department> {
+    const dept = await this.departmentsRepository.findOneBy({ id });
+    if (!dept) throw new NotFoundException(`Department with ID ${id} not found`);
+    Object.assign(dept, data);
+    return this.departmentsRepository.save(dept);
+  }
+
+  async setDefault(id: string): Promise<Department> {
+    const dept = await this.departmentsRepository.findOne({ where: { id }, relations: ['branch'] });
+    if (!dept) throw new NotFoundException(`Department with ID ${id} not found`);
+    // Clear default flag on all departments in the same branch
+    await this.departmentsRepository.update({ branchId: dept.branchId }, { isDefault: false });
+    dept.isDefault = true;
     return this.departmentsRepository.save(dept);
   }
 

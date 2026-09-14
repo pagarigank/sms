@@ -5,13 +5,13 @@ export class WorkflowApproval {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   instanceId: string;
 
-  @Column()
+  @Column('uuid')
   approverUserId: string;
 
   @Column({ type: 'int' })

@@ -1,27 +1,30 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { DataSource } from 'typeorm';
+import * as crypto from 'crypto';
+import { runWithTenantContext } from './tenant-context';
 
 @Injectable()
 export class TenantContextMiddleware implements NestMiddleware {
-  constructor(private dataSource: DataSource) {}
+  use(req: Request, res: Response, next: NextFunction) {
+    // 1) Explicit override (impersonation flow sets req.tenantId after
+    //    JWT verification), 2) JWT payload (set by JwtAuthGuard), 3) header
+    //    (trusted only for pre-auth public endpoints like tenant lookup).
+    const headerTenantId = req.headers['x-tenant-id'] as string | undefined;
+    const jwtTenantId = (req as any).user?.tenantId as string | undefined;
+    const overrideTenantId = (req as any).tenantId as string | undefined;
+    const tenantId = overrideTenantId || jwtTenantId || headerTenantId;
 
-  async use(req: Request, res: Response, next: NextFunction) {
-    // Extract tenant_id from JWT token or header
-    const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'] as string;
-
-    if (tenantId) {
-      // Set the Postgres session variable for Row-Level Security
-      const queryRunner = this.dataSource.createQueryRunner();
-      try {
-        await queryRunner.query(`SET LOCAL app.current_tenant_id = '${tenantId}'`);
-        // Store tenantId on request for downstream use
-        (req as any).tenantId = tenantId;
-      } finally {
-        await queryRunner.release();
-      }
+    const platformAdmin = Boolean((req as any).user?.platformAdmin);
+    if (tenantId && typeof tenantId === 'string' && /^[0-9a-fA-F-]{36}$/.test(tenantId)) {
+      (req as any).tenantId = tenantId;
+      // Run the rest of the request (all downstream TypeORM queries) inside
+      // the tenant context; TenantAwareDataSource reads it per connection.
+      // Platform admins bypass RLS via the app.is_platform_admin GUC.
+      return runWithTenantContext({ tenantId, platformAdmin }, () => next());
     }
-
-    next();
+    // No tenant context (platform admin viewing all, or unauthenticated public
+    // endpoint). Platform admin flag still propagates to GUC so RLS policies
+    // that check is_platform_admin can allow cross-tenant access.
+    return runWithTenantContext({ tenantId: '' as any, platformAdmin }, () => next());
   }
 }

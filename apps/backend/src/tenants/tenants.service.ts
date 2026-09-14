@@ -28,6 +28,24 @@ export class TenantsService {
     return this.tenantsRepository.save(tenant);
   }
 
+  async update(id: string, data: Partial<Tenant>): Promise<Tenant> {
+    const tenant = await this.tenantsRepository.findOneBy({ id });
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${id} not found`);
+    }
+    Object.assign(tenant, data);
+    return this.tenantsRepository.save(tenant);
+  }
+
+  async setStatus(id: string, status: string): Promise<Tenant> {
+    const tenant = await this.tenantsRepository.findOneBy({ id });
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${id} not found`);
+    }
+    tenant.status = status;
+    return this.tenantsRepository.save(tenant);
+  }
+
   async remove(id: string): Promise<void> {
     const result = await this.tenantsRepository.delete(id);
     if (result.affected === 0) {

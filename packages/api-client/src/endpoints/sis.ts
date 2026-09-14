@@ -3,6 +3,11 @@ import type { ApiClient } from '../client';
 export function sisEndpoints(client: ApiClient) {
   return {
     // Students
+    // Guardian portal: children of the authenticated guardian user
+    // (JWT-derived server-side; no tenantId param needed).
+    listMyChildren: () =>
+      client.get('/api/v1/sis/students/my-children'),
+
     listStudents: (params: { tenantId: string; branchId?: string }) =>
       client.get('/api/v1/sis/students', params as any),
 

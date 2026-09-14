@@ -5,13 +5,13 @@ export class ApplicantStageTransition {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   fromStageId: string;
 
-  @Column()
+  @Column('uuid')
   toStageId: string;
 
   @Column({ nullable: true })
@@ -20,7 +20,7 @@ export class ApplicantStageTransition {
   @Column({ nullable: true })
   autoTransition: boolean;
 
-  @Column({ nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   conditions: Record<string, any>;
 
   @Column({ default: true })

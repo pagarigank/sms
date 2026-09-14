@@ -3,9 +3,38 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
+import { useLookupValues } from '@/lib/use-lookup';
+import { Plus } from 'lucide-react';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useToast,
+  // ColumnDef from @sms/ui so it matches the DataTable prop type
+  // (the workspace has duplicate react-table majors; this avoids variance errors).
+  type ColumnDef,
+} from '@sms/ui';
+
+const ROOM_TYPES_FALLBACK = ['classroom', 'laboratory', 'office', 'clinic', 'cashier', 'canteen', 'library', 'gym', 'stockroom'];
 
 export default function RoomsPage() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ floorId: '', branchId: '', name: '', roomType: 'classroom', capacity: '' });
 
@@ -14,98 +43,160 @@ export default function RoomsPage() {
     queryFn: () => apiClient.facility.listRooms(),
   });
 
+  // Room types are a tenant-configurable Lookup List (spec §8) — not a hardcode.
+  const roomTypes = useLookupValues('room_type', ROOM_TYPES_FALLBACK);
+
   const createMutation = useMutation({
-    mutationFn: (data: typeof form) => apiClient.facility.createRoom({
-      ...data,
-      capacity: data.capacity ? parseInt(data.capacity) : undefined,
-    }),
+    mutationFn: (data: typeof form) =>
+      apiClient.facility.createRoom({
+        ...data,
+        capacity: data.capacity ? parseInt(data.capacity) : undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       setShowCreate(false);
       setForm({ floorId: '', branchId: '', name: '', roomType: 'classroom', capacity: '' });
+      toast({ title: 'Room created', description: 'The room has been added to the facility registry.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
-  const roomTypes = ['classroom', 'laboratory', 'office', 'clinic', 'cashier', 'canteen', 'library', 'gym', 'stockroom'];
+  const columns: ColumnDef<any, any>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <span className="font-medium text-[hsl(var(--foreground))]">{row.original.name}</span>
+      ),
+    },
+    {
+      accessorKey: 'roomType',
+      header: 'Type',
+      cell: ({ row }) => (
+        <span className="text-[hsl(var(--ink-200))] capitalize">{row.original.roomType}</span>
+      ),
+    },
+    {
+      accessorKey: 'capacity',
+      header: 'Capacity',
+      cell: ({ row }) => (
+        <span className="text-[hsl(var(--ink-200))]">{row.original.capacity ?? '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={statusToVariant(row.original.status)}>
+          <StatusDot />
+          {row.original.status
+            ? row.original.status.charAt(0).toUpperCase() + row.original.status.slice(1)
+            : 'Unknown'}
+        </Badge>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Rooms</h1>
           <p className="text-muted-foreground">Manage rooms across all buildings</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-          Add Room
-        </button>
+        <Button onClick={() => setShowCreate(true)}>
+          <Plus className="h-4 w-4" /> Add Room
+        </Button>
       </div>
 
-      {showCreate && (
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Create Room</h2>
-          <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }} className="mt-4 space-y-4">
+      <DataTable
+        columns={columns}
+        data={(rooms?.data as any[]) ?? []}
+        isLoading={isLoading}
+        emptyMessage="No rooms found."
+        emptyDescription="Add your first room to start mapping the campus."
+        emptyAction={
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4" /> Add Room
+          </Button>
+        }
+      />
+
+      {/* Create Room dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Room</DialogTitle>
+            <DialogDescription>Register a new room under a floor.</DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createMutation.mutate(form);
+            }}
+            className="space-y-4"
+          >
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium">Name</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2" required />
+                <Label htmlFor="room-name">Name</Label>
+                <Input
+                  id="room-name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="mt-1"
+                  required
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium">Room Type</label>
-                <select value={form.roomType} onChange={(e) => setForm({ ...form, roomType: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2">
-                  {roomTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <Label>Room Type</Label>
+                <Select value={form.roomType} onValueChange={(v) => setForm({ ...form, roomType: v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roomTypes.map((t) => (
+                      <SelectItem key={t} value={t} className="capitalize">
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium">Floor ID</label>
-                <input value={form.floorId} onChange={(e) => setForm({ ...form, floorId: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2" required />
+                <Label htmlFor="room-floor">Floor ID</Label>
+                <Input
+                  id="room-floor"
+                  value={form.floorId}
+                  onChange={(e) => setForm({ ...form, floorId: e.target.value })}
+                  className="mt-1"
+                  required
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium">Capacity</label>
-                <input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2" />
+                <Label htmlFor="room-capacity">Capacity</Label>
+                <Input
+                  id="room-capacity"
+                  type="number"
+                  min={0}
+                  value={form.capacity}
+                  onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                  className="mt-1"
+                />
               </div>
             </div>
-            <div className="flex space-x-2">
-              <button type="submit" disabled={createMutation.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending}>
                 {createMutation.isPending ? 'Creating...' : 'Create'}
-              </button>
-              <button type="button" onClick={() => setShowCreate(false)} className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">Cancel</button>
-            </div>
+              </Button>
+            </DialogFooter>
           </form>
-        </div>
-      )}
-
-      <div className="rounded-lg border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium">Name</th>
-              <th className="px-4 py-3 text-left font-medium">Type</th>
-              <th className="px-4 py-3 text-left font-medium">Capacity</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
-            ) : rooms?.data?.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No rooms found</td></tr>
-            ) : (
-              rooms?.data?.map((r) => (
-                <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
-                  <td className="px-4 py-3 font-medium">{r.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.roomType}</td>
-                  <td className="px-4 py-3">{r.capacity}</td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${
-                      r.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}>{r.status}</span>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

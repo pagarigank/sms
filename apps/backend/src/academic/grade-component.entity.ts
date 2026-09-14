@@ -5,10 +5,10 @@ export class GradeComponent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   gradingSystemId: string;
 
   @Column()

@@ -5,16 +5,16 @@ export class HealthRecord {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   studentId: string;
 
   @Column()
   recordType: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   title: string;
 
   @Column({ nullable: true })

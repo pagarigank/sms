@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTenantStore } from '@/lib/store';
 import { apiClient } from '@/lib/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
+import { Building2, GitBranch } from 'lucide-react';
 
 export function TenantSwitcher() {
-  const { currentTenantId, currentBranchId, setCurrentTenant, setCurrentBranch } = useTenantStore();
+  const currentTenantId = useTenantStore((s) => s.currentTenantId);
+  const currentBranchId = useTenantStore((s) => s.currentBranchId);
+  const setCurrentTenant = useTenantStore((s) => s.setCurrentTenant);
+  const setCurrentBranch = useTenantStore((s) => s.setCurrentBranch);
 
   const { data: tenantsRes } = useQuery({
     queryKey: ['tenants'],
@@ -19,8 +24,12 @@ export function TenantSwitcher() {
     enabled: !!currentTenantId,
   });
 
-  const tenants = tenantsRes?.data ?? [];
-  const branches = branchesRes?.data ?? [];
+  const tenants = Array.isArray(tenantsRes?.data)
+    ? (tenantsRes.data as { id: string; name: string }[])
+    : ((tenantsRes?.data as unknown as { data?: { id: string; name: string }[] } | undefined)?.data ?? []);
+  const branches = Array.isArray(branchesRes?.data)
+    ? (branchesRes.data as { id: string; name: string }[])
+    : ((branchesRes?.data as unknown as { data?: { id: string; name: string }[] } | undefined)?.data ?? []);
 
   // Auto-select first tenant if none selected
   useEffect(() => {
@@ -37,38 +46,46 @@ export function TenantSwitcher() {
   }, [currentBranchId, branches, setCurrentBranch]);
 
   return (
-    <div className="flex items-center space-x-4">
-      {/* Tenant Selector */}
-      <div>
-        <label className="text-xs text-muted-foreground">Tenant</label>
-        <select
-          value={currentTenantId || ''}
-          onChange={(e) => {
-            setCurrentTenant(e.target.value || null);
-            setCurrentBranch(null);
-          }}
-          className="block w-full rounded-md border px-2 py-1 text-sm"
+    <div className="flex items-center gap-2">
+      <Select
+        value={currentTenantId ?? undefined}
+        onValueChange={(v) => {
+          setCurrentTenant(v);
+          setCurrentBranch(null);
+        }}
+      >
+        <SelectTrigger
+          className="h-9 w-44 gap-1.5 rounded-lg border-[hsl(var(--border))] bg-[hsl(var(--surface-muted))] text-sm"
+          aria-label="Select tenant"
         >
+          <Building2 className="h-4 w-4 shrink-0 text-[hsl(var(--ink-300))]" />
+          <SelectValue placeholder="Tenant" />
+        </SelectTrigger>
+        <SelectContent>
           {tenants.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
+            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
           ))}
-        </select>
-      </div>
+        </SelectContent>
+      </Select>
 
-      {/* Branch Selector */}
-      <div>
-        <label className="text-xs text-muted-foreground">Branch</label>
-        <select
-          value={currentBranchId || ''}
-          onChange={(e) => setCurrentBranch(e.target.value || null)}
-          className="block w-full rounded-md border px-2 py-1 text-sm"
+      <Select
+        value={currentBranchId ?? 'all-branches'}
+        onValueChange={(v) => setCurrentBranch(v === 'all-branches' ? null : v)}
+      >
+        <SelectTrigger
+          className="h-9 w-44 gap-1.5 rounded-lg border-[hsl(var(--border))] bg-[hsl(var(--surface-muted))] text-sm"
+          aria-label="Select branch"
         >
-          <option value="">All Branches</option>
+          <GitBranch className="h-4 w-4 shrink-0 text-[hsl(var(--ink-300))]" />
+          <SelectValue placeholder="Branch" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all-branches">All Branches</SelectItem>
           {branches.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
+            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
           ))}
-        </select>
-      </div>
+        </SelectContent>
+      </Select>
     </div>
   );
 }

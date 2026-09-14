@@ -12,10 +12,10 @@ export default function DashboardPage() {
 
   const tenants = tenantsRes?.data ?? [];
   const stats = [
-    { name: 'Total Tenants', value: tenants.length, icon: Building2, color: 'bg-blue-500' },
-    { name: 'Active Tenants', value: tenants.filter((t) => t.status === 'active').length, icon: Activity, color: 'bg-green-500' },
-    { name: 'Platform Users', value: '—', icon: Users, color: 'bg-purple-500' },
-    { name: 'Total Branches', value: '—', icon: GraduationCap, color: 'bg-orange-500' },
+    { name: 'Total Tenants', value: tenants.length, icon: Building2, color: 'var(--accent)' },
+    { name: 'Active Tenants', value: tenants.filter((t) => t.status === 'active').length, icon: Activity, color: 'var(--status-success-ink)' },
+    { name: 'Platform Users', value: '—', icon: Users, color: 'var(--secondary)' },
+    { name: 'Total Branches', value: '—', icon: GraduationCap, color: 'var(--status-info-ink)' },
   ];
 
   return (
@@ -30,8 +30,8 @@ export default function DashboardPage() {
           <div key={stat.name} className="rounded-lg border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
-              <div className={`rounded-full p-2 ${stat.color}`}>
-                <stat.icon className="h-4 w-4 text-white" />
+              <div className="rounded-full p-2" style={{ backgroundColor: stat.color }}>
+                <stat.icon className="h-4 w-4" style={{ color: 'var(--ink-inverse)' }} />
               </div>
             </div>
             <p className="mt-2 text-3xl font-bold">{stat.value}</p>
@@ -48,11 +48,11 @@ export default function DashboardPage() {
                 <p className="font-medium">{tenant.name}</p>
                 <p className="text-sm text-muted-foreground">{tenant.slug}</p>
               </div>
-              <span className={`rounded-full px-2 py-1 text-xs font-medium ${
-                tenant.status === 'active' ? 'bg-green-100 text-green-800' :
-                tenant.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
+              <span className={`rounded-full px-2 py-1 text-xs font-medium
+                ${tenant.status === 'active' ? 'bg-[hsl(var(--status-success-surface))] text-[hsl(var(--status-success-ink))]' : ''}
+                ${tenant.status === 'suspended' ? 'bg-[hsl(var(--status-warning-surface))] text-[hsl(var(--status-warning-ink))]' : ''}
+                ${tenant.status !== 'active' && tenant.status !== 'suspended' ? 'bg-[hsl(var(--status-neutral-surface))] text-[hsl(var(--status-neutral-ink))]' : ''}
+              `}>
                 {tenant.status}
               </span>
             </div>

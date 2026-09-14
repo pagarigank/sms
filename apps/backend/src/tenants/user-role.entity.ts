@@ -2,21 +2,21 @@ import { Entity, PrimaryColumn, Column, CreateDateColumn } from 'typeorm';
 
 @Entity({ name: 'user_roles' })
 export class UserRole {
-  @PrimaryColumn()
+  @PrimaryColumn('uuid')
   userId: string;
 
-  @PrimaryColumn()
+  @PrimaryColumn('uuid')
   tenantId: string;
 
-  @PrimaryColumn()
+  @PrimaryColumn('uuid')
   roleId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   branchId: string;
 
   @CreateDateColumn()
   grantedAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   grantedBy: string;
 }

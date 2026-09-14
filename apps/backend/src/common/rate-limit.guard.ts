@@ -10,10 +10,18 @@ interface RateLimitEntry {
 export class RateLimitGuard implements CanActivate {
   private store = new Map<string, RateLimitEntry>();
   private readonly WINDOW_MS = 60 * 1000; // 1 minute
-  private readonly MAX_REQUESTS = 100; // per minute per tenant
+  private readonly MAX_REQUESTS = 300; // per minute per tenant
+  private lastPrune = 0;
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+
+    // Liveness probes must never be throttled (they come from the
+    // orchestrator, not a tenant).
+    if (request.path?.includes('/health') || request.url?.includes('/health')) {
+      return true;
+    }
+
     const tenantId = request.user?.tenantId || request.headers['x-tenant-id'] || 'anonymous';
     const key = `${tenantId}:${this.getWindowKey()}`;
 
@@ -26,6 +34,16 @@ export class RateLimitGuard implements CanActivate {
 
     entry.count++;
     this.store.set(key, entry);
+
+    // Prune expired windows periodically so the in-memory store cannot grow
+    // unbounded across tenants (DoS surface).
+    const now = Date.now();
+    if (now - this.lastPrune > this.WINDOW_MS) {
+      this.lastPrune = now;
+      for (const [k, v] of this.store) {
+        if (now > v.resetAt) this.store.delete(k);
+      }
+    }
 
     // Set rate limit headers
     const response = context.switchToHttp().getResponse();

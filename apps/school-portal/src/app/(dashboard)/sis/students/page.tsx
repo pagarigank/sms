@@ -1,20 +1,70 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
-import { UserPlus, Search, Eye, Edit } from 'lucide-react';
+import { UserPlus, Search, Eye, AlertCircle } from 'lucide-react';
+import {
+  Badge,
+  // Import ColumnDef from @sms/ui so it matches the DataTable prop type
+  // (the workspace has duplicate react-table majors; this avoids variance errors).
+  type ColumnDef,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useToast,
+} from '@sms/ui';
 
 export default function StudentsPage() {
   const { currentTenantId, currentBranchId } = useTenantStore();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ firstName: '', middleName: '', lastName: '', birthDate: '', sex: '', lrn: '' });
 
   const { data: students, isLoading } = useQuery({
     queryKey: ['students', currentTenantId, currentBranchId],
     queryFn: () => apiClient.sis.listStudents({ tenantId: currentTenantId!, branchId: currentBranchId ?? undefined }),
     enabled: !!currentTenantId,
+  });
+
+  const createStudent = useMutation({
+    mutationFn: () =>
+      apiClient.sis.createStudent({
+        firstName: form.firstName,
+        middleName: form.middleName || undefined,
+        lastName: form.lastName,
+        birthDate: form.birthDate || undefined,
+        sex: form.sex || undefined,
+        lrn: form.lrn || undefined,
+        status: 'active',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      setShowCreate(false);
+      setForm({ firstName: '', middleName: '', lastName: '', birthDate: '', sex: '', lrn: '' });
+      toast({ title: 'Student created', description: 'The student record has been created.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
   });
 
   const { data: profile } = useQuery({
@@ -27,72 +77,214 @@ export default function StudentsPage() {
     `${s.firstName} ${s.lastName} ${s.lrn} ${s.studentNumber}`.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (isLoading) return <div className="flex items-center justify-center p-8"><div className="animate-spin h-8 w-8 border-b-2 border-primary rounded-full" /></div>;
-
   if (selectedStudent && profile) {
     return <StudentProfile360 profile={profile.data} onBack={() => setSelectedStudent(null)} />;
   }
 
+  const columns: ColumnDef<any, any>[] = [
+    {
+      accessorKey: 'studentNumber',
+      header: 'Student #',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-[hsl(var(--foreground))]">
+          {row.original.studentNumber || '—'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'lastName',
+      header: 'Name',
+      cell: ({ row }) => (
+        <span className="font-medium text-[hsl(var(--foreground))]">
+          {row.original.lastName}, {row.original.firstName} {row.original.middleName || ''}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'lrn',
+      header: 'LRN',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-[hsl(var(--ink-200))]">{row.original.lrn || '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={statusToVariant(row.original.status)}>
+          <StatusDot />
+          {row.original.status ? row.original.status.charAt(0).toUpperCase() + row.original.status.slice(1) : 'Unknown'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setSelectedStudent(row.original.id)}
+            aria-label={`View ${row.original.firstName} ${row.original.lastName}`}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Students</h1>
           <p className="text-muted-foreground">Manage student records and profiles</p>
         </div>
-        <button className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-          <UserPlus className="mr-2 h-4 w-4" /> Add Student
-        </button>
+        <Button onClick={() => setShowCreate(true)}>
+          <UserPlus className="h-4 w-4" />
+          Add Student
+        </Button>
       </div>
 
-      <div className="rounded-lg border bg-card shadow-sm">
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
-              placeholder="Search by name, LRN, or student number..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex h-9 w-full max-w-sm rounded-md border px-3 py-1 text-sm"
-            />
+      <DataTable
+        columns={columns}
+        data={filteredStudents}
+        isLoading={isLoading}
+        toolbar={
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, LRN, or student number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+                aria-label="Search students"
+              />
+            </div>
           </div>
-        </div>
-        <div className="p-4">
-          {filteredStudents.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No students found. Add your first student to get started.</p>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b text-left text-sm text-muted-foreground">
-                  <th className="pb-3 font-medium">Student #</th>
-                  <th className="pb-3 font-medium">Name</th>
-                  <th className="pb-3 font-medium">LRN</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map((student: any) => (
-                  <tr key={student.id} className="border-b last:border-0">
-                    <td className="py-3 font-mono text-sm">{student.studentNumber || '—'}</td>
-                    <td className="py-3 font-medium">{student.lastName}, {student.firstName} {student.middleName || ''}</td>
-                    <td className="py-3 font-mono text-sm">{student.lrn || '—'}</td>
-                    <td className="py-3">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{student.status}</span>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex gap-1">
-                        <button onClick={() => setSelectedStudent(student.id)} className="p-1 hover:bg-muted rounded"><Eye className="h-4 w-4" /></button>
-                        <button className="p-1 hover:bg-muted rounded"><Edit className="h-4 w-4" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+        }
+        onRowClick={(row) => setSelectedStudent(row.id)}
+        emptyMessage="No students found."
+        emptyDescription="Add your first student to get started."
+        emptyAction={
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <UserPlus className="h-4 w-4" />
+            Add Student
+          </Button>
+        }
+      />
+
+      {/* Create Student dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Student</DialogTitle>
+            <DialogDescription>Create a new student record.</DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => { e.preventDefault(); createStudent.mutate(); }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="student-first-name">First Name *</Label>
+                <Input
+                  id="student-first-name"
+                  value={form.firstName}
+                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  className="mt-1"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="student-last-name">Last Name *</Label>
+                <Input
+                  id="student-last-name"
+                  value={form.lastName}
+                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                  className="mt-1"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="student-middle-name">Middle Name</Label>
+                <Input
+                  id="student-middle-name"
+                  value={form.middleName}
+                  onChange={(e) => setForm({ ...form, middleName: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="student-birth-date">Birth Date</Label>
+                <Input
+                  id="student-birth-date"
+                  type="date"
+                  value={form.birthDate}
+                  onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Sex</Label>
+                <Select value={form.sex} onValueChange={(v) => setForm({ ...form, sex: v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="student-lrn">LRN</Label>
+                <Input
+                  id="student-lrn"
+                  value={form.lrn}
+                  onChange={(e) => setForm({ ...form, lrn: e.target.value })}
+                  maxLength={12}
+                  placeholder="12 digits"
+                  className="mt-1"
+                />
+                {form.lrn && !/^\d{12}$/.test(form.lrn) && (
+                  <p className="text-xs mt-1" style={{ color: 'hsl(var(--status-danger-ink))' }}>
+                    LRN must be exactly 12 digits
+                  </p>
+                )}
+              </div>
+            </div>
+            {createStudent.isError && (
+              <div
+                className="flex items-start gap-2 p-3 rounded-lg border"
+                style={{
+                  backgroundColor: 'hsl(var(--status-danger-surface))',
+                  borderColor: 'hsl(var(--status-danger-ink) / 0.2)',
+                  color: 'hsl(var(--status-danger-ink))',
+                }}
+              >
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <p className="text-sm">
+                  {createStudent.error instanceof Error ? createStudent.error.message : 'Failed to create student'}
+                </p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createStudent.isPending}>
+                {createStudent.isPending ? 'Creating...' : 'Create Student'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -114,19 +306,27 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <button onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Back</button>
+        <Button variant="ghost" size="sm" onClick={onBack}>← Back</Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{student.lastName}, {student.firstName}</h1>
-          <p className="text-muted-foreground">LRN: {student.lrn || 'N/A'} | Status: {student.status}</p>
+          <p className="text-muted-foreground">
+            LRN: {student.lrn || 'N/A'} ·{' '}
+            <span className="inline-flex translate-y-0.5">
+              <Badge variant={statusToVariant(student.status)}>
+                <StatusDot />
+                {student.status ? student.status.charAt(0).toUpperCase() + student.status.slice(1) : 'Unknown'}
+              </Badge>
+            </span>
+          </p>
         </div>
       </div>
 
-      <div className="flex gap-1 border-b">
+      <div className="flex gap-1 border-b overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
           >
             {tab.label}
           </button>
@@ -150,7 +350,7 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
               {guardians.map((g: any) => (
                 <div key={g.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div><p className="font-medium">{g.guardianId}</p><p className="text-sm text-muted-foreground">{g.relationship}</p></div>
-                  {g.isPrimary && <span className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium">Primary</span>}
+                  {g.isPrimary && <Badge variant="accent">Primary</Badge>}
                 </div>
               ))}
             </div>
@@ -162,7 +362,10 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
               {enrollments.map((e: any) => (
                 <div key={e.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div><p className="font-medium">School Year: {e.schoolYearId}</p><p className="text-sm text-muted-foreground">Section: {e.sectionId || '—'}</p></div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${e.status === 'enrolled' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{e.status}</span>
+                  <Badge variant={statusToVariant(e.status)}>
+                    <StatusDot />
+                    {e.status}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -173,16 +376,28 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
           holds.length === 0 ? <p className="text-muted-foreground py-4">No active holds</p> : (
             <div className="space-y-2">
               {holds.map((h: any) => (
-                <div key={h.id} className="flex items-center justify-between p-3 border rounded-lg border-red-200 bg-red-50">
-                  <div><p className="font-medium text-red-800">{h.holdType}</p><p className="text-sm">{h.reason || '—'}</p></div>
-                  <div className="text-sm text-muted-foreground">{h.blocksSchedule ? 'Blocks Schedule' : ''} {h.blocksTor ? 'Blocks TOR' : ''}</div>
+                <div
+                  key={h.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                  style={{
+                    backgroundColor: 'hsl(var(--status-danger-surface))',
+                    borderColor: 'hsl(var(--status-danger-ink) / 0.2)',
+                  }}
+                >
+                  <div>
+                    <p className="font-medium" style={{ color: 'hsl(var(--status-danger-ink))' }}>{h.holdType}</p>
+                    <p className="text-sm" style={{ color: 'hsl(var(--status-danger-ink))', opacity: 0.85 }}>{h.reason || '—'}</p>
+                  </div>
+                  <div className="text-sm" style={{ color: 'hsl(var(--status-danger-ink))', opacity: 0.75 }}>
+                    {h.blocksSchedule ? 'Blocks Schedule' : ''} {h.blocksTor ? 'Blocks TOR' : ''}
+                  </div>
                 </div>
               ))}
             </div>
           )
         )}
         {activeTab === 'health' && <p className="text-muted-foreground py-4">{healthRecords.length === 0 ? 'No health records' : `${healthRecords.length} records`}</p>}
-        {activeTab === 'discipline' && <p className="text-muted-foreground py-4">No incidents recorded</p>}
+        {activeTab === 'discipline' && <p className="text-muted-foreground py-4">{incidents.length === 0 ? 'No incidents recorded' : `${incidents.length} incidents`}</p>}
       </div>
     </div>
   );

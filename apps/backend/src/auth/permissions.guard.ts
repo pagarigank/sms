@@ -39,11 +39,15 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user;
     if (!user) throw new ForbiddenException('Not authenticated');
 
-    const tenantId = user.tenantId;
+    const jwtTenantId = user.tenantId;
+    const isPlatformAdmin = Boolean(user.platformAdmin);
 
-    // Get user's roles
+    // Platform admins: search across all tenants + system roles (tenantId = 000...000)
+    // Regular users: only their own tenant's roles.
     const userRoles = await this.userRolesRepo.find({
-      where: { userId: user.sub, tenantId },
+      where: isPlatformAdmin
+        ? { userId: user.sub }
+        : { userId: user.sub, tenantId: jwtTenantId },
     });
     if (userRoles.length === 0) throw new ForbiddenException('No roles assigned');
 

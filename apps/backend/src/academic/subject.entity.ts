@@ -5,7 +5,7 @@ export class Subject {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
   @Column()
@@ -14,7 +14,7 @@ export class Subject {
   @Column()
   title: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   description: string;
 
   @Column({ type: 'decimal', precision: 4, scale: 1, nullable: true })

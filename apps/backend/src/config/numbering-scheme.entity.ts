@@ -5,10 +5,10 @@ export class NumberingScheme {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   branchId: string;
 
   @Column()

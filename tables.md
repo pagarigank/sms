@@ -1,10 +1,12 @@
 # TABLES.md — Field-Level Schema Reference
 ### School Management System (SMS) — Every table, every field, every constraint
-**Version:** 1.1 (2026-09-04 gap-reviewed + corrected)
+**Version:** 1.2 (2026-09-06 Round-2 implementation-audit review)
 
 **Companion to:** `spec.md` (requirements), `architecture.md` (DDL), `todo.md` (build plan)
 
-**Convention:** Every tenant-scoped table carries `tenant_id UUID NOT NULL` and a Row-Level Security policy. Every table gets a composite index on `(tenant_id, ...)` on creation. Fields marked `*` are added or corrected beyond the base DDL in `architecture.md` §8. Tables marked **[NEW]** are added from the 2026-09-04 cross-file gap review (see `todo.md` Appendix B). RLS policies are noted per table; the base pattern for every tenant-scoped table is:
+**Round-2 changelog (v1.2):** gaps G-20…G-29 raised in `todo2.md` "Round-2 Gaps" — added `applicants` + `idempotency_keys` tables, canonical permission catalog, BIR-mandatory OR fields, users/branches/tenants field parity, and entity-drift reconciliation notes ([G-21]/[G-22]/[G-29]) for billing, cashiering, attendance, grading, and reporting.
+
+**Convention:** Every tenant-scoped table carries `tenant_id UUID NOT NULL` and a Row-Level Security policy. Every table gets a composite index on `(tenant_id, ...)` on creation. Fields marked `*` are added or corrected beyond the base DDL in `architecture.md` §8. Tables marked **[NEW]** are added from the 2026-09-04 cross-file gap review (see `todo.md` Appendix B). Fields tagged *[G-n]* come from the Round-2 audit. RLS policies are noted per table; the base pattern for every tenant-scoped table is:
 
 ```sql
 ALTER TABLE <table_name> ENABLE ROW LEVEL SECURITY;
@@ -26,8 +28,11 @@ CREATE POLICY tenant_isolation_<table_name> ON <table_name>
 || `status` | TEXT | NOT NULL | `'active'` | `active` | `suspended` | `archived` |
 || `branding` | JSONB | — | `'{}'` | logo url, colors, favicon |
 || `created_at` | TIMESTAMPTZ | — | `now()` | |
+|| `updated_at` | TIMESTAMPTZ | — | `now()` | *[G-24]* present on entity + api-client `Tenant` type; documented for parity |
 
 *Index: UNIQUE(slug) · idx_tenants_plan_id ON tenants (plan_id)*
+
+*RLS: `tenant_isolation_tenants`*
 
 ### `tenant_plans`
 || Field | Type | Nullable | Default | Notes |
@@ -53,6 +58,8 @@ CREATE POLICY tenant_isolation_<table_name> ON <table_name>
 || `tin` | TEXT | — | — | Tax Identification Number |
 || `bir_branch_code` | TEXT | — | — | BIR branch registration code |
 || `levels_offered` | TEXT[] | — | `'{}'` | **ADR:** Department is a per-branch entity (see `departments`); values: `elementary`, `jhs`, `shs`, `college`, `techvoc`, `kindergarten` |
+|| `contact_email` | TEXT | — | — | *[G-25]* FR-TEN-3 "contact info"; branch forms collect it |
+|| `contact_phone` | TEXT | — | — | *[G-25]* FR-TEN-3 |
 || `status` | TEXT | — | `'active'` | `active` | `inactive` |
 || `created_at` | TIMESTAMPTZ | — | `now()` | |
 
@@ -63,6 +70,8 @@ CREATE POLICY tenant_isolation_<table_name> ON <table_name>
 ## 1A. Departments (new — spec §5; bridges per-branch levels_offered to academic structure)
 
 A **Department** is a per-branch logical grouping that determines which Education Levels are active at that branch and provides a scope for staff assignment, fee structure templates, and curriculum ownership. It exists because `spec.md` §5 lists Department as a peer of Building/Floor/Room under Branch, and `frontend.md` §5 navigation shows "Department (Elementary/JHS/SHS/College)" as a tenant-admin concept. Department is NOT EducationLevel — EducationLevel is the global taxonomy (`education_levels`); Department is the per-branch activation + local configuration layer.
+
+### `departments`
 
 || Field | Type | Nullable | Default | Notes |
 ||---|---|---|---|---|---|
@@ -93,6 +102,9 @@ These tables are the foundation for every module after Phase 1. They were entire
 || `tenant_id` | UUID | NOT NULL | — | FK → `tenants(id)` |
 || `email` | TEXT | — | — | UNIQUE per tenant (partial idx) |
 || `phone` | TEXT | — | — | UNIQUE per tenant (partial idx) |
+|| `first_name` | TEXT | — | — | *[G-20]* display name lives on the account, not only in `user_person_links`; login topbar/initials read it |
+|| `middle_name` | TEXT | — | — | *[G-20]* |
+|| `last_name` | TEXT | — | — | *[G-20]* |
 || `password_hash` | TEXT | — | — | bcrypt/argon2; NULL for SSO accounts |
 || `mfa_secret` | TEXT | — | — | TOTP; encrypted at rest |
 || `mfa_enabled` | BOOLEAN | — | `false` | |
@@ -146,6 +158,52 @@ Every user account maps to exactly one person record (student, guardian, or empl
 
 *Index: UNIQUE(resource, action)*
 
+**Canonical permission catalog (seeded in `001-phase1-rls-and-seed.sql`).** Frontend route-permission maps must reference *these* codes — the seed defines **no** `iam.*` or `platform.*` resources (see [G-18] in `todo2.md`):
+
+| Resource | Actions | |
+|---|---|---|
+| `tenancy.tenant` | view, create, edit | Platform/tenant management |
+| `tenancy.branch` | view, create, edit | Branch management |
+| `tenancy.department` | view, create | Departments |
+| `academic.curriculum` | view, create, edit | Curricula |
+| `academic.subject` | view, create | Subjects |
+| `academic.structure` | view, edit | Education/grade levels, SY/terms, tracks/strands/programs |
+| `sis.student` | view, create, edit | Student records |
+| `sis.guardian` | view | Guardian directory |
+| `sis.enrollment` | view, create | Enrollment |
+| `sis.section` | view | Sections |
+| `sis.admission` | view | Admissions pipeline |
+| `scheduling.timetable` | view | Timetable builder |
+| `scheduling.facultyload` | view | Faculty load report |
+| `attendance.record` | view, edit | Attendance entry |
+| `grading.gradebook` | view, edit | Gradebook |
+| `grading.system` | view | Grading systems |
+| `grading.component` | view | Grade components |
+| `grading.honorroll` | view | Honor roll config |
+| `billing.feetype` | view | Fee types |
+| `billing.feestructure` | view | Fee structures |
+| `billing.discount` | view | Discounts |
+| `billing.invoice` | view, create, approve | Invoices/SOA |
+| `cashiering.session` | view, create | Cashier sessions |
+| `cashiering.payment` | view, create | Payment collection |
+| `cashiering.adhoc` | view | Ad-hoc sales |
+| `cashiering.report` | view | Daily collection report |
+| `communications.announcement` | view | Announcements |
+| `communications.template` | view | Notification templates |
+| `communications.message` | view | Message threads |
+| `document.template` | view, create | Document templates |
+| `document.request` | view, approve | Document requests |
+| `hr.employee` | view, create | Employee records |
+| `config.lookup` | view, edit | Lookup lists |
+| `config.role` | view, create | Roles & permissions builder |
+| `reporting.dashboard` | view | Dashboards |
+| `reporting.export` | export | Report exports |
+| `facility.building` | view | Buildings |
+| `facility.floor` | view | Floors |
+| `facility.room` | view, create | Rooms |
+
+*Frontend maps that reference `platform.dashboard:view`, `iam.role:view`, `tenancy.department:view` etc. are stale and must be regenerated from this catalog.*
+
 ### `role_permissions`
 || Field | Type | Nullable | Default | Notes |
 ||---|---|---|---|---|---|
@@ -153,6 +211,8 @@ Every user account maps to exactly one person record (student, guardian, or empl
 || `permission_id` | UUID | NOT NULL | — | FK → `permissions(id)`; comp PK |
 
 *Index: idx_role_permissions_role ON role_permissions (role_id)*
+
+*Note: role_permissions inherits tenancy through `roles` (RLS: `tenant_isolation_roles`). No direct tenant_id — tenant scope resolved via role_id FK.*
 
 ### `user_roles`
 || Field | Type | Nullable | Default | Notes |
@@ -277,7 +337,7 @@ Session audit trail for security compliance (OWASP ASVS, Data Privacy Act RA 101
 
 *Index: idx_room_assets_tenant_room ON room_assets (tenant_id, room_id) · idx_room_assets_tenant ON room_assets (tenant_id)*
 
-*RLs: `tenant_isolation_room_assets`*
+*RLS: `tenant_isolation_room_assets`*
 
 ---
 
@@ -490,15 +550,22 @@ Session audit trail for security compliance (OWASP ASVS, Data Privacy Act RA 101
 ||| `class_offering_id` | UUID | NOT NULL | — | FK → `class_offerings(id)` |
 ||| `term_id` | UUID | NOT NULL | — | FK → `terms(id)` |
 ||| `grade_component_id` | UUID | NOT NULL | — | FK → `grade_components(id)` |
-||| `score` | NUMERIC(5,2) | — | — | Raw score |
-||| `transmuted_score` | NUMERIC(5,2) | — | — | Transmuted grade |
-||| `entered_by` | UUID | — | — | FK → `employees(id)` |
+||| `grading_system_id` | UUID | — | — | *[G-29]* entity-only, absorb: FK → `grading_systems(id)` — pins the transmutation used at entry time (the active system may change later) |
+||| `enrollment_id` | UUID | — | — | *[G-29]* entity-only, absorb: FK → `enrollments(id)` |
+||| `score` | NUMERIC(5,2) | — | — | Raw score. *[G-29]* entity adds `max_score` + `percentage` — absorb both (`max_score NUMERIC(5,2)`, `percentage NUMERIC(5,2)` = raw/max × 100) |
+||| `max_score` | NUMERIC(5,2) | — | — | *[G-29]* entity-only |
+||| `percentage` | NUMERIC(5,2) | — | — | *[G-29]* entity-only |
+||| `transmuted_score` | NUMERIC(5,2) | — | — | Transmuted grade. *[G-29]* entity names it `transmuted_grade` — entity wins (matches `grading_systems.config` transmutation vocabulary) |
+||| `remarks` | TEXT | — | — | *[G-29]* entity-only, absorb |
+||| `is_finalized` | BOOLEAN | — | `false` | *[G-29]* entity-only: set by `finalizeGrades()`. Keep ONE column — entity must map finalize → `locked = true` and drop `isFinalized` |
+||| `entered_by` | UUID | — | — | FK → `employees(id)`. *[G-29]* entity uses `entered_by_user_id` (users) |
 ||| `is_manual_override` | BOOLEAN | — | `false` | *NEW: flag (FR-GRA-2)* |
 ||| `override_reason` | TEXT | — | — | *NEW: required when override* |
 ||| `overridden_by` | UUID | — | — | *NEW: FK → employees* |
 ||| `overridden_at` | TIMESTAMPTZ | — | — | |
 ||| `locked` | BOOLEAN | — | `false` | Immutable after term close |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
+||| `updated_at` | TIMESTAMPTZ | — | `now()` | *[G-29]* present on entity |
 
 *Index: idx_grade_entries_tenant ON grade_entries (tenant_id) · idx_grade_entries_student_term ON grade_entries (tenant_id, student_id, term_id) · idx_grade_entries_class_component ON grade_entries (class_offering_id, grade_component_id) · idx_grade_entries_term_locked ON grade_entries (term_id, locked)*
 
@@ -522,9 +589,6 @@ Session audit trail for security compliance (OWASP ASVS, Data Privacy Act RA 101
 
 *RLS: `tenant_isolation_honor_roll_configs`*
 
-### `subjects_curricula` *(renamed from curriculum_subjects to avoid confusion — NO, keeping original name `curriculum_subjects` as it matches architecture.md)*
-
----
 
 ## 4. SIS / Enrollment
 
@@ -563,6 +627,7 @@ Session audit trail for security compliance (OWASP ASVS, Data Privacy Act RA 101
 || `tenant_id` | UUID | NOT NULL | — | |
 ||| `first_name` | TEXT | NOT NULL | — | |
 ||| `last_name` | TEXT | NOT NULL | — | |
+||| `user_id` | UUID | — | — | *NEW (migration 011):* FK → users — links the guardian profile to its portal login; resolves "my children" via students my-children endpoint |
 ||| `contact_number` | TEXT | — | — | |
 ||| `email` | TEXT | — | — | |
 ||| `address` | TEXT | — | — | *FIX: FR-SIS-1* |
@@ -794,6 +859,46 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 
 *RLS: `tenant_isolation_applicant_stage_transitions`*
 
+### `applicants` (new — [G-23] FR-ADM-1/2, Phase 4.2)
+The admissions pipeline operates on applicants; without this table the Kanban and `applicant_stage_configs`/`applicant_stage_transitions` have no records to move. An applicant becomes a `students` row (and optionally an enrollment) when promoted to the `enrolled` stage.
+|| Field | Type | Nullable | Default | Notes |
+||---|---|---|---|---|
+|| `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
+|| `tenant_id` | UUID | NOT NULL | — | FK → `tenants(id)` |
+||| `branch_id` | UUID | NOT NULL | — | FK → `branches(id)` |
+||| `applicant_number` | TEXT | — | — | Auto-generated via `numbering_schemes` (entity_type `applicant_number`); UNIQUE(tenant_id, applicant_number) |
+||| `first_name` | TEXT | NOT NULL | — | |
+||| `middle_name` | TEXT | — | — | |
+||| `last_name` | TEXT | NOT NULL | — | |
+||| `suffix` | TEXT | — | — | |
+||| `birth_date` | DATE | — | — | |
+||| `sex` | TEXT | — | — | |
+||| `email` | TEXT | — | — | Applicant/guardian contact |
+||| `contact_number` | TEXT | — | — | |
+||| `address` | TEXT | — | — | |
+||| `lrn` | TEXT | — | — | *[FR-ADM-3]* CHECK `^\d{12}$` when NOT NULL; prior LRN for transferring college applicants |
+||| `education_level_id` | UUID | — | — | FK → `education_levels(id)` — level applying for |
+||| `grade_level_id` | UUID | — | — | FK → `grade_levels(id)` |
+||| `strand_id` | UUID | — | — | FK → `strands(id)` (SHS) |
+||| `program_id` | UUID | — | — | FK → `programs(id)` (College) |
+||| `school_year_id` | UUID | NOT NULL | — | FK → `school_years(id)` — intake year |
+||| `prior_school` | TEXT | — | — | |
+||| `current_stage` | TEXT | NOT NULL | — | FK → `applicant_stage_configs.stage_name` (default first active stage, e.g. `inquiry`) |
+||| `stage_entered_at` | TIMESTAMPTZ | — | `now()` | For pipeline SLA/aging |
+||| `custom_fields` | JSONB | — | `'{}'` | Driven by `custom_field_definitions.entity_type = 'applicant'` |
+||| `source_channel` | TEXT | — | — | `online_form` | `walk_in` | `referral` | `bulk_import` |
+||| `converted_student_id` | UUID | — | — | FK → `students(id)` — set when stage reaches `enrolled` |
+||| `converted_at` | TIMESTAMPTZ | — | — | |
+||| `created_by` | UUID | — | — | FK → `users(id)`; NULL = self-submitted online form |
+||| `created_at` | TIMESTAMPTZ | — | `now()` | |
+||| `updated_at` | TIMESTAMPTZ | — | `now()` | |
+
+*Index: UNIQUE(tenant_id, applicant_number) WHERE applicant_number IS NOT NULL · idx_applicants_tenant ON applicants (tenant_id) · idx_applicants_tenant_branch_stage ON applicants (tenant_id, branch_id, current_stage) · idx_applicants_school_year ON applicants (school_year_id) · idx_applicants_lrn ON applicants (tenant_id, lrn) WHERE lrn IS NOT NULL · idx_applicants_email ON applicants (tenant_id, email) WHERE email IS NOT NULL · idx_applicants_converted ON applicants (converted_student_id) WHERE converted_student_id IS NOT NULL*
+
+*RLS: `tenant_isolation_applicants`*
+
+*Note: applicant documents (birth certificate, Form 138/137, TOR, ID photo — FR-ADM-1) reuse `student_documents` with `student_id` replaced by a polymorphic `(owner_type, owner_id)` OR a sibling `applicant_documents` table; decide at implementation — default recommendation is a sibling `applicant_documents` table mirroring `student_documents` columns with `applicant_id UUID NOT NULL FK → applicants(id)` to keep FK integrity.*
+
 ### `behavior_incidents` (new — Guidance/Discipline)
 || Field | Type | Nullable | Default | Notes |
 ||---|---|---|---|---|---|
@@ -915,14 +1020,20 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 || `tenant_id` | UUID | NOT NULL | — | |
 ||| `branch_id` | UUID | NOT NULL | — | FK → branches |
 ||| `student_id` | UUID | NOT NULL | — | FK → students |
-||| `class_offering_id` | UUID | NOT NULL | — | FK → class_offerings |
-||| `attendance_date` | DATE | NOT NULL | — | |
-||| `period` | TEXT | — | — | Period identifier |
-||| `status` | TEXT | NOT NULL | — | present \ | absent \ | tardy \ | excused |
-||| `recorded_by` | UUID | — | — | FK → employees |
-||| `capture_mode` | TEXT | — | — | manual \ | qr_scan \ | biometric \ | parent_upload |
+||| `class_offering_id` | UUID | NOT NULL | — | FK → class_offerings |||| `attendance_date` | DATE | NOT NULL | — | |
+||| `period` | TEXT | — | — | Period identifier. *[G-29]* entity uses `period_number INT` — normalize the entity to TEXT `period` (matches `attendance_config.default_periods` JSONB keys) |
+||| `enrollment_id` | UUID | — | — | *[G-29]* entity-only, absorb: FK → enrollments — daily homeroom attendance taken without a class offering needs enrollment scope |
+||| `section_id` | UUID | — | — | *[G-29]* entity-only, absorb: FK → sections — daily mode has a section but no class_offering_id |
+||| `minutes_late` | INT | — | — | *[G-29]* entity-only, absorb (FR-ATT-3 tardy thresholds) |
+||| `excuse_reason` | TEXT | — | — | *[G-29]* entity-only, absorb — inline excuse note; formal review lives in `attendance_excuses` |
+||| `verified_by` | UUID | — | — | *[G-29]* entity-only (`verified_by_user_id`), absorb — registrar/coordinator verification |
+||| `status` | TEXT | NOT NULL | — | present \| absent \| tardy \| excused |
+||| `recorded_by` | UUID | — | — | FK → employees. *[G-29]* entity uses `recorded_by_user_id` (users) — entity wins per `cashier_sessions` precedent (FR-CSH-1) |
+||| `capture_mode` | TEXT | — | — | manual \| qr_scan \| biometric \| parent_upload (FR-ATT-2). *[G-29]* entity lacks this — add |
 ||| `notes` | TEXT | — | — | |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
+
+> *[G-29] Note:* `class_offering_id` is NOT NULL in this file but the entity allows daily-mode rows where only `section_id` is set. Relax to NULL-able with CHECK `(class_offering_id IS NOT NULL OR section_id IS NOT NULL)` to support FR-ATT-1 daily vs period modes.
 
 *Index: idx_attendance_tenant ON attendance_records (tenant_id) · idx_attendance_student_date ON attendance_records (tenant_id, student_id, attendance_date) · idx_attendance_class_date ON attendance_records (tenant_id, class_offering_id, attendance_date)*
 
@@ -1038,11 +1149,15 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 || `tenant_id` | UUID | NOT NULL | — | |
 ||| `code` | TEXT | NOT NULL | — | e.g. tuition, misc, lab |
 ||| `name` | TEXT | NOT NULL | — | |
+||| `description` | TEXT | — | — | *[G-21]* present on entity |
 ||| `is_taxable` | BOOLEAN | — | `false` | |
-||| `gl_account` | TEXT | — | — | |
+||| `tax_rate` | NUMERIC(5,2) | — | — | *[G-21]* applies when `is_taxable = true` |
+||| `gl_account` | TEXT | — | — | FR-BIL-1 GL mapping. *[G-21]* entity column is `gl_account_code` — normalize the entity to `gl_account` (two-release expand/contract) |
+||| `education_level_ids` | UUID[] | — | `'{}'` | *[G-21]* entity-only field, absorbed into schema (FR-BIL-1 tenant-defined level scoping) |
+||| `is_active` | BOOLEAN | — | `true` | *[G-21]* present on entity |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
 
-*Index: idx_fee_types_tenant ON fee_types (tenant_id) · idx_fee_types_tenant_code ON fee_types (tenant_id, code)*
+*Index: idx_fee_types_tenant ON fee_types (tenant_id) · idx_fee_types_tenant_code ON fee_types (tenant_id, code) · idx_fee_types_levels ON fee_types USING GIN(education_level_ids) WHERE education_level_ids IS NOT NULL*
 
 *RLS: `tenant_isolation_fee_types`*
 
@@ -1073,13 +1188,14 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `education_level_id` | UUID | — | — | |
 ||| `grade_level_id` | UUID | — | — | |
 ||| `strand_id` | UUID | — | — | *FIX: per-strand override* FK → strands |
-||| `track_id` | UUID | — | — | *FIX: per-track override* FK → tracks |
-||| `program_id` | UUID | — | — | FK → programs |
-||| `boarding_type` | TEXT | — | — | *FIX: day/boarding* day \ | boarding |
+||| `track_id` | UUID | — | — | *FIX: per-track override* FK → tracks |||| `program_id` | UUID | — | — | FK → programs |
+||| `boarding_type` | TEXT | — | — | *FIX: day/boarding* day \| boarding. *[G-21]* entity lacks this — add to entity (fee resolution precedence per spec §5) |
 ||| `term_id` | UUID | — | — | *FIX: per-term* FK → terms |
 ||| `school_year_id` | UUID | NOT NULL | — | FK → school_years |
 ||| `status` | TEXT | — | `'active'` | |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
+
+> *[G-21] Note:* the implemented entity stores no `template_key`; the 6-level resolution precedence in `billing.service.ts` (branch+term+strand+track+program → … → tenant default) relies on the scoping columns above. Either generate `template_key` deterministically from those columns at insert time (recommended — keeps the UNIQUE(tenant_id, template_key, school_year_id) index meaningful) or drop the column from this file. Do not leave the entity and this file disagreeing.
 
 *Index: idx_fee_structures_tenant ON fee_structures (tenant_id) · idx_fee_structures_tenant_branch ON fee_structures (tenant_id, branch_id) · idx_fee_structures_template ON fee_structures (tenant_id, template_key, school_year_id) · idx_fee_structures_resolution ON fee_structures (tenant_id, branch_id, education_level_id, grade_level_id, strand_id, track_id, program_id, boarding_type, term_id, school_year_id)*
 
@@ -1105,11 +1221,10 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||---|---|---|---|---|---|
 || `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
 || `tenant_id` | UUID | NOT NULL | — | |
-||| `branch_id` | UUID | — | — | NULL = tenant default; *FIX: NULL-able* |
-||| `name` | TEXT | NOT NULL | — | e.g. 10-Month Installment, Full Payment |
-||| `plan_type` | TEXT | NOT NULL | — | cash \ | installment |
-||| `num_installments` | INT | — | — | NULL for cash plan |
-||| `discount_percent` | NUMERIC(5,2) | — | — | Cash full-payment discount % |
+||| `branch_id` | UUID | — | — | NULL = tenant default; *FIX: NULL-able* |||| `name` | TEXT | NOT NULL | — | e.g. 10-Month Installment, Full Payment |
+||| `plan_type` | TEXT | NOT NULL | — | cash \| installment. *[G-21]* entity's `installments` INT + boolean-free model is NOT adopted — keep `plan_type` |
+||| `num_installments` | INT | — | — | NULL for cash plan. *[G-21]* replaces entity field `installments` |
+||| `discount_percent` | NUMERIC(5,2) | — | — | Cash full-payment discount %. *[G-21]* replaces entity pair `hasEarlyPaymentDiscount`/`earlyPaymentDiscountPct` (NULL/0 = no discount) |
 ||| `is_active` | BOOLEAN | — | `true` | |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
 
@@ -1124,9 +1239,10 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 || `tenant_id` | UUID | NOT NULL | — | *FIX: RLS* |
 ||| `payment_plan_id` | UUID | NOT NULL | — | FK → payment_plans |
 ||| `installment_number` | INT | NOT NULL | — | 1, 2, 3, ... |
-||| `due_date` | DATE | NOT NULL | — | |
-||| `amount` | NUMERIC(12,2) | NOT NULL | — | |
+||| `due_date` | DATE | NOT NULL | — | *[G-21]* wins over entity's `dueDayOfMonth` — plans may be assessed mid-year, so an absolute date is required; entity should derive it from enrollment date + day-of-month at generation time and store the resolved date here |
+||| `amount` | NUMERIC(12,2) | NOT NULL | — | *[G-21]* wins over entity's `percentageAmount` (a template % may live on the *plan* row; the schedule stores resolved pesos) |
 ||| `is_custom_amount` | BOOLEAN | — | `false` | |
+||| `grace_period_days` | INT | — | `0` | *[G-21]* entity-only field, absorbed (penalty grace starts after this, overriding `penalty_rules.grace_days` per installment) |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
 
 *Index: idx_installment_schedules_tenant ON installment_schedules (tenant_id) · idx_installment_schedules_plan ON installment_schedules (payment_plan_id)*
@@ -1138,11 +1254,12 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||---|---|---|---|---|---|
 || `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
 || `tenant_id` | UUID | NOT NULL | — | |
-||| `branch_id` | UUID | — | — | NULL = tenant default |
-||| `grace_days` | INT | NOT NULL | `0` | |
-||| `penalty_type` | TEXT | NOT NULL | — | flat \ | percent_per_month |
+||| `branch_id` | UUID | — | — | NULL = tenant default |||| `grace_days` | INT | NOT NULL | `0` | |
+||| `penalty_type` | TEXT | NOT NULL | — | flat \| percent_per_month. *[G-21]* entity's `dailyRatePct` is a THIRD mode — extend enum to `flat \| percent_per_month \| percent_per_day` |
 ||| `value` | NUMERIC(12,2) | NOT NULL | — | |
-||| `waivable` | BOOLEAN | — | `true` | |
+||| `max_pct` | NUMERIC(5,2) | — | — | *[G-21]* entity-only: cap on accumulated % penalties |
+||| `cap_amount` | NUMERIC(12,2) | — | — | *[G-21]* entity-only: absolute peso cap |
+||| `waivable` | BOOLEAN | — | `true` | FR-BIL-6: waiver requires approval + reason |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
 
 *Index: idx_penalty_rules_tenant ON penalty_rules (tenant_id) · idx_penalty_rules_tenant_branch ON penalty_rules (tenant_id, branch_id) · idx_penalty_rules_default ON penalty_rules (tenant_id) WHERE branch_id IS NULL*
@@ -1156,10 +1273,12 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 || `tenant_id` | UUID | NOT NULL | — | |
 ||| `branch_id` | UUID | NOT NULL | — | FK → branches |
 ||| `student_id` | UUID | NOT NULL | — | FK → students |
-||| `invoice_id` | UUID | — | — | FK → invoices NULL = pre-invoice |
-||| `discount_type_id` | UUID | NOT NULL | — | FK → discount_types |
+||| `invoice_id` | UUID | — | — | FK → invoices NULL = pre-invoice |||| `discount_type_id` | UUID | NOT NULL | — | FK → discount_types |
+||| `effective_term_id` | UUID | — | — | *[G-21]* entity-only: term the grant starts (FK → terms) |
+||| `expiry_term_id` | UUID | — | — | *[G-21]* entity-only: term the grant ends (FK → terms) |
 ||| `amount_computed` | NUMERIC(12,2) | NOT NULL | — | |
-||| `status` | TEXT | — | `'pending'` | pending \ | approved \ | rejected via workflow_instances |
+||| `status` | TEXT | — | `'pending'` | pending \| approved \| rejected via workflow_instances |
+||| `approval_workflow_instance_id` | UUID | — | — | *[G-21]* entity-only: FK → workflow_instances(id) — links the FR-CFG-4 approval chain |
 ||| `approved_by` | UUID | — | — | FK → users |
 ||| `approved_at` | TIMESTAMPTZ | — | — | |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
@@ -1173,7 +1292,10 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||---|---|---|---|---|---|
 || `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
 || `tenant_id` | UUID | NOT NULL | — | |
-||| `days_band` | TEXT | NOT NULL | — | e.g. 0-7, 8-30, 31+ |
+||| `education_level_id` | UUID | — | — | *[G-21]* entity-only: policies may differ per level (FK → education_levels) |
+||| `effective_term_id` | UUID | — | — | *[G-21]* entity-only (FK → terms) |
+||| `expiry_term_id` | UUID | — | — | *[G-21]* entity-only (FK → terms) |
+||| `days_band` | TEXT | NOT NULL | — | e.g. 0-7, 8-30, 31+. *[G-21]* entity models bands inside `rules JSONB` — keep the explicit columns as canonical, treat JSONB as an accelerator only |
 ||| `refund_pct` | NUMERIC(5,2) | NOT NULL | — | |
 ||| `is_active` | BOOLEAN | — | `true` | |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
@@ -1190,10 +1312,11 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `branch_id` | UUID | NOT NULL | — | FK → branches |
 ||| `student_id` | UUID | NOT NULL | — | FK → students |
 ||| `enrollment_id` | UUID | NOT NULL | — | FK → enrollments |
-||| `term_id` | UUID | — | — | |
-||| `total_amount` | NUMERIC(12,2) | — | — | |
+||| `term_id` | UUID | — | — | |||| `total_amount` | NUMERIC(12,2) | — | — | |
+||| `paid_amount` | NUMERIC(12,2) | — | `'0'` | *[G-21]* AR-aging + dashboard queries reference it; keep `balance` in sync (`balance = total_amount − paid_amount − discount_amount`), computed on payment allocation |
 ||| `balance` | NUMERIC(12,2) | — | — | |
-||| `status` | TEXT | — | `'open'` | open \ | partially_paid \ | paid \ | overdue |
+||| `due_date` | DATE | — | — | *[G-21]* required by AR-aging buckets (current/30/60/90+) and `idx_invoices_status` below — derived from the enrollment's payment-plan `installment_schedules.due_date` at generation |
+||| `status` | TEXT | — | `'open'` | open \| partially_paid \| paid \| overdue |
 ||| `payment_plan_id` | UUID | — | — | FK → payment_plans |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
 ||| `updated_at` | TIMESTAMPTZ | — | `now()` | |
@@ -1211,6 +1334,7 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `fee_type_id` | UUID | NOT NULL | — | FK → fee_types |
 ||| `discount_type_id` | UUID | — | — | *NEW: FK → discount_types* |
 ||| `description` | TEXT | — | — | |
+||| `quantity` | INT | — | `1` | *[G-21]* present on entity — multiplies `amount` for per-unit fees |
 ||| `amount` | NUMERIC(12,2) | NOT NULL | — | |
 ||| `discount_amount` | NUMERIC(12,2) | — | `0` | |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
@@ -1221,9 +1345,32 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 
 *RLS: `tenant_isolation_invoice_items`*
 
+> **Phase 8 audit implementation notes (2026-09-06):**
+> - `notification_rules.event_type`, `document_templates.document_type`, `employees.tin_no` were created as **JSONB** in the live DB (entity copy-paste drift) while holding plain strings — all converted to VARCHAR in migration 010. `document_type` as jsonb silently broke every `documentType === code` match in the documents UI.
+> - `document_requests.status` transitions are enforced server-side (`requested → fee_assessed → paid → released`, with `rejected` allowed until release) via `PUT documents/requests/:id/status`; release remains `PUT requests/:id/approve`.
+> - Seeded reference data (migration 010): 6 document templates with fees, 4 notification templates, 6 employees, 1 sample announcement.
+
 ---
 
 ## 9. Cashiering
+
+### `idempotency_keys` (new — [G-23] arch §9; Phase 7.1 blocking)
+Makes financial mutations retry-safe, including offline-POS sync replays. `idempotency.guard.ts` already reads/writes this table; it existed in no migration until [G-23] was raised.
+|| Field | Type | Nullable | Default | Notes |
+||---|---|---|---|---|
+|| `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
+|| `tenant_id` | UUID | NOT NULL | — | FK → `tenants(id)` |
+||| `key` | TEXT | NOT NULL | — | Client-supplied `Idempotency-Key` header value |
+||| `endpoint` | TEXT | NOT NULL | — | e.g. `POST /api/v1/cashiering/payments` |
+||| `request_hash` | TEXT | — | — | SHA-256 of the request body — a reused key with a *different* body is rejected (422) |
+||| `response_status` | INT | — | — | HTTP status of the original response |
+||| `response_body` | JSONB | — | — | Stored response replayed on retry |
+||| `created_at` | TIMESTAMPTZ | — | `now()` | Purge job deletes rows older than 24h |
+||| `expires_at` | TIMESTAMPTZ | NOT NULL | — | `created_at + 24h` per arch §9 |
+
+*Index: UNIQUE(tenant_id, key, endpoint) · idx_idempotency_keys_expires ON idempotency_keys (expires_at) — for the purge job*
+
+*RLS: `tenant_isolation_idempotency_keys`*
 
 ### `cashier_stations` (new — spec §8 catalogue)
 || Field | Type | Nullable | Default | Notes |
@@ -1248,6 +1395,7 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `code` | TEXT | NOT NULL | — | `cash` | `check` | `bank_deposit_ref` | `gcash` | `maya` | `qrph` | `card` | `online` |
 ||| `name` | TEXT | NOT NULL | — | Display |
 ||| `requires_gateway_ref` | BOOLEAN | — | `false` | |
+||| `is_cash` | BOOLEAN | — | `false` | *Implemented 2026-09-06 (migration 009):* counts toward the physical drawer on session close — only `is_cash` methods are summed into `cashier_sessions` expected amounts |
 ||| `is_active` | BOOLEAN | — | `true` | |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
 
@@ -1321,6 +1469,8 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `name` | TEXT | NOT NULL | — | |
 ||| `range_start` | BIGINT | NOT NULL | — | |
 ||| `range_end` | BIGINT | NOT NULL | — | |
+||| `prefix` | TEXT | — | — | *[G-22]* e.g. `OR` — first segment of `or_number_display` |
+||| `format_template` | TEXT | — | — | *[G-22]* renders `or_number_display` (source for [G-1]). **Implemented tokens: `{year}` and `{number}`** (e.g. `OR-{year}-{number}` → `OR-2026-0001000001`); `{number}` is the 10-digit zero-padded value |
 ||| `valid_from` | DATE | NOT NULL | — | |
 ||| `valid_to` | DATE | NOT NULL | — | |
 ||| `is_active` | BOOLEAN | — | `true` | |
@@ -1341,9 +1491,9 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `cashier_session_id` | UUID | — | — | FK → cashier_sessions |
 ||| `amount` | NUMERIC(12,2) | NOT NULL | — | |
 ||| `method` | TEXT | NOT NULL | — | FK → payment_methods.code |
-||| `gateway_reference` | TEXT | — | — | |
-||| `idempotency_key` | TEXT | UNIQUE | — | |
-||| `status` | TEXT | — | `'completed'` | completed \ | pending \ | failed \ | refunded |
+||| `gateway_reference` | TEXT | — | — | |||| `idempotency_key` | TEXT | UNIQUE | — | |
+||| `reference_no` | TEXT | — | — | *[G-22]* human check/slip/deposit reference (distinct from `gateway_reference`) |
+||| `status` | TEXT | — | `'completed'` | completed \| pending \| failed \| refunded |
 ||| `paid_at` | TIMESTAMPTZ | — | `now()` | |
 ||| `offline_origin` | BOOLEAN | — | `false` | |
 ||| `synced_at` | TIMESTAMPTZ | — | — | |
@@ -1381,6 +1531,10 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `payment_id` | UUID | NOT NULL | — | FK → payments |
 ||| `or_number` | TEXT | NOT NULL | — | *FIX [G-1/G-10]:* Gapless sequential numeric part (stored as numeric-string, e.g. `1234`); UNIQUE(branch_id, or_number) enforces gapless sequence. Cast to BIGINT for sequence operations |
 ||| `or_number_display` | TEXT | — | — | *NEW [G-1]:* Formatted display version (e.g. `OR-2026-0001234`) from `atp_series.format_template`; for human readability + PDF rendering only |
+||| `payor_name` | TEXT | — | — | *[G-22] BIR-mandatory (FR-CSH-4)* — implemented 2026-09-06 as `payorName` (nullable; derived from the student for invoice payments, buyer name for ad-hoc sales, `Walk-in` fallback). Nullable until TIN capture lands in the pay flow |
+||| `payor_tin` | TEXT | — | — | *[G-22] BIR-mandatory (FR-CSH-4)* — implemented as `payorTin` |
+||| `amount` | NUMERIC(12,2) | NOT NULL | — | *[G-22] BIR-mandatory* — implemented (denormalized from the payment for the receipt record) |
+||| `tax_exempt` | BOOLEAN | — | `false` | *[G-22] BIR-mandatory (FR-CSH-4)* — implemented as `isTaxExempt`. `is_offline` is NOT yet implemented (deferred with offline POS, §7.3) |
 ||| `atp_series_id` | UUID | NOT NULL | — | FK → atp_series |
 ||| `is_voided` | BOOLEAN | — | `false` | |
 ||| `void_reason` | TEXT | — | — | |
@@ -1568,6 +1722,7 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 *RLS: `tenant_isolation_messages`*
 
 ### `message_thread_participants` (new — TODO gap B9.2)
+> **Phase 9 audit implementation note (2026-09-06):** not created as a physical table. Participant membership is implemented as `message_threads.participantIds` (JSONB array of `users.id`, default `[]`) — migration 011. Thread listing scopes via `participantIds @> '["<userId>"]'::jsonb` containment (same per-user visibility without an extra join); read state remains on `messages.read_at` via `markRead`. Senders are auto-added as participants on first message.
 || Field | Type | Nullable | Default | Notes |
 ||---|---|---|---|---|---|
 || `thread_id` | UUID | NOT NULL | — | FK → message_threads; comp PK |
@@ -1933,7 +2088,7 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ||| `actor_user_id` | UUID | — | — | FK → users |
 ||| `entity_type` | TEXT | NOT NULL | — | |
 ||| `entity_id` | UUID | NOT NULL | — | |
-||| `action` | TEXT | NOT NULL | — | created \ | updated \ | deleted \ | viewed |
+||| `action` | TEXT | NOT NULL | — | *[G-27]* canonical values: `create` | `update` | `delete` | `view` (entity/seed write short forms; `created/updated/deleted/viewed` are legacy aliases — normalize on read if present) |
 ||| `before_state` | JSONB | — | — | |
 ||| `after_state` | JSONB | — | — | |
 ||| `ip_address` | TEXT | — | — | *FIX* |
@@ -2008,6 +2163,8 @@ Defines which stages can transition to which; the Kanban UI reads allowed transi
 ---
 
 ## 16. Reporting
+
+> *[G-19/G-21] Reconciliation note:* the implemented entities are `report_templates` (name, reportType, config JSONB, isSystem, isActive) and `scheduled_reports` (reportTemplateId, name, frequency, recipients, isActive, lastRunAt, lastRunStatus). This file's `report_definitions` and `report_subscriptions` were never created. **Decision:** keep the `tables.md` names as canonical (richer model), and treat `report_templates` → `report_definitions` and `scheduled_reports` → `report_subscriptions` as renames in the next expand/contract migration. Field mapping: `reportType` → `template_type`+`entity`; `config JSONB` → `filters`/`columns`/`group_by`; `frequency` → `cron`; `lastRunAt/lastRunStatus` → join to `report_runs` (do NOT denormalize run state onto the subscription).
 
 ### `report_definitions` (new — arch §6 aggregates)
 || Field | Type | Nullable | Default | Notes |

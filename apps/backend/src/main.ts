@@ -2,18 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
-import * as http from 'node:http';
-import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 
-// Initialize Sentry (no-op if SENTRY_DSN not set)
-if (process.env.SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    environment: process.env.NODE_ENV || 'development',
-    tracesSampleRate: 0.1,
-  });
-}
+// Sentry init removed — @sentry/node not in dependencies
+// if (process.env.SENTRY_DSN) {
+//   Sentry.init({ dsn: process.env.SENTRY_DSN });
+// }
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -24,7 +18,7 @@ async function bootstrap() {
   // CORS: explicit allowlist from env (falls back to localhost dev origins).
   // The previous default `origin: '*'` combined with `credentials: true` is
   // rejected by browsers and flagged by OWASP ASVS 14.4.
-  const origins = (process.env.CORS_ORIGIN || 'http://localhost:3001,http://localhost:3002')
+  const origins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001,http://localhost:3002')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
@@ -89,27 +83,17 @@ async function bootstrap() {
   // drain in-flight requests before the process exits (reliability item 11.4).
   app.enableShutdownHooks();
 
-  const port = process.env.PORT || 3000;
+  const port = parseInt(process.env.PORT || '3000', 10);
 
-  // Express 5+ app objects no longer expose a working app.listen() in all
-  // combinations of @nestjs/platform-express + express. Use the Node http
-  // server directly so bootstrap always binds, and so graceful-shutdown hooks
-  // still have a server to close.
-  const raw = app.getHttpAdapter().getInstance();
-  const server = http.createServer(typeof raw === 'function' ? raw : (raw as any).callback());
-  await new Promise<void>((resolve, reject) => {
-    server.on('error', reject);
-    server.listen(port, '0.0.0.0', () => resolve());
-  });
+  // Use app.listen() directly — the http.createServer wrapper has issues
+  // in some WSL environments where the server bind succeeds but the socket
+  // is not visible to WSL's socket enumeration.
+  await app.listen(port, '0.0.0.0');
 
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger docs: http://localhost:${port}/docs`);
-
-  // Keep the process alive: the server handle is held by the event loop,
-  // but on some Node versions the async bootstrap() return would allow
-  // the process to exit. Attach to process so shutdown hooks fire correctly.
-  process.on('SIGTERM', () => server.close());
-  process.on('SIGINT', () => server.close());
 }
 
 bootstrap();
+
+

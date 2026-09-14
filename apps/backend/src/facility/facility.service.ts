@@ -33,6 +33,11 @@ export class FacilityService {
     return this.buildingsRepo.save(building);
   }
 
+  async updateBuilding(id: string, data: Partial<Building>): Promise<Building> {
+    await this.buildingsRepo.update(id, data);
+    return this.findOneBuilding(id);
+  }
+
   async removeBuilding(id: string): Promise<void> {
     const result = await this.buildingsRepo.delete(id);
     if (result.affected === 0) throw new NotFoundException(`Building ${id} not found`);
@@ -58,6 +63,20 @@ export class FacilityService {
       if (existing) throw new ConflictException(`Floor number ${data.floorNumber} already exists in this building`);
     }
     const floor = this.floorsRepo.create(data);
+    return this.floorsRepo.save(floor);
+  }
+
+  async updateFloor(id: string, data: Partial<Floor>): Promise<Floor> {
+    const floor = await this.floorsRepo.findOneBy({ id });
+    if (!floor) throw new NotFoundException(`Floor ${id} not found`);
+    // Enforce uniqueness when changing floor number within the same building.
+    if (data.floorNumber !== undefined && data.floorNumber !== floor.floorNumber) {
+      const existing = await this.floorsRepo.findOne({
+        where: { buildingId: floor.buildingId, floorNumber: data.floorNumber },
+      });
+      if (existing) throw new ConflictException(`Floor number ${data.floorNumber} already exists in this building`);
+    }
+    Object.assign(floor, data);
     return this.floorsRepo.save(floor);
   }
 

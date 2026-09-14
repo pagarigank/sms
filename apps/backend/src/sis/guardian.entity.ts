@@ -1,12 +1,18 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 @Entity({ name: 'guardians' })
 export class Guardian {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
+
+  // Auth link: the login user representing this guardian (portal access).
+  // NULL until a portal account is provisioned for them.
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  userId: string;
 
   @Column()
   firstName: string;

@@ -23,6 +23,39 @@ export function admissionsEndpoints(client: ApiClient) {
     getPipeline: (params: { tenantId: string }) =>
       client.get('/api/v1/admissions/pipeline', params as any),
 
+    // Applicants (G-23) — tenant comes from the x-tenant-id header
+    createApplicant: (data: {
+      firstName: string;
+      lastName: string;
+      middleName?: string;
+      email?: string;
+      phone?: string;
+      birthDate?: string;
+      gender?: string;
+      address?: string;
+      previousSchool?: string;
+      gradeLevelAppliedFor?: string;
+      source?: string;
+      notes?: string;
+      branchId?: string;
+      stageId?: string;
+    }) => client.post('/api/v1/admissions/applicants', data),
+
+    listApplicants: (params?: { status?: string }) =>
+      client.get<any[]>('/api/v1/admissions/applicants', params as any),
+
+    getApplicant: (id: string) =>
+      client.get<any>(`/api/v1/admissions/applicants/${id}`),
+
+    updateApplicant: (id: string, data: any) =>
+      client.put(`/api/v1/admissions/applicants/${id}`, data),
+
+    moveApplicantStage: (id: string, stageId: string) =>
+      client.put(`/api/v1/admissions/applicants/${id}/stage`, { stageId }),
+
+    convertApplicant: (id: string) =>
+      client.post(`/api/v1/admissions/applicants/${id}/convert`),
+
     // Section Assignment Rules
     getSectionRules: (params: { tenantId: string; sectionId?: string }) =>
       client.get('/api/v1/admissions/section-rules', params as any),

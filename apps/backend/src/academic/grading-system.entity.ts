@@ -5,16 +5,16 @@ export class GradingSystem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   branchId: string;
 
-  @Column()
+  @Column('uuid')
   educationLevelId: string;
 
-  @Column()
+  @Column('uuid')
   schoolYearId: string;
 
   @Column()

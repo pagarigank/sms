@@ -20,6 +20,12 @@ export class Branch {
   address: string;
 
   @Column({ nullable: true })
+  contactEmail: string;
+
+  @Column({ nullable: true })
+  contactPhone: string;
+
+  @Column({ nullable: true })
   tin: string;
 
   @Column({ nullable: true })

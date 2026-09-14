@@ -1,6 +1,21 @@
+export interface FeeType {
+  id: string;
+  tenantId: string;
+  name: string;
+  code: string;
+  description?: string;
+  glAccountCode?: string;
+  isTaxable: boolean;
+  taxRate?: number;
+  educationLevelIds?: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface ApiClientConfig {
   baseUrl: string;
   getToken?: () => string | null;
+  getTenantId?: () => string | null;
   onUnauthorized?: () => void;
 }
 
@@ -46,8 +61,13 @@ export interface Department {
   tenantId: string;
   branchId: string;
   name: string;
+  code: string;
   educationLevelIds: string[];
   isDefault: boolean;
+  contactEmail?: string;
+  tenantName?: string;
+  branchName?: string;
+  createdAt: string;
 }
 
 export interface User {
@@ -58,7 +78,10 @@ export interface User {
   lastName: string;
   middleName?: string;
   status: string;
+  mfaEnabled?: boolean;
+  lastLoginAt?: string;
   createdAt: string;
+  tenantName?: string;
 }
 
 export interface Role {
@@ -66,6 +89,8 @@ export interface Role {
   tenantId: string;
   name: string;
   description?: string;
+  isSystem: boolean;
+  createdAt: string;
 }
 
 export interface Permission {
@@ -101,6 +126,7 @@ export interface Floor {
   label: string;
   floorNumber: number;
   rooms?: Room[];
+  createdAt: string;
 }
 
 export interface Room {
@@ -115,6 +141,7 @@ export interface Room {
   status: string;
   equipmentTags?: string[];
   assets?: RoomAsset[];
+  createdAt: string;
 }
 
 export interface RoomAsset {
@@ -143,6 +170,7 @@ export interface GradeLevel {
   code: string;
   name: string;
   sortOrder: number;
+  createdAt: string;
 }
 
 export interface SchoolYear {
@@ -152,6 +180,7 @@ export interface SchoolYear {
   startDate: string;
   endDate: string;
   status: string;
+  createdAt: string;
 }
 
 export interface Term {
@@ -169,6 +198,8 @@ export interface Track {
   id: string;
   tenantId: string;
   name: string;
+  code: string;
+  createdAt: string;
 }
 
 export interface Strand {
@@ -177,6 +208,7 @@ export interface Strand {
   trackId: string;
   name: string;
   code: string;
+  createdAt: string;
 }
 
 export interface Program {
@@ -185,6 +217,7 @@ export interface Program {
   code: string;
   name: string;
   level: string;
+  createdAt: string;
 }
 
 export interface Subject {
@@ -197,6 +230,7 @@ export interface Subject {
   isCore: boolean;
   isElective: boolean;
   learningArea?: string;
+  createdAt: string;
 }
 
 export interface Curriculum {
@@ -211,6 +245,9 @@ export interface Curriculum {
   status: string;
   versionLabel?: string;
   clonedFromCurriculumId?: string;
+  clonedAt?: string;
+  clonedBy?: string;
+  createdAt: string;
 }
 
 export interface CurriculumSubject {
@@ -221,6 +258,19 @@ export interface CurriculumSubject {
   termId?: string;
   prerequisiteSubjectId?: string;
   effectiveGradingSystemId?: string;
+}
+
+/**
+ * One band of a grading system's letter-grade scale, stored in
+ * `GradingSystem.config.gradeScale`. Bands are evaluated in array order;
+ * the first band whose `min <= average` matches. Use `min: null` for the
+ * catch-all failing band (e.g. the < 60 row).
+ */
+export interface GradeScaleBand {
+  label: string;
+  /** Inclusive lower bound of the band, or null for the catch-all below-range band. */
+  min: number | null;
+  descriptor?: string;
 }
 
 export interface GradingSystem {
@@ -321,13 +371,14 @@ export interface AuditEvent {
 export interface LoginRequest {
   email: string;
   password: string;
+  tenantId?: string;
 }
 
 export interface RegisterRequest {
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   tenantId?: string;
 }
 
@@ -335,4 +386,92 @@ export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
   user: User;
+}
+
+/** Login response is a discriminated union: full tokens or MFA challenge. */
+export type LoginResponse =
+  | ({ mfaRequired: false } & AuthTokens)
+  | {
+      mfaRequired: true;
+      mfaSetupRequired: boolean;
+      tempToken: string;
+      user: Pick<User, 'id' | 'email' | 'tenantId'>;
+    };
+
+export interface MfaVerifyRequest {
+  userId: string;
+  token: string;
+}
+
+export interface MeResponse {
+  user: {
+    id: string;
+    email: string;
+    tenantId: string;
+    firstName?: string;
+    lastName?: string;
+    middleName?: string;
+    status: string;
+    mfaEnabled: boolean;
+    lastLoginAt?: string;
+  };
+  tenant: { id: string; name: string; slug: string } | null;
+  roles: string[];
+  permissions: string[];
+}
+
+export interface ImpersonationGrant {
+  id: string;
+  supportUserId: string;
+  targetTenantId: string;
+  targetUserId?: string;
+  expiresAt: string;
+  reason: string;
+  isBreakGlass: boolean;
+}
+
+export interface TenantPlan {
+  id: string;
+  plan_key: string;
+  name: string;
+  max_branches?: number;
+  max_students?: number;
+  modules?: Record<string, unknown>;
+  is_active: boolean;
+}
+
+export interface RolePermission {
+  roleId: string;
+  permissionId: string;
+}
+
+export interface WorkflowDefinition {
+  id: string;
+  entityType: string;
+  name: string;
+  steps: unknown[];
+  tenantId: string;
+  createdAt: string;
+}
+
+export interface WorkflowInstance {
+  id: string;
+  workflowDefinitionId: string;
+  entityType: string;
+  entityId: string;
+  status: string;
+  currentStep: number;
+  tenantId: string;
+  createdAt: string;
+}
+
+export interface WorkflowApproval {
+  id: string;
+  workflowInstanceId: string;
+  step: number;
+  approverUserId?: string;
+  status: string;
+  comment?: string;
+  decidedAt?: string;
+  createdAt: string;
 }

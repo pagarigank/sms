@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { FacilityService } from './facility.service';
 import { CreateBuildingDto } from './dto/create-building.dto';
@@ -37,6 +37,13 @@ export class FacilityController {
     return this.facilityService.createBuilding(dto);
   }
 
+  @Put('buildings/:id')
+  @ApiOperation({ summary: 'Update a building' })
+  @ApiResponse({ status: 200, description: 'Building updated.' })
+  updateBuilding(@Param('id') id: string, @Body() dto: Partial<CreateBuildingDto>) {
+    return this.facilityService.updateBuilding(id, dto);
+  }
+
   @Delete('buildings/:id')
   @ApiOperation({ summary: 'Delete a building', description: 'Soft-delete a building (cascades to floors/rooms).' })
   @ApiResponse({ status: 200, description: 'Building deleted.' })
@@ -65,6 +72,13 @@ export class FacilityController {
   @ApiResponse({ status: 409, description: 'Floor number already exists in this building.' })
   createFloor(@Body() dto: CreateFloorDto) {
     return this.facilityService.createFloor(dto);
+  }
+
+  @Put('floors/:id')
+  @ApiOperation({ summary: 'Update a floor' })
+  @ApiResponse({ status: 200, description: 'Floor updated.' })
+  updateFloor(@Param('id') id: string, @Body() dto: Partial<CreateFloorDto>) {
+    return this.facilityService.updateFloor(id, dto);
   }
 
   @Delete('floors/:id')
@@ -102,6 +116,13 @@ export class FacilityController {
   @ApiResponse({ status: 201, description: 'Room created.' })
   createRoom(@Body() dto: CreateRoomDto) {
     return this.facilityService.createRoom(dto);
+  }
+
+  @Put('rooms/:id')
+  @ApiOperation({ summary: 'Update a room', description: 'Update room attributes (type, capacity, status, equipment tags).' })
+  @ApiResponse({ status: 200, description: 'Room updated.' })
+  updateRoom(@Param('id') id: string, @Body() dto: CreateRoomDto) {
+    return this.facilityService.updateRoom(id, dto);
   }
 
   @Delete('rooms/:id')

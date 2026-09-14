@@ -19,8 +19,14 @@ export class MfaService {
 
   /**
    * Check if a user requires MFA based on their roles.
+   *
+   * Enforcement is disabled unless MFA_REQUIRED=true is set in the environment,
+   * so dev/test logins (including first-time MFA setup challenges) go straight
+   * through. Set MFA_REQUIRED=true in production to restore enforcement.
    */
   async requiresMfa(userId: string, tenantId: string): Promise<boolean> {
+    if (process.env.MFA_REQUIRED !== 'true') return false;
+
     const userRoles = await this.userRolesRepo.find({
       where: { userId, tenantId },
     });

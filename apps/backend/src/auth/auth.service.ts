@@ -232,6 +232,7 @@ export class AuthService {
     const tenant = await this.usersRepository.manager
       .getRepository('Tenant')
       .findOneBy({ id: user.tenantId });
+    const isPlatformAdmin = await this.isPlatformAdmin(userId);
     return {
       user: {
         id: user.id,
@@ -247,11 +248,24 @@ export class AuthService {
       tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug } : null,
       roles: roleNames,
       permissions: permissionCodes,
+      platformAdmin: isPlatformAdmin,
     };
   }
 
+  async isPlatformAdmin(userId: string): Promise<boolean> {
+    const role = await this.usersRepository.manager
+      .getRepository('Role')
+      .findOne({ where: { id: 'b0000000-0000-0000-0000-000000000001' } });
+    if (!role) return false;
+    const userRole = await this.usersRepository.manager
+      .getRepository(UserRole)
+      .findOne({ where: { userId, roleId: role.id } });
+    return !!userRole;
+  }
+
   private async generateTokens(user: User, requestMeta?: { ipAddress?: string; userAgent?: string }) {
-    const payload = { sub: user.id, tenantId: user.tenantId, email: user.email };
+    const platformAdmin = await this.isPlatformAdmin(user.id);
+    const payload = { sub: user.id, tenantId: user.tenantId, email: user.email, platformAdmin };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(
       { sub: user.id },

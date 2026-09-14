@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Student } from './student.entity';
@@ -14,10 +14,15 @@ import { PromotionDecision } from './promotion-decision.entity';
 import { BehaviorIncident } from './behavior-incident.entity';
 import { HealthRecord } from './health-record.entity';
 import { StudentMergeAudit } from './student-merge-audit.entity';
+import { InvoiceService } from '../billing/invoice.service';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class SisService {
+  private readonly logger = new Logger(SisService.name);
+
   constructor(
+    private readonly invoiceService: InvoiceService,
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
     @InjectRepository(Guardian) private guardiansRepo: Repository<Guardian>,
     @InjectRepository(StudentGuardian) private studentGuardiansRepo: Repository<StudentGuardian>,
@@ -44,6 +49,22 @@ export class SisService {
     const student = await this.studentsRepo.findOne({ where: { id, tenantId } });
     if (!student) throw new NotFoundException('Student not found');
     return student;
+  }
+
+  /**
+   * Guardian portal: resolve the children of the logged-in guardian user.
+   * Lookup chain: users.id → guardians.userId → student_guardians → students.
+   * Throws Forbidden (not empty list) when the user has no guardian profile,
+   * so the portal can distinguish "no children" from "not a guardian".
+   */
+  async findChildrenOfGuardianUser(userId: string, tenantId: string) {
+    if (!userId) throw new ForbiddenException('Not authenticated as a guardian');
+    const guardian = await this.guardiansRepo.findOne({ where: { userId, tenantId } });
+    if (!guardian) throw new ForbiddenException('No guardian profile linked to this account');
+    const links = await this.studentGuardiansRepo.find({ where: { guardianId: guardian.id, tenantId } });
+    if (links.length === 0) return [];
+    const studentIds = links.map((l) => l.studentId);
+    return this.studentsRepo.find({ where: studentIds.map((id) => ({ id, tenantId })) });
   }
 
   async createStudent(data: Partial<Student>) {
@@ -119,7 +140,25 @@ export class SisService {
     if (existing) throw new BadRequestException('Student is already enrolled in this school year');
 
     const enrollment = this.enrollmentsRepo.create(data);
-    return this.enrollmentsRepo.save(enrollment);
+    const saved = await this.enrollmentsRepo.save(enrollment);
+
+    // Auto-assess fees: generate the invoice from the resolved fee structure
+    // (Phase 6 exit criterion). Non-fatal: enrollment must not be lost to a
+    // billing configuration problem — the invoice can be generated manually.
+    try {
+      await this.invoiceService.generateInvoice({
+        tenantId: saved.tenantId,
+        branchId: saved.branchId,
+        studentId: saved.studentId,
+        enrollmentId: saved.id,
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Auto-invoice failed for enrollment ${saved.id}: ${e instanceof Error ? e.message : e}`,
+      );
+    }
+
+    return saved;
   }
 
   async updateEnrollment(id: string, tenantId: string, data: Partial<Enrollment>) {

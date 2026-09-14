@@ -11,10 +11,21 @@ import { gradingEndpoints } from './endpoints/grading';
 import { configEndpoints } from './endpoints/config';
 import { sisEndpoints } from './endpoints/sis';
 import { admissionsEndpoints } from './endpoints/admissions';
+import { schedulingEndpoints } from './endpoints/scheduling';
+import { attendanceEndpoints } from './endpoints/attendance';
+import { gradingExtendedEndpoints } from './endpoints/grading-extended';
+import { billingEndpoints, invoiceEndpoints } from './endpoints/billing';
+import { cashieringEndpoints } from './endpoints/cashiering';
+import { communicationsEndpoints } from './endpoints/communications';
+import { documentsEndpoints } from './endpoints/documents';
+import { hrEndpoints } from './endpoints/hr';
+import { reportingEndpoints } from './endpoints/reporting';
+import { reportsEndpoints } from './endpoints/reports';
 
 export class ApiClient {
   private baseUrl: string;
   private getToken?: () => string | null;
+  private getTenantId?: () => string | null;
   private onUnauthorized?: () => void;
 
   public auth;
@@ -27,12 +38,23 @@ export class ApiClient {
   public academic;
   public grading;
   public config;
-  public sis;
-  public admissions;
+    public sis;
+    public admissions;
+    public scheduling;
+    public attendance;
+    public billing;
+    public invoices;
+    public cashiering;
+    public communications;
+    public documents;
+    public hr;
+    public reporting;
+    public reports;
 
   constructor(config: ApiClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, '');
     this.getToken = config.getToken;
+    this.getTenantId = config.getTenantId;
     this.onUnauthorized = config.onUnauthorized;
 
     this.auth = authEndpoints(this);
@@ -43,23 +65,33 @@ export class ApiClient {
     this.iam = iamEndpoints(this);
     this.facility = facilityEndpoints(this);
     this.academic = academicEndpoints(this);
-    this.grading = gradingEndpoints(this);
+    this.grading = { ...gradingEndpoints(this), ...gradingExtendedEndpoints(this) };
     this.config = configEndpoints(this);
     this.sis = sisEndpoints(this);
     this.admissions = admissionsEndpoints(this);
+    this.scheduling = schedulingEndpoints(this);
+    this.attendance = attendanceEndpoints(this);
+    this.billing = billingEndpoints(this);
+    this.cashiering = cashieringEndpoints(this);
+    this.communications = communicationsEndpoints(this);
+    this.documents = documentsEndpoints(this);
+    this.hr = hrEndpoints(this);
+    this.reporting = reportingEndpoints(this);
+    this.reports = reportsEndpoints(this);
+    this.invoices = invoiceEndpoints(this);
   }
 
   async request<T>(
     method: string,
     path: string,
     body?: unknown,
-    params?: Record<string, string>
+    params?: Record<string, string | number | boolean>
   ): Promise<ApiResponse<T>> {
     const url = new URL(`${this.baseUrl}${path}`);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
-          url.searchParams.set(key, value);
+          url.searchParams.set(key, String(value));
         }
       });
     }
@@ -71,6 +103,13 @@ export class ApiClient {
     const token = this.getToken?.();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Tenant context for RLS: backend middleware reads x-tenant-id for
+    // pre-auth requests and as a cross-check after JWT verification.
+    const tenantId = this.getTenantId?.();
+    if (tenantId) {
+      headers['x-tenant-id'] = tenantId;
     }
 
     const response = await fetch(url.toString(), {
@@ -86,15 +125,15 @@ export class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `HTTP ${response.status}`);
+      throw new Error((error as any).message || `HTTP ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as T;
     return { data, status: response.status };
   }
 
-  async get<T>(path: string, params?: Record<string, string>): Promise<ApiResponse<T>> {
-    return this.request<T>('GET', path, undefined, params);
+  async get<T>(path: string, params?: Record<string, string | number | boolean>): Promise<ApiResponse<T>> {
+    return this.request<T>('GET', path, undefined, params as Record<string, string>);
   }
 
   async post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {

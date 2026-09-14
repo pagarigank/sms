@@ -5,31 +5,31 @@ export class Section {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   branchId: string;
 
-  @Column()
+  @Column('uuid')
   schoolYearId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   gradeLevelId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   strandId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   programId: string;
 
   @Column()
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   adviserEmployeeId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   roomId: string;
 
   @Column({ default: 40 })

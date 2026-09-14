@@ -4,7 +4,7 @@ import { AdmissionsService } from './admissions.service';
 
 @ApiTags('admissions')
 @ApiBearerAuth('access-token')
-@Controller('api/v1/admissions')
+@Controller('admissions')
 export class AdmissionsController {
   constructor(private readonly admissionsService: AdmissionsService) {}
 
@@ -45,6 +45,47 @@ export class AdmissionsController {
   @ApiOperation({ summary: 'Get applicants grouped by pipeline stage (Kanban view)' })
   async getPipeline(@Headers('x-tenant-id') tenantId: string) {
     return this.admissionsService.getApplicantsByStage(tenantId);
+  }
+
+  // === Applicants (G-23) ===
+  @Post('applicants')
+  @ApiOperation({ summary: 'Create an admissions applicant' })
+  async createApplicant(@Headers('x-tenant-id') tenantId: string, @Body() body: any) {
+    return this.admissionsService.createApplicant({ ...body, tenantId });
+  }
+
+  @Get('applicants')
+  @ApiOperation({ summary: 'List applicants' })
+  async getApplicants(@Headers('x-tenant-id') tenantId: string, @Query('status') status?: string) {
+    return this.admissionsService.getApplicants(tenantId, status);
+  }
+
+  @Get('applicants/:id')
+  @ApiOperation({ summary: 'Get applicant detail' })
+  async getApplicant(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.admissionsService.findOneApplicant(id, tenantId);
+  }
+
+  @Put('applicants/:id')
+  @ApiOperation({ summary: 'Update applicant info' })
+  async updateApplicant(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string, @Body() body: any) {
+    return this.admissionsService.updateApplicant(id, tenantId, body);
+  }
+
+  @Put('applicants/:id/stage')
+  @ApiOperation({ summary: 'Move applicant to another pipeline stage (Kanban drag)' })
+  async moveApplicantStage(
+    @Param('id') id: string,
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() body: { stageId: string },
+  ) {
+    return this.admissionsService.moveApplicantToStage(id, tenantId, body.stageId);
+  }
+
+  @Post('applicants/:id/convert')
+  @ApiOperation({ summary: 'Convert an accepted applicant into an enrolled student' })
+  async convertApplicant(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.admissionsService.convertApplicantToStudent(id, tenantId);
   }
 
   // === Section Assignment Rules ===

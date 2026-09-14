@@ -5,13 +5,13 @@ export class StudentGuardian {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   studentId: string;
 
-  @Column()
+  @Column('uuid')
   guardianId: string;
 
   @Column({ nullable: true })

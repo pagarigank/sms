@@ -5,22 +5,22 @@ export class Enrollment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column()
+  @Column('uuid')
   branchId: string;
 
-  @Column()
+  @Column('uuid')
   studentId: string;
 
-  @Column()
+  @Column('uuid')
   schoolYearId: string;
 
-  @Column()
+  @Column('uuid')
   curriculumId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   sectionId: string;
 
   @Column({ default: 'enrolled' })
@@ -29,19 +29,19 @@ export class Enrollment {
   @Column({ type: 'timestamptz', default: () => 'NOW()' })
   enrolledAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   gradeLevelId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   strandId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   programId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   previousSchoolYearId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   previousGradeLevelId: string;
 
   @Column({ nullable: true })

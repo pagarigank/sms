@@ -5,13 +5,13 @@ export class ApplicantStageConfig {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   branchId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   educationLevelId: string;
 
   @Column()
@@ -32,7 +32,7 @@ export class ApplicantStageConfig {
   @Column({ nullable: true })
   autoAdmitOnComplete: boolean;
 
-  @Column({ nullable: true })
+  @Column({ type: 'simple-array', nullable: true })
   requiredDocuments: string[];
 
   @Column({ type: 'jsonb', default: () => "'{}'" })

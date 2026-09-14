@@ -1,10 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
-import { UserPlus, Search } from 'lucide-react';
+import { UserPlus, Search, Users } from 'lucide-react';
+import {
+  Badge,
+  // Import ColumnDef from @sms/ui so it matches the DataTable prop type
+  // (the workspace has duplicate react-table majors; this avoids variance errors).
+  type ColumnDef,
+  Button,
+  DataTable,
+  Input,
+  StatusDot,
+  statusToVariant,
+} from '@sms/ui';
 
 export default function EnrollmentsPage() {
   const { currentTenantId, currentBranchId } = useTenantStore();
@@ -20,48 +32,100 @@ export default function EnrollmentsPage() {
     `${e.studentId} ${e.schoolYearId}`.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (isLoading) return <div className="flex items-center justify-center p-8"><div className="animate-spin h-8 w-8 border-b-2 border-primary rounded-full" /></div>;
+  const columns: ColumnDef<any, any>[] = [
+    {
+      accessorKey: 'studentId',
+      header: 'Student',
+      cell: ({ row }) => (
+        <span className="font-medium text-[hsl(var(--foreground))]">{row.original.studentId}</span>
+      ),
+    },
+    {
+      accessorKey: 'schoolYearId',
+      header: 'School Year',
+      cell: ({ row }) => (
+        <span className="text-[hsl(var(--ink-200))]">{row.original.schoolYearId}</span>
+      ),
+    },
+    {
+      accessorKey: 'sectionId',
+      header: 'Section',
+      cell: ({ row }) => (
+        <span className="text-[hsl(var(--ink-200))]">{row.original.sectionId || '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={statusToVariant(row.original.status)}>
+          <StatusDot />
+          {row.original.status
+            ? row.original.status.charAt(0).toUpperCase() + row.original.status.slice(1)
+            : 'Unknown'}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'enrolledAt',
+      header: 'Enrolled At',
+      cell: ({ row }) => (
+        <span className="text-[hsl(var(--ink-200))]">
+          {row.original.enrolledAt ? new Date(row.original.enrolledAt).toLocaleDateString() : '—'}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Enrollments</h1>
           <p className="text-muted-foreground">Manage student enrollments</p>
         </div>
-        <button className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-          <UserPlus className="mr-2 h-4 w-4" /> New Enrollment
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/sis/enrollments/wizard">
+              <UserPlus className="h-4 w-4" /> Enrollment Wizard
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/sis/enrollments/batch">
+              <Users className="h-4 w-4" /> Batch Re-enroll
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-lg border bg-card shadow-sm">
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input placeholder="Search enrollments..." value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} className="flex h-9 w-full max-w-sm rounded-md border px-3 py-1 text-sm" />
+      <DataTable
+        columns={columns}
+        data={filtered}
+        isLoading={isLoading}
+        toolbar={
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search enrollments..."
+                value={search}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+                className="pl-10"
+                aria-label="Search enrollments"
+              />
+            </div>
           </div>
-        </div>
-        <div className="p-4">
-          {filtered.length === 0 ? <p className="text-center text-muted-foreground py-8">No enrollments found</p> : (
-            <table className="w-full">
-              <thead><tr className="border-b text-left text-sm text-muted-foreground">
-                <th className="pb-3 font-medium">Student</th><th className="pb-3 font-medium">School Year</th><th className="pb-3 font-medium">Section</th><th className="pb-3 font-medium">Status</th><th className="pb-3 font-medium">Enrolled At</th>
-              </tr></thead>
-              <tbody>
-                {filtered.map((e: any) => (
-                  <tr key={e.id} className="border-b last:border-0">
-                    <td className="py-3 font-medium">{e.studentId}</td>
-                    <td className="py-3">{e.schoolYearId}</td>
-                    <td className="py-3">{e.sectionId || '—'}</td>
-                    <td className="py-3"><span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${e.status === 'enrolled' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{e.status}</span></td>
-                    <td className="py-3">{e.enrolledAt ? new Date(e.enrolledAt).toLocaleDateString() : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+        }
+        emptyMessage="No enrollments found."
+        emptyDescription="Use the Enrollment Wizard to enroll a student into a school year."
+        emptyAction={
+          <Button size="sm" asChild>
+            <Link href="/sis/enrollments/wizard">
+              <UserPlus className="h-4 w-4" /> Open Enrollment Wizard
+            </Link>
+          </Button>
+        }
+      />
     </div>
   );
 }

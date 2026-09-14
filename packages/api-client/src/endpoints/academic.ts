@@ -6,25 +6,46 @@ import type {
 
 export const academicEndpoints = (client: ApiClient) => ({
   // Education Levels
-  listEducationLevels: () =>
-    client.get<EducationLevel[]>('/api/v1/academic/education-levels'),
+  listEducationLevels: (params?: { limit?: number }) =>
+    client.get<EducationLevel[]>('/api/v1/academic/education-levels', params as Record<string, string | number | boolean>),
 
   createEducationLevel: (data: { code: string; name: string; sortOrder: number }) =>
     client.post<EducationLevel>('/api/v1/academic/education-levels', data),
 
+  updateEducationLevel: (id: string, data: Partial<EducationLevel>) =>
+    client.patch<EducationLevel>(`/api/v1/academic/education-levels/${id}`, data),
+
+  deleteEducationLevel: (id: string) =>
+    client.delete<EducationLevel>(`/api/v1/academic/education-levels/${id}`),
+
   // Grade Levels
-  listGradeLevels: (params?: { educationLevelId?: string }) =>
+  listGradeLevels: (params?: { educationLevelId?: string; limit?: number; search?: string }) =>
     client.get<GradeLevel[]>('/api/v1/academic/grade-levels', params as Record<string, string>),
 
   createGradeLevel: (data: { educationLevelId: string; code: string; name: string; sortOrder: number }) =>
     client.post<GradeLevel>('/api/v1/academic/grade-levels', data),
 
+  updateGradeLevel: (id: string, data: Partial<GradeLevel>) =>
+    client.patch<GradeLevel>(`/api/v1/academic/grade-levels/${id}`, data),
+
+  deleteGradeLevel: (id: string) =>
+    client.delete<GradeLevel>(`/api/v1/academic/grade-levels/${id}`),
+
   // School Years
-  listSchoolYears: () =>
-    client.get<SchoolYear[]>('/api/v1/academic/school-years'),
+  listSchoolYears: (params?: { branchId?: string; limit?: number; search?: string; status?: string }) =>
+    client.get<SchoolYear[]>('/api/v1/academic/school-years', params as Record<string, string>),
 
   createSchoolYear: (data: { name: string; startDate: string; endDate: string }) =>
     client.post<SchoolYear>('/api/v1/academic/school-years', data),
+
+  updateSchoolYear: (id: string, data: Partial<SchoolYear>) =>
+    client.patch<SchoolYear>(`/api/v1/academic/school-years/${id}`, data),
+
+  deleteSchoolYear: (id: string) =>
+    client.delete<SchoolYear>(`/api/v1/academic/school-years/${id}`),
+
+  activateSchoolYear: (id: string) =>
+    client.post<SchoolYear>(`/api/v1/academic/school-years/${id}/activate`),
 
   // Terms
   listTerms: (schoolYearId: string) =>
@@ -34,35 +55,59 @@ export const academicEndpoints = (client: ApiClient) => ({
     client.post<Term>('/api/v1/academic/terms', data),
 
   // Tracks
-  listTracks: () =>
-    client.get<Track[]>('/api/v1/academic/tracks'),
+  listTracks: (params?: { limit?: number; search?: string }) =>
+    client.get<Track[]>('/api/v1/academic/tracks', params as Record<string, string>),
 
   createTrack: (data: { name: string }) =>
     client.post<Track>('/api/v1/academic/tracks', data),
 
+  updateTrack: (id: string, data: Partial<Track>) =>
+    client.patch<Track>(`/api/v1/academic/tracks/${id}`, data),
+
+  deleteTrack: (id: string) =>
+    client.delete<Track>(`/api/v1/academic/tracks/${id}`),
+
   // Strands
-  listStrands: (params?: { trackId?: string }) =>
+  listStrands: (params?: { trackId?: string; limit?: number; search?: string }) =>
     client.get<Strand[]>('/api/v1/academic/strands', params as Record<string, string>),
 
   createStrand: (data: { trackId: string; name: string; code: string }) =>
     client.post<Strand>('/api/v1/academic/strands', data),
 
+  updateStrand: (id: string, data: Partial<Strand>) =>
+    client.patch<Strand>(`/api/v1/academic/strands/${id}`, data),
+
+  deleteStrand: (id: string) =>
+    client.delete<Strand>(`/api/v1/academic/strands/${id}`),
+
   // Programs
-  listPrograms: () =>
-    client.get<Program[]>('/api/v1/academic/programs'),
+  listPrograms: (params?: { limit?: number; search?: string; level?: string }) =>
+    client.get<Program[]>('/api/v1/academic/programs', params as Record<string, string>),
 
   createProgram: (data: { code: string; name: string; level: string }) =>
     client.post<Program>('/api/v1/academic/programs', data),
 
-  // Subjects
-  listSubjects: () =>
-    client.get<Subject[]>('/api/v1/academic/subjects'),
+  updateProgram: (id: string, data: Partial<Program>) =>
+    client.patch<Program>(`/api/v1/academic/programs/${id}`, data),
 
-  createSubject: (data: { code: string; title: string; units: number; isCore?: boolean; isElective?: boolean; learningArea?: string }) =>
+  deleteProgram: (id: string) =>
+    client.delete<Program>(`/api/v1/academic/programs/${id}`),
+
+  // Subjects
+  listSubjects: (params?: { limit?: number; search?: string; isCore?: boolean }) =>
+    client.get<Subject[]>('/api/v1/academic/subjects', params as Record<string, string>),
+
+  createSubject: (data: { code: string; title: string; units: number; isCore?: boolean; isElective?: boolean; learningArea?: string; hoursPerWeek?: number }) =>
     client.post<Subject>('/api/v1/academic/subjects', data),
 
+  updateSubject: (id: string, data: Partial<Subject>) =>
+    client.patch<Subject>(`/api/v1/academic/subjects/${id}`, data),
+
+  deleteSubject: (id: string) =>
+    client.delete<Subject>(`/api/v1/academic/subjects/${id}`),
+
   // Curricula
-  listCurricula: (params?: { schoolYearId?: string; educationLevelId?: string }) =>
+  listCurricula: (params?: { schoolYearId?: string; educationLevelId?: string; branchId?: string; limit?: number; search?: string }) =>
     client.get<Curriculum[]>('/api/v1/academic/curricula', params as Record<string, string>),
 
   getCurriculum: (id: string) =>
@@ -71,15 +116,22 @@ export const academicEndpoints = (client: ApiClient) => ({
   createCurriculum: (data: { educationLevelId: string; schoolYearId: string; gradeLevelId?: string; strandId?: string; programId?: string; branchId?: string }) =>
     client.post<Curriculum>('/api/v1/academic/curricula', data),
 
+  updateCurriculum: (id: string, data: Partial<Curriculum>) =>
+    client.patch<Curriculum>(`/api/v1/academic/curricula/${id}`, data),
+
   cloneCurriculum: (id: string) =>
     client.post<Curriculum>(`/api/v1/academic/curricula/${id}/clone`),
 
   publishCurriculum: (id: string) =>
     client.post<Curriculum>(`/api/v1/academic/curricula/${id}/publish`),
 
+  deleteCurriculum: (id: string) =>
+    client.delete<Curriculum>(`/api/v1/academic/curricula/${id}`),
+
   // Curriculum Subjects
-  listCurriculumSubjects: (params?: { curriculumId?: string }) =>
-    client.get<CurriculumSubject[]>('/api/v1/academic/curriculum-subjects', params as Record<string, string>),
+  // Backend route is nested: GET /academic/curricula/:curriculumId/subjects
+  listCurriculumSubjects: (curriculumId: string) =>
+    client.get<CurriculumSubject[]>(`/api/v1/academic/curricula/${curriculumId}/subjects`),
 
   createCurriculumSubject: (data: { curriculumId: string; subjectId: string; termId?: string; prerequisiteSubjectId?: string }) =>
     client.post<CurriculumSubject>('/api/v1/academic/curriculum-subjects', data),

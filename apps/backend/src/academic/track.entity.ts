@@ -5,7 +5,7 @@ export class Track {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   tenantId: string;
 
   @Column()

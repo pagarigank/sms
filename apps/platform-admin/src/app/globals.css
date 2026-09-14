@@ -3,57 +3,131 @@
 @tailwind utilities;
 
 @layer base {
+  /* override shared tokens for the platform-admin temperature:
+     cool-neutral light surface, same accent (blue) + secondary (indigo). */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --radius: 0.625rem;
+
+    --surface-base: 210 25% 97%;
+    --surface-raised: 0 0% 100%;
+    --surface-overlay: 0 0% 100%;
+    --surface-input: 210 20% 94%;
+    --surface-muted: 210 15% 95%;
+
+    --ink-100: 215 25% 12%;
+    --ink-200: 215 12% 42%;
+    --ink-300: 215 10% 55%;
+    --ink-inverse: 0 0% 100%;
+
+    --border: 210 20% 91%;
+    --border-strong: 210 20% 85%;
+
+    /* brand accent — blue */
+    --accent: 222.2 86% 53%;
+    --accent-ink: 0 0% 100%;
+    --accent-subtle: 222.2 86% 94%;
+
+    /* secondary — indigo, for data viz / highlights only */
+    --secondary: 233 82% 60%;
+    --secondary-ink: 0 0% 100%;
+    --secondary-subtle: 233 82% 94%;
+
+    --status-success-surface: 142 71% 96%;
+    --status-success-ink: 25 20% 15%;
+    --status-warning-surface: 38 92% 95%;
+    --status-warning-ink: 38 44% 18%;
+    --status-danger-surface: 0 72% 95%;
+    --status-danger-ink: 0 50% 18%;
+    --status-info-surface: 212 92% 95%;
+    --status-info-ink: 220 30% 18%;
+    --status-neutral-surface: 210 15% 95%;
+    --status-neutral-ink: 215 12% 40%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* keep shadcn aliases working */
+    --background: var(--surface-base);
+    --foreground: var(--ink-100);
+    --card: var(--surface-raised);
+    --card-foreground: var(--ink-100);
+    --popover: var(--surface-overlay);
+    --popover-foreground: var(--ink-100);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-ink);
+    --secondary: var(--surface-muted);
+    --secondary-foreground: var(--ink-100);
+    --muted: var(--surface-muted);
+    --muted-foreground: var(--ink-200);
+    --accent: var(--surface-muted);
+    --accent-foreground: var(--ink-100);
+    --border: var(--border);
+    --input: var(--surface-input);
+    --ring: var(--accent);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --radius: 0.625rem;
+
+    --surface-base: 222.2 84% 4.9%;
+    --surface-raised: 222.2 84% 4.9%;
+    --surface-overlay: 222.2 84% 4.9%;
+    --surface-input: 222.2 84% 5.5%;
+    --surface-muted: 222.2 84% 7%;
+
+    --ink-100: 0 0% 100%;
+    --ink-200: 210 20% 80%;
+    --ink-300: 210 15% 60%;
+    --ink-inverse: 222.2 84% 4.9%;
+
+    --border: 222.2 84% 10%;
+    --border-strong: 222.2 84% 15%;
+
+    --accent: 222.2 86% 53%;
+    --accent-ink: 0 0% 100%;
+    --accent-subtle: 222.2 86% 14%;
+
+    --secondary: 233 82% 60%;
+    --secondary-ink: 0 0% 100%;
+    --secondary-subtle: 233 82% 14%;
+
+    --status-success-surface: 222.2 84% 10%;
+    --status-success-ink: 142 71% 60%;
+    --status-warning-surface: 222.2 84% 10%;
+    --status-warning-ink: 38 92% 60%;
+    --status-danger-surface: 222.2 84% 10%;
+    --status-danger-ink: 0 72% 65%;
+    --status-info-surface: 222.2 84% 10%;
+    --status-info-ink: 212 92% 65%;
+    --status-neutral-surface: 222.2 84% 10%;
+    --status-neutral-ink: 210 20% 70%;
+
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --destructive-foreground: 0 0% 100%;
+
+    --background: var(--surface-base);
+    --foreground: var(--ink-100);
+    --card: var(--surface-raised);
+    --card-foreground: var(--ink-100);
+    --popover: var(--surface-overlay);
+    --popover-foreground: var(--ink-100);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-ink);
+    --secondary: var(--surface-muted);
+    --secondary-foreground: var(--ink-100);
+    --muted: var(--surface-muted);
+    --muted-foreground: var(--ink-200);
+    --accent: var(--surface-muted);
+    --accent-foreground: var(--ink-100);
+    --border: var(--border);
+    --input: var(--surface-input);
+    --ring: var(--accent);
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
 }
+
+
