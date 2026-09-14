@@ -133,7 +133,7 @@ function StepTransition({ stepKey, children }: { stepKey: string; children: Reac
   }
 
   // Mount one frame after render so the fade-in transition runs on every step change.
-  if (!mounted) {
+  if (!mounted && typeof window !== 'undefined') {
     requestAnimationFrame(() => setMounted(true));
   }
 
