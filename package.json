@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "turbo run test",
+    "audit:contract": "node scripts/contract-audit.js",
     "clean": "turbo run clean"
   },
   "devDependencies": {

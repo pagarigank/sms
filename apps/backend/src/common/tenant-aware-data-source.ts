@@ -8,10 +8,13 @@ import { getTenantIdFromContext, getPlatformAdminFromContext } from './tenant-co
  * on every pooled pg client when running inside a tenant context (AsyncLocalStorage,
  * populated by TenantContextMiddleware), and resets them when the client is released
  * back to the pool. This makes the tenant_isolation_* RLS policies enforced.
- *
- * Platform admin bypass: when `app.is_platform_admin` is set to 'true', all
- * tenant_isolation_* policies allow access to all rows regardless of the
- * current_tenant_id GUC.
+ * * Platform admin bypass (G-30, migration 014): the RLS bypass requires BOTH
+ * `app.is_platform_admin` = 'true' AND membership in the `platform_admin_rls`
+ * DB marker role (pg_has_role gate). The GUC alone is inert — Postgres lets
+ * any role set custom GUCs, so membership is what carries authority. This
+ * service sets the GUC only from server-side JWT context; grant
+ * `platform_admin_rls` solely to the dedicated platform-admin connection
+ * role (dev: sms_app carries it for parity — see migration 014).
  *
  * How it works: the pg pool emits 'connect' once per physical client. We
  * wrap client.query; on each call, if an ALS tenant context exists and the

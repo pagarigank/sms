@@ -19,12 +19,15 @@ export class TenantContextMiddleware implements NestMiddleware {
       (req as any).tenantId = tenantId;
       // Run the rest of the request (all downstream TypeORM queries) inside
       // the tenant context; TenantAwareDataSource reads it per connection.
-      // Platform admins bypass RLS via the app.is_platform_admin GUC.
+      // Platform admins bypass RLS via the app.is_platform_admin GUC — which
+      // is INERT at the DB unless the connection role is a member of the
+      // platform_admin_rls marker role (migration 014, G-30 remediation).
       return runWithTenantContext({ tenantId, platformAdmin }, () => next());
     }
     // No tenant context (platform admin viewing all, or unauthenticated public
-    // endpoint). Platform admin flag still propagates to GUC so RLS policies
-    // that check is_platform_admin can allow cross-tenant access.
+    // endpoint). Platform admin flag still propagates to GUC; policies honor
+    // it only when the connection role holds platform_admin_rls membership
+    // (migration 014, G-30 remediation).
     return runWithTenantContext({ tenantId: '' as any, platformAdmin }, () => next());
   }
 }
