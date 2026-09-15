@@ -14,7 +14,7 @@ export class FeeStructure {
   // Nullable: not used by the 6-level fee-resolution logic in
   // billing.service.ts (see tables.md G-21 note); API-created structures
   // leave it NULL. Kept for BIR-style template bookkeeping.
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ nullable: true })
   templateKey: string;
 
   @Column({ type: 'uuid', nullable: true })

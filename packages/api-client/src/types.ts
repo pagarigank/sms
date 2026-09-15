@@ -310,17 +310,19 @@ export interface LookupList {
   id: string;
   tenantId: string;
   name: string;
-  code: string;
-  description?: string;
+  /** Entity type the list applies to (e.g. room_type, payment_method). */
+  entityType: string;
+  isActive: boolean;
+  createdAt?: string;
 }
 
 export interface LookupItem {
   id: string;
   tenantId: string;
-  listId: string;
+  lookupListId: string;
   value: string;
   label: string;
-  sortOrder: number;
+  sortOrder?: number;
   isActive: boolean;
 }
 
@@ -328,30 +330,38 @@ export interface CustomFieldDefinition {
   id: string;
   tenantId: string;
   entityType: string;
-  fieldName: string;
+  fieldKey: string;
   fieldType: string;
   label: string;
-  options?: Record<string, unknown>;
-  isRequired: boolean;
+  required: boolean;
+  options?: any[];
+  validationRules?: Record<string, unknown>;
+  visibilityRules?: Record<string, unknown>;
   sortOrder: number;
+  createdAt?: string;
 }
 
 export interface NumberingScheme {
   id: string;
   tenantId: string;
+  branchId?: string;
   name: string;
   entityType: string;
+  /** Format template, e.g. "STU-{SEQ:6}" or "{PREFIX}-{SEQ}". */
   format: string;
-  currentSequence: number;
+  counterValue: number;
+  isActive: boolean;
+  createdAt?: string;
 }
 
 export interface FeatureFlag {
   id: string;
   tenantId: string;
-  key: string;
-  name: string;
-  isEnabled: boolean;
-  config?: Record<string, unknown>;
+  branchId?: string;
+  flagKey: string;
+  enabled: boolean;
+  rolloutPercentage: number;
+  createdAt?: string;
 }
 
 export interface AuditEvent {

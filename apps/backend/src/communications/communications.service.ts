@@ -65,7 +65,13 @@ export class CommunicationsService {
   // === Dispatch (stub — wires to real provider in Phase 8.1 final) ===
   async dispatch(data: {
     tenantId: string; branchId: string; eventType: string;
-    recipientUserId: string; recipientContact: string;
+    recipientUserId: string;
+    /** Legacy single-contact form, used as fallback for every channel. */
+    recipientContact?: string;
+    /** Channel-specific contacts: an sms template uses the phone, an email
+     * template the address. Takes precedence over `recipientContact`. */
+    recipientPhone?: string | null;
+    recipientEmail?: string | null;
     variables: Record<string, any>;
   }) {
     // Find matching rules for this event type (rules ARE tenant-scoped —
@@ -79,20 +85,30 @@ export class CommunicationsService {
       const template = await this.templatesRepo.findOne({ where: { id: rule.templateId, tenantId: data.tenantId } });
       if (!template) continue;
 
+      // A contact only reaches its channel: an sms template needs a phone, an
+      // email template needs an address — skip mismatched pairs instead of
+      // logging an undeliverable notification.
+      const contact =
+        template.channel === 'sms'
+          ? String(data.recipientPhone ?? data.recipientContact ?? '')
+          : String(data.recipientEmail ?? data.recipientContact ?? '');
+      if (!contact) continue;
+      if (template.channel === 'email' && !contact.includes('@')) continue;
+
       // Resolve merge fields
       let body = template.bodyTemplate;
       for (const [key, value] of Object.entries(data.variables)) {
         body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value));
       }
 
-      // Log the dispatch
+      // Log the dispatch (recipientContact records the channel-appropriate contact)
       const log = this.logsRepo.create({
         tenantId: data.tenantId,
         branchId: data.branchId,
         templateId: template.id,
         channel: template.channel,
         recipientUserId: data.recipientUserId,
-        recipientContact: data.recipientContact,
+        recipientContact: contact,
         payload: data.variables,
         status: 'queued',
       });

@@ -14,7 +14,7 @@ export class Subject {
   @Column()
   title: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ type: 'decimal', precision: 4, scale: 1, nullable: true })

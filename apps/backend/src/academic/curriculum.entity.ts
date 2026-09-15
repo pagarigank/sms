@@ -26,7 +26,8 @@ export class Curriculum {
   @Column('uuid')
   schoolYearId: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  // Version label ("2026.1"), not an identifier.
+  @Column({ nullable: true })
   versionLabel: string;
 
   @Column({ default: 'draft' })

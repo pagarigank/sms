@@ -7,6 +7,8 @@ import { PermanentRecord } from './permanent-record.entity';
 import { ClassOffering } from './class-offering.entity';
 import { Subject } from '../academic/subject.entity';
 import { GradeComponent } from '../academic/grade-component.entity';
+import { GradingSystem } from '../academic/grading-system.entity';
+import { Enrollment } from '../sis/enrollment.entity';
 
 @Injectable()
 export class GradingExtendedService {
@@ -24,16 +26,18 @@ export class GradingExtendedService {
     });
   }
 
-  async enterGrade(data: Partial<GradeEntry>) {
-    const entry = this.gradeEntriesRepo.create(data);
+  async enterGrade(data: Partial<GradeEntry>, enteredByUserId?: string) {
+    const entry = await this.normalizeGradeEntry(data);
+    if (enteredByUserId) entry.enteredByUserId = enteredByUserId;
     return this.gradeEntriesRepo.save(entry);
   }
 
   async bulkEnterGrades(entries: Partial<GradeEntry>[]) {
     const results = { created: 0, updated: 0, errors: [] as any[] };
 
-    for (const entry of entries) {
+    for (const raw of entries) {
       try {
+        const entry = await this.normalizeGradeEntry(raw);
         const existing = await this.gradeEntriesRepo.findOne({
           where: {
             studentId: entry.studentId,
@@ -54,11 +58,116 @@ export class GradingExtendedService {
           results.created++;
         }
       } catch (error: any) {
-        results.errors.push({ entry, error: error.message });
+        results.errors.push({
+          entry: raw,
+          error: error.message,
+          status: error.getStatus?.() ?? 400,
+        });
       }
     }
 
     return results;
+  }
+
+  /**
+   * Complete a client-supplied grade entry so it satisfies the NOT NULL
+   * foreign keys on grade_entries, and derive the computed score columns.
+   *
+   * Clients (the gradebook grid) send only { studentId, classOfferingId,
+   * gradeComponentId, rawScore } — everything else is derivable server-side:
+   *   termId            ← class offering
+   *   gradingSystemId   ← grade component
+   *   enrollmentId      ← the student's enrollment in the offering's school year
+   *   percentage        ← rawScore / maxScore × 100 (rawScore as-is when no max is set)
+   *   transmutedGrade   ← the grading system's configured transmutation table
+   *                       (e.g. DepEd Order 8 s. 2015 — nothing hard-coded here)
+   */
+  private async normalizeGradeEntry(data: Partial<GradeEntry>): Promise<GradeEntry> {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new BadRequestException('Request body must be a JSON object');
+    }
+
+    const missing: string[] = [];
+    if (!data.studentId) missing.push('studentId');
+    if (!data.classOfferingId) missing.push('classOfferingId');
+    if (!data.gradeComponentId) missing.push('gradeComponentId');
+    if (missing.length) throw new BadRequestException(`Missing required field(s): ${missing.join(', ')}`);
+
+    // `score` is a common client alias for rawScore — accept it but never store it.
+    const payload: Partial<GradeEntry> & { score?: unknown } = { ...data };
+    if (payload.rawScore == null && payload.score != null) payload.rawScore = payload.score as number;
+    delete payload.score;
+
+    const rawScore = payload.rawScore == null ? null : Number(payload.rawScore);
+    if (rawScore != null && Number.isNaN(rawScore)) {
+      throw new BadRequestException('rawScore (or score) must be a number');
+    }
+    const maxScore = payload.maxScore == null ? null : Number(payload.maxScore);
+    if (maxScore != null && (Number.isNaN(maxScore) || maxScore <= 0)) {
+      throw new BadRequestException('maxScore must be a positive number');
+    }
+
+    const offeringsRepo = this.gradeEntriesRepo.manager.getRepository(ClassOffering);
+    const offering = await offeringsRepo.findOne({ where: { id: payload.classOfferingId, tenantId: payload.tenantId } });
+    if (!offering) throw new NotFoundException(`Class offering ${payload.classOfferingId} not found`);
+
+    const componentsRepo = this.gradeEntriesRepo.manager.getRepository(GradeComponent);
+    const component = await componentsRepo.findOne({ where: { id: payload.gradeComponentId, tenantId: payload.tenantId } });
+    if (!component) throw new NotFoundException(`Grade component ${payload.gradeComponentId} not found`);
+
+    let enrollmentId: string | undefined = payload.enrollmentId;
+    if (!enrollmentId) {
+      const enrollment = await this.gradeEntriesRepo.manager.getRepository(Enrollment).findOne({
+        where: { tenantId: payload.tenantId, studentId: payload.studentId, schoolYearId: offering.schoolYearId },
+        order: { createdAt: 'DESC' },
+      });
+      if (!enrollment) {
+        throw new BadRequestException(
+          `No enrollment found for student ${payload.studentId} in the class offering's school year — cannot record a grade`,
+        );
+      }
+      enrollmentId = enrollment.id;
+    }
+
+    const percentage =
+      rawScore == null ? null : maxScore ? (rawScore / maxScore) * 100 : rawScore;
+    const roundedPercentage = percentage == null ? null : Math.round(percentage * 100) / 100;
+    const transmutedGrade =
+      roundedPercentage == null ? null : await this.transmuteGrade(component.gradingSystemId, roundedPercentage);
+
+    return this.gradeEntriesRepo.create({
+      ...payload,
+      tenantId: payload.tenantId!,
+      enrollmentId,
+      termId: payload.termId ?? offering.termId,
+      gradingSystemId: component.gradingSystemId,
+      rawScore,
+      maxScore,
+      percentage: roundedPercentage,
+      transmutedGrade,
+    });
+  }
+
+  /**
+   * Transmute a percentage into the grading system's reported grade using its
+   * configured `config.transmutation` band table ({ "minPercentage": grade }).
+   * Falls back to rounding the percentage when the system defines no table.
+   */
+  private async transmuteGrade(gradingSystemId: string, percentage: number): Promise<number> {
+    const system = await this.gradeEntriesRepo.manager
+      .getRepository(GradingSystem)
+      .findOne({ where: { id: gradingSystemId } });
+    const table = (system?.config as any)?.transmutation;
+    if (!table || typeof table !== 'object') return Math.round(percentage);
+
+    const bands = Object.entries(table as Record<string, number>)
+      .map(([min, grade]) => ({ min: Number(min), grade: Number(grade) }))
+      .filter((b) => !Number.isNaN(b.min) && !Number.isNaN(b.grade))
+      .sort((a, b) => b.min - a.min);
+    if (bands.length === 0) return Math.round(percentage);
+
+    const match = bands.find((b) => percentage >= b.min);
+    return match ? match.grade : bands[bands.length - 1].grade;
   }
 
   async finalizeGrades(classOfferingId: string, termId: string, tenantId: string) {
@@ -132,11 +241,17 @@ export class GradingExtendedService {
     if (!request) throw new NotFoundException('Grade change request not found');
     if (request.status !== 'pending') throw new BadRequestException('Request is not pending');
 
-    // Update the grade entry
+    // Update the grade entry, keeping the computed columns consistent.
     if (request.gradeEntryId) {
       const gradeEntry = await this.gradeEntriesRepo.findOne({ where: { id: request.gradeEntryId } });
       if (gradeEntry) {
         gradeEntry.rawScore = request.newScore;
+        const percentage =
+          gradeEntry.maxScore && gradeEntry.maxScore > 0
+            ? (Number(request.newScore) / Number(gradeEntry.maxScore)) * 100
+            : Number(request.newScore);
+        gradeEntry.percentage = Math.round(percentage * 100) / 100;
+        gradeEntry.transmutedGrade = await this.transmuteGrade(gradeEntry.gradingSystemId, gradeEntry.percentage);
         await this.gradeEntriesRepo.save(gradeEntry);
       }
     }
@@ -171,8 +286,47 @@ export class GradingExtendedService {
     });
   }
 
+  /**
+   * Create a permanent record, deriving what clients don't send:
+   *   enrollmentId  ← the student's enrollment for the record's school year
+   *   gradeLevelId  ← that enrollment's grade level
+   *   recordType    ← defaults to 'report_card'
+   */
   async createPermanentRecord(data: Partial<PermanentRecord>) {
-    const record = this.permanentRecordsRepo.create(data);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new BadRequestException('Request body must be a JSON object');
+    }
+
+    const missing: string[] = [];
+    if (!data.studentId) missing.push('studentId');
+    if (!data.schoolYearId) missing.push('schoolYearId');
+    if (missing.length) throw new BadRequestException(`Missing required field(s): ${missing.join(', ')}`);
+
+    let enrollmentId = data.enrollmentId;
+    let gradeLevelId = data.gradeLevelId;
+    if (!enrollmentId || !gradeLevelId) {
+      const enrollment = await this.permanentRecordsRepo.manager.getRepository(Enrollment).findOne({
+        where: { tenantId: data.tenantId, studentId: data.studentId, schoolYearId: data.schoolYearId },
+        order: { createdAt: 'DESC' },
+      });
+      if (!enrollment) {
+        throw new BadRequestException(
+          `No enrollment found for student ${data.studentId} in school year ${data.schoolYearId} — cannot create a permanent record`,
+        );
+      }
+      enrollmentId = enrollmentId ?? enrollment.id;
+      gradeLevelId = gradeLevelId ?? enrollment.gradeLevelId;
+    }
+    if (!gradeLevelId) {
+      throw new BadRequestException('gradeLevelId could not be derived: the enrollment has no grade level');
+    }
+
+    const record = this.permanentRecordsRepo.create({
+      ...data,
+      enrollmentId,
+      gradeLevelId,
+      recordType: data.recordType ?? 'report_card',
+    });
     return this.permanentRecordsRepo.save(record);
   }
 

@@ -1,5 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, Index } from 'typeorm';
 
+// BIR requirement: no duplicate OR numbers for the same tenant/branch/ATP series
+// (created by 012-hardening-rls-and-or-race.sql). Declared here so the entity
+// metadata carries the constraint too, instead of only the deployed schema.
+@Index('uq_series_counters_scope', ['tenantId', 'branchId', 'atpSeriesId'], { unique: true })
 @Entity({ name: 'series_counters' })
 export class SeriesCounter {
   @PrimaryGeneratedColumn('uuid')

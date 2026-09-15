@@ -7,6 +7,9 @@
 
 ALTER TABLE "applicants" ENABLE ROW LEVEL SECURITY;
 
+-- DROP first so re-running the migration set is safe (003 already does this).
+DROP POLICY IF EXISTS "tenant_isolation_applicants" ON "applicants";
+
 CREATE POLICY "tenant_isolation_applicants"
   ON "applicants"
   AS PERMISSIVE

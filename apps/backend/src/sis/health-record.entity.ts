@@ -14,7 +14,7 @@ export class HealthRecord {
   @Column()
   recordType: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ nullable: true })
   title: string;
 
   @Column({ nullable: true })

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 
@@ -164,5 +164,19 @@ export class BillingController {
   @ApiOperation({ summary: 'Create a withdrawal policy' })
   async createWithdrawalPolicy(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
     return this.billingService.createWithdrawalPolicy({ ...data, tenantId });
+  }
+
+  // === Withdrawal / Refund Quotes ===
+  @Get('refunds/quote')
+  @ApiOperation({ summary: 'Quote a withdrawal refund for an enrollment', description: 'Applies the tenant\'s withdrawal policies (bracket + pro-rate) against payments made for the enrollment. Query params: enrollmentId, withdrawalDate (ISO date, defaults to now). Read-only.' })
+  async quoteRefund(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('enrollmentId') enrollmentId: string,
+    @Query('withdrawalDate') withdrawalDate?: string,
+  ) {
+    if (!enrollmentId) throw new BadRequestException('enrollmentId query parameter is required');
+    const when = withdrawalDate ? new Date(withdrawalDate) : new Date();
+    if (isNaN(when.getTime())) throw new BadRequestException('withdrawalDate must be a valid ISO date');
+    return this.billingService.computeRefund(tenantId, enrollmentId, when);
   }
 }

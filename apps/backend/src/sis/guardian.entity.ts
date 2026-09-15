@@ -10,7 +10,9 @@ export class Guardian {
 
   // Auth link: the login user representing this guardian (portal access).
   // NULL until a portal account is provisioned for them.
-  @Index()
+  // Named to match 011-guardian-portal-reconcile-and-seed.sql; an anonymous
+  // @Index() generated a second, differently named index on the same column.
+  @Index('idx_guardians_user')
   @Column({ type: 'uuid', nullable: true })
   userId: string;
 

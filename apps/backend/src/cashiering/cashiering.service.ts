@@ -241,10 +241,12 @@ export class CashieringService {
       throw new BadRequestException('Payment amount must be greater than zero');
     }
 
-    // Check idempotency
+    // Check idempotency — scoped to the tenant: the payments.idempotencyKey
+    // unique index is global, so an unscoped lookup could return another
+    // tenant's payment on a colliding key.
     if (data.idempotencyKey) {
       const existing = await this.paymentsRepo.findOne({
-        where: { idempotencyKey: data.idempotencyKey },
+        where: { tenantId: data.tenantId, idempotencyKey: data.idempotencyKey },
       });
       if (existing) return existing;
     }

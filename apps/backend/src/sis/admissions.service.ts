@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Applicant } from './applicant.entity';
 import { ApplicantStageConfig } from './applicant-stage-config.entity';
 import { ApplicantStageTransition } from './applicant-stage-transition.entity';
@@ -17,6 +17,7 @@ export class AdmissionsService {
     @InjectRepository(SectionAssignmentRule) private rulesRepo: Repository<SectionAssignmentRule>,
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
     @InjectRepository(Enrollment) private enrollmentsRepo: Repository<Enrollment>,
+    private dataSource: DataSource,
   ) {}
 
   // === Pipeline Stages ===
@@ -105,6 +106,15 @@ export class AdmissionsService {
    * Convert an accepted applicant into a real Student (G-23 completion).
    * Applicant is marked 'enrolled' and linked via metadata for traceability.
    */
+  /**
+   * Convert an accepted applicant into a real student.
+   *
+   * Student creation + applicant stage-move run in ONE transaction: a failure
+   * between the two writes would leave a student with an applicant still
+   * 'pending', and the name-based double-conversion guard would then block
+   * any retry — an operator dead-end. Rolling back together keeps both rows
+   * consistent (either both commit or neither does).
+   */
   async convertApplicantToStudent(id: string, tenantId: string) {
     const applicant = await this.findOneApplicant(id, tenantId);
 
@@ -118,32 +128,39 @@ export class AdmissionsService {
       );
     }
 
-    const student = this.studentsRepo.create({
-      tenantId,
-      branchId: applicant.branchId ?? undefined,
-      firstName: applicant.firstName,
-      middleName: applicant.middleName ?? undefined,
-      lastName: applicant.lastName,
-      birthDate: applicant.birthDate ?? undefined,
-      sex: applicant.gender ?? undefined,
-      address: applicant.address ?? undefined,
-      status: 'active',
-      customFields: { convertedFromApplicantId: applicant.id },
-    });
-    const saved = await this.studentsRepo.save(student);
+    return this.dataSource.transaction(async (manager) => {
+      const studentsRepo = manager.getRepository(Student);
+      const applicantsRepo = manager.getRepository(Applicant);
+      const stagesRepo = manager.getRepository(ApplicantStageConfig);
 
-    // Move applicant to the terminal 'enrolled' stage if configured
-    const enrolledStage = await this.stagesRepo.findOne({
-      where: { tenantId, stageCode: 'enrolled', isActive: true },
-    });
-    if (enrolledStage) {
-      applicant.stageId = enrolledStage.id;
-      applicant.status = enrolledStage.stageCode;
-      applicant.notes = [applicant.notes, `Converted to student ${saved.id}`].filter(Boolean).join(' | ');
-      await this.applicantsRepo.save(applicant);
-    }
+      const saved = await studentsRepo.save(
+        studentsRepo.create({
+          tenantId,
+          branchId: applicant.branchId ?? undefined,
+          firstName: applicant.firstName,
+          middleName: applicant.middleName ?? undefined,
+          lastName: applicant.lastName,
+          birthDate: applicant.birthDate ?? undefined,
+          sex: applicant.gender ?? undefined,
+          address: applicant.address ?? undefined,
+          status: 'active',
+          customFields: { convertedFromApplicantId: applicant.id },
+        }),
+      );
 
-    return saved;
+      // Move applicant to the terminal 'enrolled' stage if configured
+      const enrolledStage = await stagesRepo.findOne({
+        where: { tenantId, stageCode: 'enrolled', isActive: true },
+      });
+      if (enrolledStage) {
+        applicant.stageId = enrolledStage.id;
+        applicant.status = enrolledStage.stageCode;
+        applicant.notes = [applicant.notes, `Converted to student ${saved.id}`].filter(Boolean).join(' | ');
+        await applicantsRepo.save(applicant);
+      }
+
+      return saved;
+    });
   }
 
   // === Pipeline Kanban ===

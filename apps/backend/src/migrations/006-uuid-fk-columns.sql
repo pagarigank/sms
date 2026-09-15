@@ -114,6 +114,25 @@ DROP POLICY IF EXISTS "tenant_isolation_workflow_definitions" ON "workflow_defin
 DROP POLICY IF EXISTS "tenant_isolation_workflow_instances" ON "workflow_instances";
 
 -- ===== column type conversions (315) =====
+-- 000-create-all-tables.sql now derives every column type from the entity
+-- metadata, so a database built from the current migration set is ALREADY uuid
+-- and these conversions would fail ("function pg_catalog.btrim(uuid) does not
+-- exist"). They still matter for a database that predates this file, and ALTER
+-- cannot be wrapped in a conditional, so gate the whole section on whether two
+-- representative columns are still text. No-ops on an up-to-date schema.
+SELECT (
+         COALESCE(
+           (SELECT data_type FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'ad_hoc_sale_items'
+               AND column_name = 'adHocSaleId') <> 'uuid',
+           false)
+         OR COALESCE(
+           (SELECT data_type FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'user_person_links'
+               AND column_name = 'tenantId') <> 'uuid',
+           false)
+       ) AS legacy_text_columns \gset
+\if :legacy_text_columns
 ALTER TABLE "ad_hoc_sale_items" ALTER COLUMN "adHocSaleId" TYPE uuid USING NULLIF(trim("adHocSaleId"), '')::uuid;
 ALTER TABLE "ad_hoc_sale_items" ALTER COLUMN "tenantId" TYPE uuid USING NULLIF(trim("tenantId"), '')::uuid;
 ALTER TABLE "ad_hoc_sales" ALTER COLUMN "branchId" TYPE uuid USING NULLIF(trim("branchId"), '')::uuid;
@@ -429,6 +448,7 @@ ALTER TABLE "workflow_definitions" ALTER COLUMN "tenantId" TYPE uuid USING NULLI
 ALTER TABLE "workflow_instances" ALTER COLUMN "tenantId" TYPE uuid USING NULLIF(trim("tenantId"), '')::uuid;
 ALTER TABLE "workflow_instances" ALTER COLUMN "workflowDefinitionId" TYPE uuid USING NULLIF(trim("workflowDefinitionId"), '')::uuid;
 ALTER TABLE "user_roles" ALTER COLUMN "grantedBy" TYPE uuid USING NULLIF(trim("grantedBy"), '')::uuid;
+\endif
 
 -- ===== policy re-creates (101) =====
 CREATE POLICY "tenant_isolation_users" ON "users" AS PERMISSIVE USING ((("tenantId")::text = current_setting('app.current_tenant_id'::text)));

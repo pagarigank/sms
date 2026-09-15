@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 /**
  * Admissions applicant (G-23).
@@ -7,6 +7,10 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
  * pipeline (applicant_stage_configs). When accepted, convertApplicantToStudent()
  * creates the actual Student record — applicants are NOT students.
  */
+// Index names match 004-phase1-fixes.sql so the migration-built schema and the
+// entity metadata agree (TypeORM compares indexes by name).
+@Index('idx_applicants_tenant', ['tenantId'])
+@Index('idx_applicants_stage', ['tenantId', 'stageId', 'status'])
 @Entity({ name: 'applicants' })
 export class Applicant {
   @PrimaryGeneratedColumn('uuid')

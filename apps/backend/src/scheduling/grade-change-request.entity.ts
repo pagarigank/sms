@@ -32,7 +32,7 @@ export class GradeChangeRequest {
   @Column({ type: 'numeric', nullable: true })
   newScore: number;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'text', nullable: true })
   reason: string;
 
   @Column({ default: 'pending' })

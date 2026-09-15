@@ -38,7 +38,7 @@ export class GradeEntry {
   @Column({ type: 'numeric', nullable: true })
   transmutedGrade: number;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'text', nullable: true })
   remarks: string;
 
   @Column({ default: false })

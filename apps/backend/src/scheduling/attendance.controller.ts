@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 
@@ -31,15 +31,18 @@ export class AttendanceController {
 
   @Post('records')
   @ApiOperation({ summary: 'Record attendance for a student' })
-  async recordAttendance(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
-    return this.attendanceService.recordAttendance({ ...data, tenantId });
+  async recordAttendance(@Body() data: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    return this.attendanceService.recordAttendance({ ...data, tenantId }, req.user?.id ?? req.user?.userId ?? req.user?.sub);
   }
 
   @Post('records/bulk')
   @ApiOperation({ summary: 'Bulk record attendance for a class' })
-  async bulkRecord(@Body() body: { records: any[] }, @Headers('x-tenant-id') tenantId: string) {
+  async bulkRecord(@Body() body: { records: any[] }, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    if (!body || !Array.isArray(body.records)) {
+      throw new BadRequestException('Body must be { records: [...] }');
+    }
     const records = body.records.map(r => ({ ...r, tenantId }));
-    return this.attendanceService.bulkRecordAttendance(records);
+    return this.attendanceService.bulkRecordAttendance(records, req.user?.id ?? req.user?.userId ?? req.user?.sub);
   }
 
   @Get('students/:studentId/summary')

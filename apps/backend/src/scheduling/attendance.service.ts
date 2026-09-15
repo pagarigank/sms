@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { AttendanceRecord } from './attendance-record.entity';
@@ -8,9 +8,15 @@ import { AttendanceNotificationThreshold } from './attendance-notification-thres
 import { ClassOffering } from './class-offering.entity';
 import { StudentSectionAssignment } from '../sis/student-section-assignment.entity';
 import { Student } from '../sis/student.entity';
+import { Enrollment } from '../sis/enrollment.entity';
+import { Guardian } from '../sis/guardian.entity';
+import { StudentGuardian } from '../sis/student-guardian.entity';
+import { CommunicationsService } from '../communications/communications.service';
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     @InjectRepository(AttendanceRecord) private recordsRepo: Repository<AttendanceRecord>,
     @InjectRepository(AttendanceConfig) private configsRepo: Repository<AttendanceConfig>,
@@ -19,6 +25,9 @@ export class AttendanceService {
     @InjectRepository(ClassOffering) private offeringsRepo: Repository<ClassOffering>,
     @InjectRepository(StudentSectionAssignment) private assignmentsRepo: Repository<StudentSectionAssignment>,
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
+    @InjectRepository(Guardian) private guardiansRepo: Repository<Guardian>,
+    @InjectRepository(StudentGuardian) private studentGuardiansRepo: Repository<StudentGuardian>,
+    private communicationsService: CommunicationsService,
   ) {}
 
   /**
@@ -61,31 +70,36 @@ export class AttendanceService {
     });
   }
 
-  async recordAttendance(data: Partial<AttendanceRecord>) {
+  async recordAttendance(data: Partial<AttendanceRecord>, recordedByUserId?: string) {
+    const record = await this.normalizeAttendanceRecord(data);
+    if (recordedByUserId) record.recordedByUserId = recordedByUserId;
+
     // Check if already recorded
     const existing = await this.recordsRepo.findOne({
       where: {
-        studentId: data.studentId,
-        classOfferingId: data.classOfferingId,
-        attendanceDate: data.attendanceDate,
-        tenantId: data.tenantId,
+        studentId: record.studentId,
+        classOfferingId: record.classOfferingId,
+        attendanceDate: record.attendanceDate,
+        tenantId: record.tenantId,
       },
     });
 
     if (existing) {
-      Object.assign(existing, data);
+      Object.assign(existing, record);
       return this.recordsRepo.save(existing);
     }
 
-    const record = this.recordsRepo.create(data);
     return this.recordsRepo.save(record);
   }
 
-  async bulkRecordAttendance(records: Partial<AttendanceRecord>[]) {
+  async bulkRecordAttendance(records: Partial<AttendanceRecord>[], recordedByUserId?: string) {
     const results = { created: 0, updated: 0, errors: [] as any[] };
 
-    for (const record of records) {
+    for (const raw of records) {
       try {
+        const record = await this.normalizeAttendanceRecord(raw);
+        if (recordedByUserId) record.recordedByUserId = recordedByUserId;
+
         const existing = await this.recordsRepo.findOne({
           where: {
             studentId: record.studentId,
@@ -100,16 +114,76 @@ export class AttendanceService {
           await this.recordsRepo.save(existing);
           results.updated++;
         } else {
-          const newRecord = this.recordsRepo.create(record);
-          await this.recordsRepo.save(newRecord);
+          await this.recordsRepo.save(record);
           results.created++;
         }
       } catch (error: any) {
-        results.errors.push({ record, error: error.message });
+        results.errors.push({
+          record: raw,
+          error: error.message,
+          status: error.getStatus?.() ?? 400,
+        });
       }
     }
 
     return results;
+  }
+
+  /**
+   * Complete a client-supplied attendance record so it satisfies the NOT NULL
+   * foreign keys on attendance_records.
+   *
+   * The attendance grid sends { studentId, enrollmentId?, sectionId?,
+   * classOfferingId, attendanceDate, status }. enrollmentId/sectionId are
+   * derivable server-side — the grid's roster entry can legitimately lack an
+   * enrollmentId (an empty string), and clients that only know the class
+   * offering shouldn't need to resolve the rest themselves:
+   *   sectionId     ← class offering
+   *   enrollmentId  ← the student's enrollment in the offering's school year
+   */
+  private async normalizeAttendanceRecord(data: Partial<AttendanceRecord>): Promise<Partial<AttendanceRecord>> {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new BadRequestException('Record must be a JSON object');
+    }
+
+    const missing: string[] = [];
+    if (!data.studentId) missing.push('studentId');
+    if (!data.classOfferingId) missing.push('classOfferingId');
+    if (!data.attendanceDate) missing.push('attendanceDate');
+    if (!data.status) missing.push('status');
+    if (missing.length) throw new BadRequestException(`Missing required field(s): ${missing.join(', ')}`);
+
+    if (isNaN(new Date(data.attendanceDate as any).getTime())) {
+      throw new BadRequestException('attendanceDate must be a valid date');
+    }
+
+    const offering = await this.offeringsRepo.findOne({
+      where: { id: data.classOfferingId!, tenantId: data.tenantId! },
+    });
+    if (!offering) {
+      throw new NotFoundException(`Class offering ${data.classOfferingId} not found`);
+    }
+
+    // An empty string from the UI means "not provided" — derive it.
+    let enrollmentId = data.enrollmentId || undefined;
+    if (!enrollmentId) {
+      const enrollment = await this.recordsRepo.manager.getRepository(Enrollment).findOne({
+        where: { tenantId: data.tenantId!, studentId: data.studentId!, schoolYearId: offering.schoolYearId },
+        order: { createdAt: 'DESC' },
+      });
+      if (!enrollment) {
+        throw new BadRequestException(
+          `No enrollment found for student ${data.studentId} in the class offering's school year — cannot record attendance`,
+        );
+      }
+      enrollmentId = enrollment.id;
+    }
+
+    return {
+      ...data,
+      enrollmentId,
+      sectionId: data.sectionId || offering.sectionId,
+    };
   }
 
   async getStudentAttendanceSummary(studentId: string, tenantId: string, schoolYearId: string) {
@@ -179,6 +253,12 @@ export class AttendanceService {
     return this.thresholdsRepo.save(threshold);
   }
 
+  /**
+   * Evaluate the tenant's absence/tardiness thresholds for a student and,
+   * when breached, dispatch `attendance_absence` notifications to every
+   * guardian who `canReceiveNotifications`. Dispatch failures are logged and
+   * swallowed so threshold checks never break attendance entry.
+   */
   async checkAbsenceThresholds(tenantId: string, studentId: string) {
     // Get recent attendance
     const records = await this.recordsRepo.find({
@@ -209,12 +289,88 @@ export class AttendanceService {
       lateCount >= thresholds.tardyCountThreshold ||
       consecutiveAbsences >= thresholds.consecutiveAbsenceThreshold;
 
+    if (!shouldNotify) {
+      return {
+        shouldNotify,
+        absentCount,
+        lateCount,
+        consecutiveAbsences,
+        thresholds,
+      };
+    }
+
+    const dispatched = await this.dispatchAbsenceAlerts(tenantId, studentId, {
+      absentCount,
+      lateCount,
+      consecutiveAbsences,
+    });
+
     return {
       shouldNotify,
       absentCount,
       lateCount,
       consecutiveAbsences,
       thresholds,
+      notificationsDispatched: dispatched,
     };
+  }
+
+  /**
+   * Send `attendance_absence` notifications for a student to all guardians
+   * who opted into notifications. Uses the last absence date as the template
+   * `{{date}}` variable. Best-effort: never throws to the caller.
+   */
+  private async dispatchAbsenceAlerts(
+    tenantId: string,
+    studentId: string,
+    counts: { absentCount: number; lateCount: number; consecutiveAbsences: number },
+  ): Promise<number> {
+    try {      const student = await this.studentsRepo.findOne({ where: { id: studentId, tenantId } });
+      if (!student) return 0;
+
+      const links = await this.studentGuardiansRepo.find({ where: { tenantId, studentId } });
+      if (links.length === 0) return 0;
+
+      const guardianIds = [...new Set(links.map((l) => l.guardianId))];
+      const guardians = await this.guardiansRepo.find({ where: { id: In(guardianIds), tenantId } });      const notifiable = guardians.filter((g) => {
+        const link = links.find((l) => l.guardianId === g.id);
+        return link?.canReceiveNotifications && (g.email || g.contactNumber);
+      });
+      if (notifiable.length === 0) return 0;
+
+      const latestRecord = await this.recordsRepo.findOne({
+        where: { studentId, tenantId, status: 'absent' },
+        order: { attendanceDate: 'DESC' },
+      });
+      const absenceDate = latestRecord?.attendanceDate
+        ? String(latestRecord.attendanceDate)
+        : new Date().toISOString().slice(0, 10);
+
+      let dispatched = 0;
+      for (const guardian of notifiable) {
+        const results = await this.communicationsService.dispatch({
+          tenantId,
+          branchId: student.branchId,
+          eventType: 'attendance_absence',
+          recipientUserId: guardian.id,
+          recipientPhone: guardian.contactNumber ?? null,
+          recipientEmail: guardian.email ?? null,
+          variables: {
+            studentName: `${student.firstName} ${student.lastName}`,
+            date: absenceDate,
+            absentCount: counts.absentCount,
+            lateCount: counts.lateCount,
+            consecutiveAbsences: counts.consecutiveAbsences,
+          },
+        });
+        dispatched += results.length;
+      }
+      return dispatched;
+    } catch (err) {
+      this.logger.warn(
+        `Absence-threshold dispatch failed for student ${studentId}: ${err instanceof Error ? err.message : err}`,
+      );
+      return 0;
+    }
   }
 }

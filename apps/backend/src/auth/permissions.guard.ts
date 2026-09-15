@@ -5,6 +5,8 @@ import { Repository, In } from 'typeorm';
 import { UserRole } from '../tenants/user-role.entity';
 import { RolePermission } from '../tenants/role-permission.entity';
 import { Permission } from '../tenants/permission.entity';
+import { IS_PUBLIC_KEY } from './public.decorator';
+import { resolveApiPermission } from './api-permissions';
 
 export const REQUIRE_PERMISSION = 'require_permission';
 export const RequirePermission = (resource: string, action: string) => {
@@ -29,13 +31,26 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.getAllAndOverride<{ resource: string; action: string }>(REQUIRE_PERMISSION, [
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!required) return true;
+    if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest();
+
+    // Explicit decorator metadata wins; otherwise fall back to the declarative
+    // API→permission map (domain controllers carry no per-route decorators).
+    const required =
+      this.reflector.getAllAndOverride<{ resource: string; action: string }>(REQUIRE_PERMISSION, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? resolveApiPermission(request.method, request.path ?? request.url ?? '');
+
+    // No declared requirement (unmapped route, self-service endpoint) → the
+    // route is protected by authentication only.
+    if (!required) return true;
+
     const user = request.user;
     if (!user) throw new ForbiddenException('Not authenticated');
 
@@ -46,12 +61,12 @@ export class PermissionsGuard implements CanActivate {
     // Regular users: only their own tenant's roles.
     const userRoles = await this.userRolesRepo.find({
       where: isPlatformAdmin
-        ? { userId: user.sub }
-        : { userId: user.sub, tenantId: jwtTenantId },
+        ? { userId: user.sub ?? user.id }
+        : { userId: user.sub ?? user.id, tenantId: jwtTenantId },
     });
     if (userRoles.length === 0) throw new ForbiddenException('No roles assigned');
 
-    const roleIds = userRoles.map(ur => ur.roleId);
+    const roleIds = userRoles.map((ur) => ur.roleId);
 
     // Get permissions for those roles
     const rolePermissions = await this.rolePermissionsRepo.find({
@@ -59,13 +74,13 @@ export class PermissionsGuard implements CanActivate {
     });
     if (rolePermissions.length === 0) throw new ForbiddenException('No permissions assigned');
 
-    const permissionIds = rolePermissions.map(rp => rp.permissionId);
+    const permissionIds = rolePermissions.map((rp) => rp.permissionId);
     const permissions = await this.permissionsRepo.find({
       where: { id: In(permissionIds) },
     });
 
     const hasPermission = permissions.some(
-      p => p.resource === required.resource && p.action === required.action,
+      (p) => p.resource === required.resource && p.action === required.action,
     );
     if (!hasPermission) {
       throw new ForbiddenException(`Missing permission: ${required.resource}:${required.action}`);

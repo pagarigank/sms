@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CashieringService } from './cashiering.service';
+import { OptionalIdempotencyGuard } from '../common/idempotency.guard';
 
 @ApiTags('cashiering')
 @ApiBearerAuth('access-token')
@@ -67,6 +68,7 @@ export class CashieringController {
   }
 
   @Post('payments/:id/allocate')
+  @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Allocate payment across invoices' })
   async allocatePayment(
     @Param('id') id: string,
@@ -78,6 +80,7 @@ export class CashieringController {
 
   // === Refunds ===
   @Put('receipts/:id/void')
+  @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Void an official receipt' })
   async voidReceipt(
     @Param('id') id: string,
@@ -88,6 +91,7 @@ export class CashieringController {
   }
 
   @Post('refunds')
+  @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Create a refund request' })
   async createRefund(@Headers('x-tenant-id') tenantId: string, @Body() body: any) {
     return this.cashieringService.createRefund({ ...body, tenantId });
@@ -95,6 +99,7 @@ export class CashieringController {
 
   // === Ad-Hoc Sales ===
   @Post('ad-hoc-sales')
+  @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Create an ad-hoc sale (non-tuition)' })
   async createAdHocSale(@Headers('x-tenant-id') tenantId: string, @Body() body: any) {
     return this.cashieringService.createAdHocSale({ ...body, tenantId });

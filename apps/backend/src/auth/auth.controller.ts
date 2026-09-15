@@ -7,6 +7,7 @@ import { GuardianAuthService } from './guardian-auth.service';
 import { ImpersonationService } from './impersonation.service';
 import { ImpersonationGrant } from './impersonation.types';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { Public } from './public.decorator';
 import { PermissionsGuard, RequirePermission } from './permissions.guard';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -38,6 +39,7 @@ export class AuthController {
     return this.authService.register(body);
   }
 
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Staff login' })
@@ -49,12 +51,13 @@ export class AuthController {
   }
 
   @Post('platform/impersonate/break-glass')
-  @RequirePermission('platform.impersonate', 'impersonate')
+  @RequirePermission('platform.impersonation', 'use')
   @ApiOperation({ summary: 'Break-glass impersonation as platform admin' })
   async platformBreakGlass(@Request() req: any, @Body() body: { targetTenantId: string; reason: string }): Promise<ImpersonationGrant> {
     return this.impersonationService.breakGlassImpersonation(req.user.id, body.targetTenantId, body.reason);
   }
 
+  @Public()
   @Get('tenant-lookup')
   @ApiOperation({ summary: 'Resolve tenant by slug (public, pre-auth)' })
   lookupTenant(@Query('slug') slug: string) {
@@ -63,6 +66,7 @@ export class AuthController {
 
   // === MFA ===
 
+  @Public()
   @Post('mfa/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify MFA token' })
@@ -83,12 +87,14 @@ export class AuthController {
 
   // === Guardian/Student Auth ===
 
+  @Public()
   @Post('guardian/register')
   @ApiOperation({ summary: 'Register guardian account' })
   registerGuardian(@Body() body: any) {
     return this.guardianAuthService.register(body);
   }
 
+  @Public()
   @Post('guardian/login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Guardian login with email/password' })
@@ -96,6 +102,7 @@ export class AuthController {
     return this.guardianAuthService.loginWithPassword(body.email, body.password, body.tenantId);
   }
 
+  @Public()
   @Post('guardian/otp/request')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request OTP for mobile login' })
@@ -103,6 +110,7 @@ export class AuthController {
     return this.guardianAuthService.requestOtp(body.phone, body.tenantId);
   }
 
+  @Public()
   @Post('guardian/otp/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP and login' })
@@ -289,6 +297,7 @@ export class AuthController {
 
   // === Token Management ===
 
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
@@ -296,6 +305,7 @@ export class AuthController {
     return this.authService.refresh(body.refreshToken);
   }
 
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log out — terminate current session (audit-recorded)' })

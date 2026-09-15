@@ -1,889 +1,347 @@
 -- ============================================================
--- SMS Database Migration — All Phase 1-3 Tables
+-- 000 — Entity-accurate schema baseline
 -- ============================================================
--- Generated: 2026-09-04
--- Usage: Run against a clean Postgres database
--- psql -U kpagarigan2 -d sms -f 000-create-all-tables.sql
+-- GENERATED FILE — the DDL below is derived from the TypeORM @Entity
+-- metadata, which is the source of truth for the application. Do not
+-- hand-edit the generated block; regenerate instead:
+--
+--   cd apps/backend
+--   node scripts/generate-schema-baseline.js \
+--     --template scripts/schema-baseline.template.sql \
+--     --out src/migrations/000-create-all-tables.sql
+--
+-- History: this file previously carried ~37 hand-written CREATE TABLE
+-- statements using snake_case column names ("tenant_id", "created_at") while
+-- every entity maps to camelCase ("tenantId", "createdAt"). It also omitted 68
+-- of the 105 entity tables, so it could never build the schema the application
+-- expects. The database everyone ran against had been materialised by TypeORM
+-- `synchronize`, which is why the mismatch went unnoticed: every statement here
+-- is `IF NOT EXISTS`, so on an existing database this file is a no-op.
+--
+-- Every statement is idempotent and safe to re-run on a populated database.
+--
+-- Row-level security is NOT defined here: 003-rls-policies.sql creates the
+-- tenant_isolation_<table> policies for every tenant-scoped table, and
+-- 012/013/014 add the platform-admin role gate. Creating them here as well
+-- collided with those files (same policy names, no DROP POLICY IF EXISTS),
+-- which is why 003 could not run.
 -- ============================================================
 
--- Enable UUID generation
+-- ============================================================
+-- EXTENSIONS
+-- ============================================================
+-- pgcrypto: gen_random_uuid() (older migrations / functions)
+-- uuid-ossp: uuid_generate_v4() (TypeORM's @PrimaryGeneratedColumn('uuid'))
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
--- PHASE 1: Tenancy & IAM
+-- TABLES, INDEXES AND CONSTRAINTS
 -- ============================================================
+-- Generated from every @Entity in apps/backend/src.
+CREATE TABLE IF NOT EXISTS "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "email" character varying, "firstName" character varying, "lastName" character varying, "middleName" character varying, "phone" character varying, "passwordHash" character varying, "mfaSecret" character varying, "mfaEnabled" boolean NOT NULL DEFAULT false, "status" character varying NOT NULL DEFAULT 'active', "lastLoginAt" TIMESTAMP, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"));
 
--- 1. Tenant Plans (global catalog, not tenant-scoped)
-CREATE TABLE IF NOT EXISTS tenant_plans (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  plan_key TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  max_branches INT,
-  max_students INT,
-  modules JSONB DEFAULT '{}',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "user_person_links" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" uuid NOT NULL, "personType" character varying(20) NOT NULL, "personId" uuid NOT NULL, "tenantId" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b50b0e765fa704fdc169f8af46f" PRIMARY KEY ("id"));
 
--- 2. Tenants
-CREATE TABLE IF NOT EXISTS tenants (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  plan_id UUID REFERENCES tenant_plans(id),
-  status TEXT NOT NULL DEFAULT 'active',
-  branding JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE INDEX IF NOT EXISTS "IDX_f0fffdbd39b319628f839c0b29" ON "user_person_links" ("personType");
 
--- 3. Branches
-CREATE TABLE IF NOT EXISTS branches (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  code TEXT NOT NULL,
-  address TEXT,
-  tin TEXT,
-  bir_branch_code TEXT,
-  levels_offered TEXT[] DEFAULT '{}',
-  status TEXT DEFAULT 'active',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(tenant_id, code)
-);
+CREATE TABLE IF NOT EXISTS "user_sessions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "userId" uuid NOT NULL, "sessionTokenHash" character varying NOT NULL, "ipAddress" character varying, "userAgent" character varying, "loginAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "lastActivityAt" TIMESTAMP WITH TIME ZONE, "logoutAt" TIMESTAMP WITH TIME ZONE, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, "isForceTerminated" boolean NOT NULL DEFAULT false, "terminatedBy" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_e93e031a5fed190d4789b6bfd83" PRIMARY KEY ("id"));
 
--- 4. Departments
-CREATE TABLE IF NOT EXISTS departments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  education_level_ids UUID[] DEFAULT '{}',
-  is_default BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE INDEX IF NOT EXISTS "IDX_bc83b28925d1e4d0003833cf92" ON "user_sessions" ("userId", "loginAt");
 
--- 5. Users
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  email TEXT,
-  phone TEXT,
-  password_hash TEXT,
-  mfa_secret TEXT,
-  mfa_enabled BOOLEAN DEFAULT false,
-  status TEXT DEFAULT 'active',
-  last_login_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE INDEX IF NOT EXISTS "IDX_dcc480258dd8d6e0eb3ef8981c" ON "user_sessions" ("tenantId");
 
--- 6. Roles
-CREATE TABLE IF NOT EXISTS roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_system BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "user_roles" ("userId" uuid NOT NULL, "tenantId" uuid NOT NULL, "roleId" uuid NOT NULL, "branchId" uuid, "grantedAt" TIMESTAMP NOT NULL DEFAULT now(), "grantedBy" uuid, CONSTRAINT "PK_46399e1fbf712c2738a4d9be693" PRIMARY KEY ("userId", "tenantId", "roleId"));
 
--- 7. Permissions (global catalog)
-CREATE TABLE IF NOT EXISTS permissions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  resource TEXT NOT NULL,
-  action TEXT NOT NULL,
-  description TEXT,
-  UNIQUE(resource, action)
-);
+CREATE TABLE IF NOT EXISTS "role_permissions" ("roleId" uuid NOT NULL, "permissionId" uuid NOT NULL, CONSTRAINT "PK_d430a02aad006d8a70f3acd7d03" PRIMARY KEY ("roleId", "permissionId"));
 
--- 8. Role-Permissions junction
-CREATE TABLE IF NOT EXISTS role_permissions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-  UNIQUE(role_id, permission_id)
-);
+CREATE TABLE IF NOT EXISTS "rebac_edges" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "subjectUserId" character varying NOT NULL, "relation" character varying NOT NULL, "objectType" character varying NOT NULL, "objectId" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "expiresAt" TIMESTAMP, CONSTRAINT "PK_469aa784f0e5bb97dbf90f7a22c" PRIMARY KEY ("id"));
 
--- 9. User-Roles junction
-CREATE TABLE IF NOT EXISTS user_roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  branch_id UUID REFERENCES branches(id),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id, role_id, tenant_id)
-);
+CREATE TABLE IF NOT EXISTS "roles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "name" character varying NOT NULL, "description" character varying, "isSystem" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_c1433d71a4838793a49dcad46ab" PRIMARY KEY ("id"));
 
--- 10. ReBAC Edges
-CREATE TABLE IF NOT EXISTS rebac_edges (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  subject_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  relation TEXT NOT NULL,
-  object_type TEXT NOT NULL,
-  object_id UUID NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "permissions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "resource" character varying NOT NULL, "action" character varying NOT NULL, "description" character varying, CONSTRAINT "PK_920331560282b8bd21bb02290df" PRIMARY KEY ("id"));
 
--- ============================================================
--- PHASE 1: Config Engine
--- ============================================================
+CREATE TABLE IF NOT EXISTS "student_transfers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "fromBranchId" uuid NOT NULL, "toBranchId" uuid NOT NULL, "fromSchoolYearId" uuid, "toSchoolYearId" uuid, "fromGradeLevelId" uuid, "toGradeLevelId" uuid, "reason" character varying, "status" character varying NOT NULL DEFAULT 'pending', "requestedBy" character varying, "requestedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "approvedBy" character varying, "approvedAt" TIMESTAMP WITH TIME ZONE, "completedBy" character varying, "completedAt" TIMESTAMP WITH TIME ZONE, "metadata" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a5c3b6c61199784501930784735" PRIMARY KEY ("id"));
 
--- 11. Lookup Lists
-CREATE TABLE IF NOT EXISTS lookup_lists (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  code TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(tenant_id, code)
-);
+CREATE TABLE IF NOT EXISTS "tenant_plans" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "planKey" character varying NOT NULL, "name" character varying NOT NULL, "maxBranches" integer, "maxStudents" integer, "modules" jsonb NOT NULL DEFAULT '{}', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_25ae63a541a412628dfe3e36207" UNIQUE ("planKey"), CONSTRAINT "PK_530d4b0e76244f85ae78915babf" PRIMARY KEY ("id"));
 
--- 12. Lookup Items
-CREATE TABLE IF NOT EXISTS lookup_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  list_id UUID NOT NULL REFERENCES lookup_lists(id) ON DELETE CASCADE,
-  value TEXT NOT NULL,
-  label TEXT NOT NULL,
-  sort_order INT DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "student_section_assignments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "sectionId" uuid NOT NULL, "studentId" uuid NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "assignedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "assignedBy" character varying, "unassignedAt" TIMESTAMP, "unassignedBy" character varying, "unassignmentReason" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_fbc9c300e138c4ad82b83fb1b63" PRIMARY KEY ("id"));
 
--- 13. Custom Field Definitions
-CREATE TABLE IF NOT EXISTS custom_field_definitions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  entity_type TEXT NOT NULL,
-  field_name TEXT NOT NULL,
-  field_type TEXT NOT NULL,
-  label TEXT NOT NULL,
-  options JSONB DEFAULT '{}',
-  is_required BOOLEAN DEFAULT false,
-  sort_order INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "departments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "name" character varying NOT NULL, "code" character varying NOT NULL, "educationLevelIds" uuid array NOT NULL DEFAULT '{}', "isDefault" boolean NOT NULL DEFAULT false, "contactEmail" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_839517a681a86bb84cbcc6a1e9d" PRIMARY KEY ("id"));
 
--- 14. Numbering Schemes
-CREATE TABLE IF NOT EXISTS numbering_schemes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  entity_type TEXT NOT NULL,
-  format TEXT NOT NULL,
-  current_sequence INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "branches" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "code" character varying NOT NULL, "address" character varying, "contactEmail" character varying, "contactPhone" character varying, "tin" character varying, "birBranchCode" character varying, "levelsOffered" text array NOT NULL DEFAULT '{}', "status" character varying NOT NULL DEFAULT 'active', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "tenantId" uuid, CONSTRAINT "UQ_9c06cbb83feb2f0be6263bd47ee" UNIQUE ("code"), CONSTRAINT "PK_7f37d3b42defea97f1df0d19535" PRIMARY KEY ("id"));
 
--- 15. Feature Flags
-CREATE TABLE IF NOT EXISTS feature_flags (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  key TEXT NOT NULL,
-  name TEXT NOT NULL,
-  is_enabled BOOLEAN DEFAULT false,
-  config JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(tenant_id, key)
-);
+CREATE TABLE IF NOT EXISTS "tenants" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "slug" character varying NOT NULL, "planId" uuid NOT NULL, "status" character varying NOT NULL DEFAULT 'active', "branding" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_2310ecc5cb8be427097154b18fc" UNIQUE ("slug"), CONSTRAINT "PK_53be67a04681c66b87ee27c9321" PRIMARY KEY ("id"));
 
--- 16. Audit Events
-CREATE TABLE IF NOT EXISTS audit_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  actor_user_id UUID,
-  entity_type TEXT NOT NULL,
-  entity_id UUID NOT NULL,
-  action TEXT NOT NULL,
-  before_state JSONB,
-  after_state JSONB,
-  correlation_id TEXT,
-  ip_address TEXT,
-  request_id TEXT,
-  occurred_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "student_merge_audit" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "primaryStudentId" uuid NOT NULL, "mergedStudentId" uuid NOT NULL, "mergeReason" character varying, "mergedData" jsonb NOT NULL DEFAULT '{}', "mergedBy" character varying, "mergedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "isUndone" boolean NOT NULL DEFAULT false, "undoneBy" character varying, "undoneAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4a197e6f3cb151ed47ad7065e1a" PRIMARY KEY ("id"));
 
--- 17. Education Levels
-CREATE TABLE IF NOT EXISTS education_levels (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  code TEXT NOT NULL,
-  name TEXT NOT NULL,
-  sort_order INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "student_documents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "documentType" character varying NOT NULL, "title" character varying, "description" character varying, "fileUrl" character varying NOT NULL, "fileName" character varying, "mimeType" character varying, "fileSize" integer, "isSystemGenerated" boolean NOT NULL DEFAULT false, "isVisibleToGuardian" boolean NOT NULL DEFAULT true, "verificationCode" character varying, "uploadedBy" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b5805e41001d410755048c8dfc4" PRIMARY KEY ("id"));
 
--- ============================================================
--- PHASE 2: Facility Management
--- ============================================================
+CREATE TABLE IF NOT EXISTS "student_guardians" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "guardianId" uuid NOT NULL, "relationship" character varying, "isPrimary" boolean NOT NULL DEFAULT false, "isEmergencyContact" boolean NOT NULL DEFAULT true, "canReceiveNotifications" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_11ef78f5131711d8da1b14e3332" PRIMARY KEY ("id"));
 
--- 18. Buildings
-CREATE TABLE IF NOT EXISTS buildings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  code TEXT,
-  address TEXT,
-  floor_count INT,
-  contact TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "sections" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "gradeLevelId" uuid, "strandId" uuid, "programId" uuid, "name" character varying NOT NULL, "adviserEmployeeId" uuid, "roomId" uuid, "capacity" integer NOT NULL DEFAULT '40', "isActive" boolean NOT NULL DEFAULT true, "homeroom" character varying, "assignmentRules" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_f9749dd3bffd880a497d007e450" PRIMARY KEY ("id"));
 
--- 19. Floors
-CREATE TABLE IF NOT EXISTS floors (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
-  label TEXT NOT NULL,
-  floor_number INT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(building_id, floor_number)
-);
+CREATE TABLE IF NOT EXISTS "section_assignment_rules" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "sectionId" uuid NOT NULL, "ruleType" character varying NOT NULL, "ruleConfig" jsonb NOT NULL, "priority" integer NOT NULL DEFAULT '0', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d5fb420e41fda01b7a3c0a6e809" PRIMARY KEY ("id"));
 
--- 20. Rooms
-CREATE TABLE IF NOT EXISTS rooms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-  floor_id UUID NOT NULL REFERENCES floors(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  room_type TEXT NOT NULL,
-  capacity INT,
-  seating_layout TEXT,
-  status TEXT DEFAULT 'active',
-  equipment_tags TEXT[] DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "health_records" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "recordType" character varying NOT NULL, "title" character varying, "description" character varying, "recordDate" date, "recordedByUserId" character varying, "clinician" character varying, "diagnosis" character varying, "treatment" character varying, "medication" character varying, "followUpDate" TIMESTAMP, "parentNotified" boolean, "attachments" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_adbd60dda85d616da89ba3f8270" PRIMARY KEY ("id"));
 
--- 21. Room Assets
-CREATE TABLE IF NOT EXISTS room_assets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-  asset_tag TEXT,
-  asset_type TEXT NOT NULL,
-  description TEXT,
-  condition TEXT,
-  maintenance_flag BOOLEAN DEFAULT false,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "guardians" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "userId" uuid, "firstName" character varying NOT NULL, "middleName" character varying, "lastName" character varying NOT NULL, "suffix" character varying, "contactNumber" character varying, "email" character varying, "address" character varying, "occupation" character varying, "employer" character varying, "relationshipToStudent" character varying, "customFields" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_3dcf02f3dc96a2c017106f280be" PRIMARY KEY ("id"));
 
--- ============================================================
--- PHASE 3: Academic Structure
--- ============================================================
+CREATE INDEX IF NOT EXISTS "idx_guardians_user" ON "guardians" ("userId");
 
--- 22. Grade Levels
-CREATE TABLE IF NOT EXISTS grade_levels (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  education_level_id UUID NOT NULL REFERENCES education_levels(id) ON DELETE CASCADE,
-  code TEXT NOT NULL,
-  name TEXT NOT NULL,
-  sort_order INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "enrollment_holds" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "studentId" uuid NOT NULL, "holdType" character varying NOT NULL, "reason" character varying, "blocksSchedule" boolean NOT NULL DEFAULT true, "blocksTor" boolean NOT NULL DEFAULT false, "blocksExamPermit" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "placedBy" character varying, "placedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "releasedBy" character varying, "releasedAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b6fed1eaa34ce503271ced6104d" PRIMARY KEY ("id"));
 
--- 23. School Years
-CREATE TABLE IF NOT EXISTS school_years (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  status TEXT DEFAULT 'draft',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "behavior_incidents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid, "incidentType" character varying NOT NULL, "description" character varying NOT NULL, "incidentDate" date NOT NULL, "incidentLocation" character varying, "witnesses" character varying, "actionTaken" character varying, "reportedBy" character varying, "reportedToUserId" character varying, "status" character varying NOT NULL DEFAULT 'open', "resolution" character varying, "followUpDate" TIMESTAMP, "attachments" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_9bb14887a5543f007f2ca770651" PRIMARY KEY ("id"));
 
--- 24. Terms
-CREATE TABLE IF NOT EXISTS terms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  school_year_id UUID NOT NULL REFERENCES school_years(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  sequence INT NOT NULL,
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  grading_deadline DATE,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "promotion_decisions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "gradeLevelId" uuid NOT NULL, "decision" character varying NOT NULL, "targetGradeLevelId" uuid, "remarks" character varying, "decidedBy" character varying, "decidedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "isFinalized" boolean NOT NULL DEFAULT false, "finalizedBy" character varying, "finalizedAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d874e3710af617f28416d426fa9" PRIMARY KEY ("id"));
 
--- 25. Tracks (SHS)
-CREATE TABLE IF NOT EXISTS tracks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "applicants" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" character varying, "firstName" character varying NOT NULL, "middleName" character varying, "lastName" character varying NOT NULL, "email" character varying, "phone" character varying, "birthDate" date, "gender" character varying, "address" character varying, "previousSchool" character varying, "gradeLevelAppliedFor" character varying, "source" character varying, "status" character varying NOT NULL DEFAULT 'new', "stageId" character varying, "notes" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_c02ec3c46124479ce758ca50943" PRIMARY KEY ("id"));
 
--- 26. Strands (SHS)
-CREATE TABLE IF NOT EXISTS strands (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  track_id UUID REFERENCES tracks(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  code TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE INDEX IF NOT EXISTS "idx_applicants_stage" ON "applicants" ("tenantId", "stageId", "status");
 
--- 27. Programs (College)
-CREATE TABLE IF NOT EXISTS programs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  code TEXT NOT NULL,
-  name TEXT NOT NULL,
-  level TEXT NOT NULL DEFAULT 'college',
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE INDEX IF NOT EXISTS "idx_applicants_tenant" ON "applicants" ("tenantId");
 
--- 28. Subjects
-CREATE TABLE IF NOT EXISTS subjects (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  code TEXT NOT NULL,
-  title TEXT NOT NULL,
-  units NUMERIC(4,1) DEFAULT 0,
-  hours_per_week NUMERIC(4,1),
-  lecture_hours NUMERIC(4,1),
-  lab_hours NUMERIC(4,1),
-  is_core BOOLEAN DEFAULT true,
-  is_elective BOOLEAN DEFAULT false,
-  learning_area TEXT,
-  co_requisite_subject_id UUID REFERENCES subjects(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "applicant_stage_transitions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "fromStageId" uuid NOT NULL, "toStageId" uuid NOT NULL, "requiredRole" character varying, "autoTransition" boolean, "conditions" jsonb, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a10c5674e49e3bfa90dbf5fd139" PRIMARY KEY ("id"));
 
--- 29. Curricula
-CREATE TABLE IF NOT EXISTS curricula (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  branch_id UUID REFERENCES branches(id),
-  education_level_id UUID NOT NULL REFERENCES education_levels(id),
-  grade_level_id UUID REFERENCES grade_levels(id),
-  strand_id UUID REFERENCES strands(id),
-  program_id UUID REFERENCES programs(id),
-  school_year_id UUID NOT NULL REFERENCES school_years(id),
-  status TEXT DEFAULT 'draft',
-  version_label TEXT,
-  cloned_from_curriculum_id UUID REFERENCES curricula(id),
-  cloned_at TIMESTAMPTZ,
-  cloned_by UUID,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "student_schedules" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "studentId" uuid NOT NULL, "classOfferingId" uuid NOT NULL, "subjectId" uuid NOT NULL, "sectionId" uuid, "roomId" uuid, "timeSlot" jsonb NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_1252cd1d427422be13e201ee3c8" PRIMARY KEY ("id"));
 
--- 30. Curriculum Subjects
-CREATE TABLE IF NOT EXISTS curriculum_subjects (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  curriculum_id UUID NOT NULL REFERENCES curricula(id) ON DELETE CASCADE,
-  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  term_id UUID REFERENCES terms(id),
-  prerequisite_subject_id UUID REFERENCES subjects(id),
-  effective_grading_system_id UUID,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "applicant_stage_configs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "educationLevelId" uuid, "stageName" character varying NOT NULL, "stageCode" character varying NOT NULL, "sortOrder" integer NOT NULL DEFAULT '0', "isDefault" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "autoAdmitOnComplete" boolean, "requiredDocuments" text, "config" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_940a9f07ca56f02ba5abc6551fc" PRIMARY KEY ("id"));
 
--- 31. Grading Systems
-CREATE TABLE IF NOT EXISTS grading_systems (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  branch_id UUID REFERENCES branches(id),
-  education_level_id UUID NOT NULL REFERENCES education_levels(id),
-  school_year_id UUID NOT NULL REFERENCES school_years(id),
-  name TEXT NOT NULL,
-  type TEXT NOT NULL DEFAULT 'numeric',
-  config JSONB DEFAULT '{}',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(tenant_id, education_level_id, school_year_id, branch_id)
-);
+CREATE TABLE IF NOT EXISTS "grade_entries" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "classOfferingId" uuid NOT NULL, "gradingSystemId" uuid NOT NULL, "gradeComponentId" uuid NOT NULL, "termId" uuid NOT NULL, "rawScore" numeric, "maxScore" numeric, "percentage" numeric, "transmutedGrade" numeric, "remarks" text, "isFinalized" boolean NOT NULL DEFAULT false, "enteredByUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_01ecf2b2337fe10004fd843a652" PRIMARY KEY ("id"));
 
--- 32. Grade Components
-CREATE TABLE IF NOT EXISTS grade_components (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  grading_system_id UUID NOT NULL REFERENCES grading_systems(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  weight NUMERIC(5,2) NOT NULL,
-  "order" INT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+CREATE TABLE IF NOT EXISTS "school_calendars" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "name" character varying NOT NULL, "startDate" date NOT NULL, "endDate" date NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "config" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_2dcdfe93ca062791f4aefecee29" PRIMARY KEY ("id"));
 
--- 33. Honor Roll Configs
-CREATE TABLE IF NOT EXISTS honor_roll_configs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  branch_id UUID REFERENCES branches(id),
-  education_level_id UUID NOT NULL REFERENCES education_levels(id),
-  school_year_id UUID NOT NULL REFERENCES school_years(id),
-  with_honors_threshold NUMERIC(5,2) DEFAULT 90,
-  with_high_honors_threshold NUMERIC(5,2) DEFAULT 93,
-  with_highest_honors_threshold NUMERIC(5,2) DEFAULT 96,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(tenant_id, education_level_id, school_year_id, branch_id)
-);
+CREATE TABLE IF NOT EXISTS "permanent_records" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "gradeLevelId" uuid NOT NULL, "recordType" jsonb NOT NULL, "grades" jsonb NOT NULL DEFAULT '{}', "attendance" jsonb NOT NULL DEFAULT '{}', "generalAverage" numeric(5,2), "rank" integer, "remarks" character varying, "status" character varying NOT NULL DEFAULT 'draft', "verifiedByUserId" character varying, "verifiedAt" TIMESTAMP WITH TIME ZONE, "documentUrl" character varying, "verificationCode" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_891a7130201bb87fce2f2e64242" PRIMARY KEY ("id"));
 
--- ============================================================
--- INDEXES
--- ============================================================
+CREATE TABLE IF NOT EXISTS "students" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "lrn" character varying, "studentNumber" character varying, "firstName" character varying NOT NULL, "middleName" character varying, "lastName" character varying NOT NULL, "suffix" character varying, "birthDate" date, "sex" character varying, "address" character varying, "photoUrl" character varying, "priorSchool" character varying, "healthFlags" character varying, "iepNotes" character varying, "govIdType" character varying, "govIdNumber" character varying, "status" character varying NOT NULL DEFAULT 'active', "customFields" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP, "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_3ff076e239ff049ae82992ebb51" UNIQUE ("lrn"), CONSTRAINT "PK_7d7f07271ad4ce999880713f05e" PRIMARY KEY ("id"));
 
--- Tenancy
-CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
-CREATE INDEX IF NOT EXISTS idx_branches_tenant_id ON branches(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_departments_tenant_branch ON departments(tenant_id, branch_id);
-CREATE INDEX IF NOT EXISTS idx_departments_is_default ON departments(is_default);
+CREATE TABLE IF NOT EXISTS "grade_change_requests" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "classOfferingId" uuid NOT NULL, "gradeEntryId" uuid NOT NULL, "workflowInstanceId" uuid, "requestedByUserId" uuid NOT NULL, "oldScore" numeric, "newScore" numeric, "reason" text, "status" character varying NOT NULL DEFAULT 'pending', "approvedByUserId" character varying, "approvedAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_8a1ac9aa3dbd33961dbd782280f" PRIMARY KEY ("id"));
 
--- IAM
-CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_roles_tenant_id ON roles(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_roles_tenant_id ON user_roles(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_rebac_edges_subject ON rebac_edges(subject_user_id);
-CREATE INDEX IF NOT EXISTS idx_rebac_edges_object ON rebac_edges(object_type, object_id);
+CREATE TABLE IF NOT EXISTS "attendance_notification_thresholds" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "educationLevelId" uuid, "absenceCountThreshold" numeric NOT NULL DEFAULT '3', "tardyCountThreshold" numeric NOT NULL DEFAULT '3', "consecutiveAbsenceThreshold" numeric NOT NULL DEFAULT '5', "notificationChannel" character varying NOT NULL DEFAULT 'email', "notifyGuardian" boolean NOT NULL DEFAULT true, "notifyAdviser" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_17f2a10dcde61cb95676e688228" PRIMARY KEY ("id"));
 
--- Config Engine
-CREATE INDEX IF NOT EXISTS idx_lookup_lists_tenant ON lookup_lists(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_lookup_items_list ON lookup_items(list_id);
-CREATE INDEX IF NOT EXISTS idx_custom_fields_tenant_entity ON custom_field_definitions(tenant_id, entity_type);
-CREATE INDEX IF NOT EXISTS idx_numbering_schemes_tenant ON numbering_schemes(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_feature_flags_tenant ON feature_flags(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_audit_events_tenant ON audit_events(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_audit_events_entity ON audit_events(entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_audit_events_occurred ON audit_events(occurred_at);
-CREATE INDEX IF NOT EXISTS idx_education_levels_tenant ON education_levels(tenant_id);
+CREATE TABLE IF NOT EXISTS "calendar_events" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "calendarId" uuid NOT NULL, "eventType" character varying NOT NULL, "title" character varying NOT NULL, "description" character varying, "startDate" date NOT NULL, "endDate" date, "isHoliday" boolean NOT NULL DEFAULT false, "isExamWeek" boolean NOT NULL DEFAULT false, "isTrainingDay" boolean NOT NULL DEFAULT false, "metadata" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_faf5391d232322a87cdd1c6f30c" PRIMARY KEY ("id"));
 
--- Facility
-CREATE INDEX IF NOT EXISTS idx_buildings_tenant_branch ON buildings(tenant_id, branch_id);
-CREATE INDEX IF NOT EXISTS idx_floors_building ON floors(building_id);
-CREATE INDEX IF NOT EXISTS idx_rooms_tenant_branch ON rooms(tenant_id, branch_id);
-CREATE INDEX IF NOT EXISTS idx_rooms_floor ON rooms(floor_id);
-CREATE INDEX IF NOT EXISTS idx_room_assets_room ON room_assets(room_id);
+CREATE TABLE IF NOT EXISTS "attendance_excuses" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "attendanceRecordId" uuid NOT NULL, "excuseType" character varying NOT NULL, "description" text, "documentUrl" character varying, "status" character varying NOT NULL DEFAULT 'pending', "reviewedByUserId" character varying, "reviewNotes" character varying, "submittedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_2bbb9aad91e57335848938f8afb" PRIMARY KEY ("id"));
 
--- Academic
-CREATE INDEX IF NOT EXISTS idx_grade_levels_tenant ON grade_levels(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_grade_levels_education ON grade_levels(education_level_id);
-CREATE INDEX IF NOT EXISTS idx_school_years_tenant ON school_years(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_terms_school_year ON terms(school_year_id);
-CREATE INDEX IF NOT EXISTS idx_tracks_tenant ON tracks(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_strands_track ON strands(track_id);
-CREATE INDEX IF NOT EXISTS idx_programs_tenant ON programs(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_subjects_tenant ON subjects(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_subjects_code ON subjects(tenant_id, code);
-CREATE INDEX IF NOT EXISTS idx_curricula_tenant ON curricula(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_curricula_school_year ON curricula(school_year_id);
-CREATE INDEX IF NOT EXISTS idx_curricula_education ON curricula(education_level_id);
-CREATE INDEX IF NOT EXISTS idx_curriculum_subjects_curriculum ON curriculum_subjects(curriculum_id);
-CREATE INDEX IF NOT EXISTS idx_curriculum_subjects_subject ON curriculum_subjects(subject_id);
-CREATE INDEX IF NOT EXISTS idx_grading_systems_tenant ON grading_systems(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_grading_systems_resolve ON grading_systems(tenant_id, education_level_id, school_year_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_grade_components_system ON grade_components(grading_system_id);
-CREATE INDEX IF NOT EXISTS idx_honor_roll_configs_tenant ON honor_roll_configs(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_honor_roll_configs_resolve ON honor_roll_configs(tenant_id, education_level_id, school_year_id);
+CREATE TABLE IF NOT EXISTS "attendance_records" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "sectionId" uuid NOT NULL, "classOfferingId" uuid NOT NULL, "attendanceDate" date NOT NULL, "periodNumber" integer, "status" character varying NOT NULL, "minutesLate" integer, "excuseReason" character varying, "recordedByUserId" character varying, "verifiedByUserId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_946920332f5bc9efad3f3023b96" PRIMARY KEY ("id"));
 
--- ============================================================
--- ROW-LEVEL SECURITY POLICIES
--- ============================================================
+CREATE TABLE IF NOT EXISTS "faculty_load_limits" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "employeeId" uuid, "maxUnits" numeric NOT NULL DEFAULT '24', "maxHoursPerWeek" numeric NOT NULL DEFAULT '40', "warnOnApproachPct" numeric NOT NULL DEFAULT 0.8, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d252dacf36f472a98ca2d79c89c" PRIMARY KEY ("id"));
 
--- Enable RLS on all tenant-scoped tables
-ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE rebac_edges ENABLE ROW LEVEL SECURITY;
-ALTER TABLE lookup_lists ENABLE ROW LEVEL SECURITY;
-ALTER TABLE lookup_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE custom_field_definitions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE numbering_schemes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE feature_flags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE education_levels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE buildings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE floors ENABLE ROW LEVEL SECURITY;
-ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE room_assets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE grade_levels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE school_years ENABLE ROW LEVEL SECURITY;
-ALTER TABLE terms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tracks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE strands ENABLE ROW LEVEL SECURITY;
-ALTER TABLE programs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE curricula ENABLE ROW LEVEL SECURITY;
-ALTER TABLE curriculum_subjects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE grading_systems ENABLE ROW LEVEL SECURITY;
-ALTER TABLE grade_components ENABLE ROW LEVEL SECURITY;
-ALTER TABLE honor_roll_configs ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS "scheduled_reports" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "reportTemplateId" uuid NOT NULL, "name" character varying NOT NULL, "frequency" character varying NOT NULL, "recipients" text NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "lastRunAt" TIMESTAMP WITH TIME ZONE, "lastRunStatus" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4e9443d4280f94e84c7349300a6" PRIMARY KEY ("id"));
 
--- Create tenant isolation policies
+CREATE TABLE IF NOT EXISTS "attendance_config" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "educationLevelId" uuid NOT NULL, "captureMode" character varying NOT NULL DEFAULT 'daily', "allowLateSubmission" boolean NOT NULL DEFAULT true, "lateGracePeriodMinutes" numeric NOT NULL DEFAULT '15', "notifyGuardianOnAbsence" boolean NOT NULL DEFAULT true, "config" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d63110530cdd359332a88396b78" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "report_templates" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "name" character varying NOT NULL, "reportType" jsonb NOT NULL, "config" jsonb NOT NULL DEFAULT '{}', "description" character varying, "isSystem" boolean NOT NULL DEFAULT true, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_f85e16e6beea41a2b3a3350b84e" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "teaching_loads" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "employeeId" uuid NOT NULL, "classOfferingId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "termId" uuid NOT NULL, "isSubstitute" boolean NOT NULL DEFAULT false, "substituteForEmployeeId" uuid, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_0d057dea1dcaf2597d306e6d3bd" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "employees" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "firstName" character varying NOT NULL, "lastName" character varying NOT NULL, "email" character varying, "contactNumber" character varying, "photoUrl" character varying, "hireDate" date, "position" character varying, "department" character varying, "employmentStatus" character varying, "sssNo" character varying, "philhealthNo" character varying, "pagibigNo" character varying, "tinNo" character varying, "customFields" jsonb NOT NULL DEFAULT '{}', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b9535a98350d5b26e7eb0c26af4" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "dtr_records" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "employeeId" uuid NOT NULL, "attendanceDate" date NOT NULL, "timeIn" TIME, "timeOut" TIME, "source" character varying NOT NULL DEFAULT 'manual', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_5f38d14be803796a67d745c188b" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "buildings" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "name" character varying NOT NULL, "code" character varying, "address" character varying, "floorCount" integer, "contact" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_bc65c1acce268c383e41a69003a" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "floors" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "buildingId" uuid NOT NULL, "label" character varying NOT NULL, "floorNumber" integer, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dae78234002afa84842d3a08ee0" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "room_assets" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "roomId" uuid NOT NULL, "assetTag" character varying NOT NULL, "assetType" character varying NOT NULL, "condition" character varying, "maintenanceFlag" boolean NOT NULL DEFAULT false, "notes" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_3d80470a7e85886687776c0b744" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "rooms" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "floorId" uuid NOT NULL, "name" character varying NOT NULL, "roomType" character varying NOT NULL, "capacity" integer, "seatingLayout" character varying, "status" character varying NOT NULL DEFAULT 'active', "equipmentTags" text array NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_0368a2d7c215f2d0458a54933f2" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "generated_documents" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "studentId" uuid NOT NULL, "templateId" uuid NOT NULL, "requestId" uuid, "fileUrl" character varying NOT NULL, "verificationCode" character varying NOT NULL, "qrPayload" character varying, "releasedBy" character varying, "releasedAt" TIMESTAMP WITH TIME ZONE, "isVoided" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_adf23951f7aa5997a090992eccf" UNIQUE ("verificationCode"), CONSTRAINT "PK_93d5f4d6fdc3c0fcc5a7a3aedc2" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "education_levels" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "code" character varying, "name" character varying NOT NULL, "description" character varying, "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_87650fa9bdce80639107ce2ba23" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "document_templates" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "name" character varying NOT NULL, "documentType" character varying NOT NULL, "content" jsonb NOT NULL DEFAULT '{}', "versionLabel" character varying, "signatoryRequired" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_0372838b7b7cd3571aef80466d1" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "document_requests" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "studentId" uuid NOT NULL, "documentTemplateId" uuid NOT NULL, "status" character varying NOT NULL DEFAULT 'requested', "feeAmount" numeric(12,2) NOT NULL DEFAULT '0', "paymentId" uuid, "releasedBy" character varying, "releasedAt" TIMESTAMP WITH TIME ZONE, "verificationCode" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_43076ee267e48f196b68ce008e6" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "workflow_instances" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "workflowDefinitionId" uuid NOT NULL, "entityType" character varying NOT NULL, "entityId" character varying NOT NULL, "currentStep" integer NOT NULL DEFAULT '0', "status" character varying NOT NULL DEFAULT 'pending', "requestedBy" character varying, "requestedAt" TIMESTAMP WITH TIME ZONE, "reason" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_90cc94e44ff8b7b7869f50e4fc4" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "workflow_definitions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "entityType" character varying NOT NULL, "name" character varying NOT NULL, "description" character varying, "steps" jsonb NOT NULL DEFAULT '[]', "slaHours" integer NOT NULL DEFAULT '48', "escalationTo" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4f92fadfc5fb722f080ceaec272" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "workflow_approvals" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "instanceId" uuid NOT NULL, "approverUserId" uuid NOT NULL, "stepIndex" integer NOT NULL, "decision" character varying NOT NULL, "reason" character varying, "decidedAt" TIMESTAMP WITH TIME ZONE NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_36949dc46e63a84b77b624651ef" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "numbering_schemes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "name" character varying NOT NULL, "entityType" character varying NOT NULL, "format" character varying NOT NULL, "counterValue" bigint NOT NULL DEFAULT '0', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b8e765aef8393772530d1e42c49" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "lookup_lists" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "name" character varying NOT NULL, "entityType" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4af8fe54e70ea38e9d75b733818" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "lookup_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "lookupListId" uuid NOT NULL, "label" character varying NOT NULL, "value" character varying NOT NULL, "sortOrder" integer, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_2b0e0240c0ad7e09926a7cc867a" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "feature_flags" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "flagKey" character varying NOT NULL, "enabled" boolean NOT NULL DEFAULT false, "rolloutPercentage" integer NOT NULL DEFAULT '100', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_db657d344e9caacfc9d5cf8bbac" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "custom_field_definitions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "entityType" character varying NOT NULL, "fieldKey" character varying NOT NULL, "fieldType" character varying NOT NULL, "label" character varying NOT NULL, "required" boolean NOT NULL DEFAULT false, "validationRules" jsonb NOT NULL DEFAULT '{}', "options" jsonb NOT NULL DEFAULT '[]', "visibilityRules" jsonb NOT NULL DEFAULT '{}', "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_91f4cf6416f7aeb02c217005cb2" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "audit_events" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "actorUserId" uuid, "entityType" character varying NOT NULL, "entityId" character varying NOT NULL, "action" character varying NOT NULL, "beforeState" jsonb, "afterState" jsonb, "ipAddress" character varying, "requestId" character varying, "correlationId" character varying, "occurredAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_910f64d901a5c3e9878f0d4a407" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "notification_rules" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "eventType" character varying NOT NULL, "threshold" jsonb NOT NULL DEFAULT '{}', "templateId" uuid NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_eb87ba4f7f01eabf003fcf4e65c" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "notification_templates" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "name" character varying NOT NULL, "eventType" character varying NOT NULL, "channel" character varying NOT NULL, "subject" character varying, "bodyTemplate" text NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_76f0fc48b8d057d2ae7f3a2848a" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "notification_logs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "templateId" uuid, "channel" character varying NOT NULL, "recipientUserId" uuid, "recipientContact" jsonb, "payload" jsonb NOT NULL DEFAULT '{}', "status" character varying NOT NULL DEFAULT 'queued', "providerMsgId" character varying, "sentAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_19c524e644cdeaebfcffc284871" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "messages" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "threadId" uuid NOT NULL, "senderUserId" uuid NOT NULL, "body" text NOT NULL, "attachmentUrl" character varying, "readAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_18325f38ae6de43878487eff986" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "message_threads" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "subject" character varying, "studentId" uuid, "createdBy" character varying, "participantIds" jsonb NOT NULL DEFAULT '[]', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_257a191f664b9470b5d94f98264" PRIMARY KEY ("id"));
+
+CREATE INDEX IF NOT EXISTS "IDX_6af99c548fac91178c01a4318e" ON "message_threads" ("participantIds");
+
+CREATE TABLE IF NOT EXISTS "channel_configs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "channel" character varying NOT NULL, "provider" character varying NOT NULL, "credentialsRef" character varying NOT NULL, "senderId" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_71b592f5e0da6907fce0f0654cb" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "announcements" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "title" character varying NOT NULL, "body" text NOT NULL, "audienceType" character varying NOT NULL, "audienceIds" text NOT NULL DEFAULT '', "channel" text NOT NULL DEFAULT 'sms,email,push', "createdBy" character varying, "sentAt" TIMESTAMP WITH TIME ZONE, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b3ad760876ff2e19d58e05dc8b0" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "refunds" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "originalOrId" uuid NOT NULL, "paymentId" uuid, "invoiceId" character varying NOT NULL, "amount" numeric(12,2) NOT NULL, "reason" character varying NOT NULL, "approvedBy" character varying, "status" character varying NOT NULL DEFAULT 'pending', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_5106efb01eeda7e49a78b869738" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "payments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "invoiceId" uuid, "adHocSaleId" uuid, "cashierSessionId" uuid, "amount" numeric(12,2) NOT NULL, "method" character varying NOT NULL, "gatewayReference" character varying, "idempotencyKey" character varying, "status" character varying NOT NULL DEFAULT 'completed', "paidAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "offlineOrigin" boolean NOT NULL DEFAULT false, "syncedAt" TIMESTAMP WITH TIME ZONE, "denominationBreakdown" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_743b9fb1d2a059f2f7860418e4e" UNIQUE ("idempotencyKey"), CONSTRAINT "PK_197ab7af18c93fbb0c9b28b4a59" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "payment_methods" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "isCash" boolean NOT NULL DEFAULT false, "requiresGatewayRef" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_34f9b8c6dfb4ac3559f7e2820d1" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "series_counters" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "atpSeriesId" uuid NOT NULL, "counterValue" bigint NOT NULL DEFAULT '0', "reservedBlockStart" bigint, "reservedBlockEnd" bigint, "sessionId" uuid, "reservedAt" TIMESTAMP WITH TIME ZONE, "expiresAt" TIMESTAMP WITH TIME ZONE, "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_0269b1e9e90044ad2dd372b574d" PRIMARY KEY ("id"));
+
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_series_counters_scope" ON "series_counters" ("tenantId", "branchId", "atpSeriesId");
+
+CREATE TABLE IF NOT EXISTS "enrollments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "studentId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "curriculumId" uuid NOT NULL, "sectionId" uuid, "status" character varying NOT NULL DEFAULT 'enrolled', "enrolledAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "gradeLevelId" uuid, "strandId" uuid, "programId" uuid, "previousSchoolYearId" uuid, "previousGradeLevelId" uuid, "notes" character varying, "customFields" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7c0f752f9fb68bf6ed7367ab00f" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "payment_allocations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "paymentId" uuid NOT NULL, "invoiceId" uuid NOT NULL, "amountApplied" numeric(12,2) NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a5c6ff22065ac772620c85f4efb" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "official_receipts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "paymentId" uuid NOT NULL, "orNumber" character varying NOT NULL, "orNumberDisplay" character varying, "atpSeriesId" character varying NOT NULL, "payorName" character varying, "payorTin" character varying, "amount" numeric(12,2) NOT NULL DEFAULT '0', "isTaxExempt" boolean NOT NULL DEFAULT false, "isVoided" boolean NOT NULL DEFAULT false, "voidReason" character varying, "reversedBy" character varying, "issuedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_24fe45ad9af64c067aef2c20daa" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "denomination_sets" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "currency" character varying NOT NULL DEFAULT 'PHP', "denominations" text NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_ee93e22d98f25cd850f53d0835b" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "cashier_sessions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "stationId" uuid, "cashierUserId" uuid NOT NULL, "openingFloat" numeric(12,2) NOT NULL, "denominationBreakdown" jsonb NOT NULL DEFAULT '{}', "openedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "closingActual" numeric(12,2), "closedAt" TIMESTAMP WITH TIME ZONE, "status" character varying NOT NULL DEFAULT 'open', "varianceAmount" numeric(12,2), "varianceApprovedBy" character varying, "varianceApprovedAt" TIMESTAMP WITH TIME ZONE, "shiftReportUrl" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_46e6cc581c2e2d21cb1e29e3ba0" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "cashier_stations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "stationCode" character varying NOT NULL, "printerConfig" jsonb NOT NULL DEFAULT '{}', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4a42561acaf9d2fc2b54894bb28" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "atp_series" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "name" character varying NOT NULL, "rangeStart" bigint NOT NULL, "rangeEnd" bigint NOT NULL, "validFrom" date NOT NULL, "validTo" date NOT NULL, "prefix" character varying, "formatTemplate" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_8403fec63641e096cf95c8898f2" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "ad_hoc_sale_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "adHocSaleId" uuid NOT NULL, "description" character varying NOT NULL, "quantity" integer NOT NULL DEFAULT '1', "unitPrice" numeric(12,2) NOT NULL, "discountAmount" numeric(12,2) NOT NULL DEFAULT '0', "lineTotal" numeric(12,2) NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_129c5a17fe16f5f3445ce209615" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "ad_hoc_sales" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "sessionId" uuid NOT NULL, "buyerName" character varying, "totalAmount" numeric(12,2) NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_687671cf7b56b74a4400d2e69af" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "withdrawal_policies" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "name" character varying NOT NULL, "withinDays" integer NOT NULL, "refundPercentage" numeric NOT NULL, "isProRated" boolean NOT NULL DEFAULT true, "description" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_08d6ad1d96e66320aea6173d5ad" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "student_discount_grants" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "discountTypeId" uuid NOT NULL, "percentage" numeric, "fixedAmount" numeric, "reason" text, "supportingDocumentUrl" text, "status" character varying NOT NULL DEFAULT 'pending', "approvedByUserId" character varying, "approvedAt" TIMESTAMP WITH TIME ZONE, "workflowInstanceId" character varying, "validFrom" date, "validUntil" date, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_3217db86c187a3bde3b1b6d2b6c" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "payment_plans" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "name" character varying NOT NULL, "description" character varying, "numberOfInstallments" integer NOT NULL DEFAULT '1', "cashDiscountPercentage" numeric NOT NULL DEFAULT '0', "installmentFee" numeric NOT NULL DEFAULT '0', "penaltyPercentage" numeric NOT NULL DEFAULT '0', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_8f05aee900e96c2e0c24df48262" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "penalty_rules" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "name" character varying NOT NULL, "gracePeriodDays" integer NOT NULL DEFAULT '1', "penaltyPercentage" numeric NOT NULL DEFAULT '0', "penaltyFixedAmount" numeric NOT NULL DEFAULT '0', "maxPenaltyAmount" numeric NOT NULL DEFAULT '0', "computationType" character varying NOT NULL DEFAULT 'daily', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_f17c98d146939f4d584862a302f" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "invoice_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "invoiceId" uuid NOT NULL, "feeTypeId" uuid NOT NULL, "description" character varying, "amount" numeric NOT NULL, "discountAmount" numeric NOT NULL DEFAULT '0', "taxAmount" numeric NOT NULL DEFAULT '0', "netAmount" numeric NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_53b99f9e0e2945e69de1a12b75a" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "invoices" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "studentId" uuid NOT NULL, "enrollmentId" uuid NOT NULL, "termId" uuid, "invoiceNumber" character varying, "totalAmount" numeric NOT NULL DEFAULT '0', "discountAmount" numeric NOT NULL DEFAULT '0', "penaltyAmount" numeric NOT NULL DEFAULT '0', "paidAmount" numeric NOT NULL DEFAULT '0', "balance" numeric NOT NULL DEFAULT '0', "status" character varying NOT NULL DEFAULT 'open', "dueDate" date, "paymentPlanId" uuid, "metadata" jsonb NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_668cef7c22a427fd822cc1be3ce" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "installment_schedules" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "invoiceId" uuid NOT NULL, "paymentPlanId" uuid NOT NULL, "installmentNumber" integer NOT NULL, "amount" numeric NOT NULL, "dueDate" date NOT NULL, "penaltyAmount" numeric NOT NULL DEFAULT '0', "paidAmount" numeric NOT NULL DEFAULT '0', "status" character varying NOT NULL DEFAULT 'pending', "paidAt" date, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_253c6ebbc1b8d2dc50e83a36c82" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "fee_types" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "description" character varying, "isTaxable" boolean NOT NULL DEFAULT false, "taxRate" numeric NOT NULL DEFAULT '0', "glAccount" character varying, "isActive" boolean NOT NULL DEFAULT true, "isSystem" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_13c213789b6c9fc376303db1fb9" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "fee_structures" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "templateKey" character varying, "educationLevelId" uuid, "gradeLevelId" uuid, "strandId" uuid, "programId" uuid, "schoolYearId" uuid NOT NULL, "termId" uuid, "status" character varying NOT NULL DEFAULT 'active', "name" character varying, "description" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d634078deb9cf5ceb5788ad9b53" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "fee_structure_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "feeStructureId" uuid NOT NULL, "feeTypeId" uuid NOT NULL, "amount" numeric NOT NULL, "isRequired" boolean NOT NULL DEFAULT true, "description" character varying, "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dfb11c01a68b4d7169b26ed7e69" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "discount_types" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "description" character varying, "discountMode" character varying NOT NULL DEFAULT 'percentage', "defaultPercentage" numeric NOT NULL DEFAULT '0', "defaultAmount" numeric NOT NULL DEFAULT '0', "requiresApproval" boolean NOT NULL DEFAULT true, "isActive" boolean NOT NULL DEFAULT true, "isScholarship" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b8680bade668df47e67dcdfc93b" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "school_years" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "name" character varying NOT NULL, "startDate" date, "endDate" date, "status" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_3fe99d570a61178cb99065783cf" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "terms" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "name" character varying, "sequence" integer, "startDate" date, "endDate" date, "gradingDeadline" date, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_33b6fe77d6ace7ff43cc8a65958" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "tracks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "name" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_242a37ffc7870380f0e611986e8" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "strands" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "trackId" uuid, "name" character varying NOT NULL, "code" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_70b329e4ab09529659462df5392" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "subjects" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "code" character varying NOT NULL, "title" character varying NOT NULL, "description" text, "units" numeric(4,1), "hoursPerWeek" numeric(4,1), "lectureHours" numeric(4,1), "labHours" numeric(4,1), "isCore" boolean NOT NULL DEFAULT true, "isElective" boolean NOT NULL DEFAULT false, "learningArea" character varying, "coRequisiteSubjectId" character varying, "versionLabel" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_1a023685ac2b051b4e557b0b280" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "programs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "level" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d43c664bcaafc0e8a06dfd34e05" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "honor_roll_configs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "educationLevelId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "withHonorsThreshold" numeric(5,2), "withHighHonorsThreshold" numeric(5,2), "withHighestHonorsThreshold" numeric(5,2), "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b71f9c6bf7c7b87785e11a1d727" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "grading_systems" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "educationLevelId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "name" character varying NOT NULL, "type" character varying NOT NULL, "config" jsonb NOT NULL DEFAULT '{}', "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b5c08039cdd918de98652c19eb4" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "grade_levels" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "educationLevelId" uuid NOT NULL, "code" character varying, "name" character varying NOT NULL, "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_6acd477de8b53978fc389479713" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "grade_components" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "gradingSystemId" uuid NOT NULL, "name" character varying NOT NULL, "weight" numeric(5,2) NOT NULL, "order" integer, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_976138902c8bcede7e4fe4ec3c7" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "curricula" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid, "educationLevelId" uuid NOT NULL, "gradeLevelId" uuid, "strandId" uuid, "programId" uuid, "schoolYearId" uuid NOT NULL, "versionLabel" character varying, "status" character varying NOT NULL DEFAULT 'draft', "clonedFromCurriculumId" character varying, "clonedAt" TIMESTAMP WITH TIME ZONE, "clonedBy" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7c5dd2066e2bbf3b6ad0a71c567" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "curriculum_subjects" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "curriculumId" uuid NOT NULL, "subjectId" uuid NOT NULL, "termId" uuid, "prerequisiteSubjectId" uuid, "coRequisiteSubjectId" uuid, "order" integer, "effectiveGradingSystemId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a732b6eb93955090ef3690062c4" PRIMARY KEY ("id"));
+
+CREATE TABLE IF NOT EXISTS "class_offerings" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "branchId" uuid NOT NULL, "schoolYearId" uuid NOT NULL, "termId" uuid NOT NULL, "sectionId" uuid NOT NULL, "subjectId" uuid NOT NULL, "facultyEmployeeId" uuid, "roomId" uuid, "timeSlots" jsonb NOT NULL DEFAULT '[]', "units" numeric NOT NULL DEFAULT '0', "hoursPerWeek" numeric NOT NULL DEFAULT '0', "status" character varying NOT NULL DEFAULT 'active', "notes" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_606ab9efbebc0967066902f950a" PRIMARY KEY ("id"));
+
 DO $$
-DECLARE
-  t TEXT;
 BEGIN
-  FOR t IN
-    SELECT unnest(ARRAY[
-      'tenants', 'branches', 'departments', 'users', 'roles',
-      'user_roles', 'rebac_edges', 'lookup_lists', 'lookup_items',
-      'custom_field_definitions', 'numbering_schemes', 'feature_flags',
-      'audit_events', 'education_levels', 'buildings', 'floors',
-      'rooms', 'room_assets', 'grade_levels', 'school_years',
-      'terms', 'tracks', 'strands', 'programs', 'subjects',
-      'curricula', 'curriculum_subjects', 'grading_systems',
-      'grade_components', 'honor_roll_configs'
-    ])
-  LOOP
-    -- Drop existing policy if any
-    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_%s ON %s', t, t);
-    -- Create new policy
-    IF t = 'tenants' THEN
-      -- Tenants: special policy - users see their own tenant
-      EXECUTE format('
-        CREATE POLICY tenant_isolation_%s ON %s
-        USING (id = current_setting(''app.current_tenant_id'')::uuid)
-      ', t, t);
-    ELSE
-      -- All other tables: standard tenant_id filter
-      EXECUTE format('
-        CREATE POLICY tenant_isolation_%s ON %s
-        USING (tenant_id = current_setting(''app.current_tenant_id'')::uuid)
-      ', t, t);
-    END IF;
-  END LOOP;
+  ALTER TABLE "departments" ADD CONSTRAINT "FK_b01d8cc3129c198d66516f98faf" FOREIGN KEY ("branchId") REFERENCES "branches"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "branches" ADD CONSTRAINT "FK_19db6a12993aa421cc984376635" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "tenants" ADD CONSTRAINT "FK_bf4b8434d205b4a051fa0c89aa3" FOREIGN KEY ("planId") REFERENCES "tenant_plans"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "floors" ADD CONSTRAINT "FK_58ed6d6bd6268cdf83b7c72d1b5" FOREIGN KEY ("buildingId") REFERENCES "buildings"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "room_assets" ADD CONSTRAINT "FK_9d14620ca4cc7fb06ba2bb38c70" FOREIGN KEY ("roomId") REFERENCES "rooms"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "rooms" ADD CONSTRAINT "FK_4d1c2078e85df4b86a6e80348e5" FOREIGN KEY ("floorId") REFERENCES "floors"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "terms" ADD CONSTRAINT "FK_8ccf58120321db1b8293c4f3575" FOREIGN KEY ("schoolYearId") REFERENCES "school_years"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "strands" ADD CONSTRAINT "FK_fc6bfe4d17de26fd6624a6b1aaa" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE "grade_levels" ADD CONSTRAINT "FK_5c37bf12408d2dcce1645aad2f0" FOREIGN KEY ("educationLevelId") REFERENCES "education_levels"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- ============================================================
--- SEED DATA
+-- SUPPLEMENTARY TABLES (no entity — used by IdempotencyGuard)
 -- ============================================================
-
--- Tenant Plans
-INSERT INTO tenant_plans (id, plan_key, name, max_branches, max_students, modules) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'starter', 'Starter', 2, 500, '{"college":false,"offline_pos":false,"reporting":true}'),
-  ('a0000000-0000-0000-0000-000000000002', 'professional', 'Professional', 5, 3000, '{"college":true,"offline_pos":true,"reporting":true}'),
-  ('a0000000-0000-0000-0000-000000000003', 'enterprise', 'Enterprise', NULL, NULL, '{"college":true,"offline_pos":true,"reporting":true}')
-ON CONFLICT (plan_key) DO NOTHING;
-
--- Default Roles (template for new tenants)
-INSERT INTO roles (id, tenant_id, name, description, is_system) VALUES
-  ('b0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'Platform Super Admin', 'Cross-tenant platform administration', true),
-  ('b0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'Tenant Admin', 'Full tenant administration', true),
-  ('b0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'Branch Admin', 'Branch-level administration', true),
-  ('b0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'Registrar', 'Admissions, enrollment, records', true),
-  ('b0000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'Cashier', 'Payment collection and receipting', true),
-  ('b0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'Teacher', 'Attendance, gradebook, class records', true),
-  ('b0000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000000', 'Accounting/Finance Officer', 'Fee setup, discounts, AR aging, GL export', true),
-  ('b0000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000000', 'Subject/Program Coordinator', 'Curriculum, class offerings, load assignment', true),
-  ('b0000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000000', 'Guidance Counselor', 'Behavior/incident records, referrals', true),
-  ('b0000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000000', 'Nurse', 'Health records, immunization, clinic', true),
-  ('b0000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000000', 'Guardian', 'Parent/guardian portal access', true),
-  ('b0000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000000', 'Student', 'Student portal access', true),
-  ('b0000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000000', 'Platform Support', 'Cross-tenant support (audited impersonation)', true),
-  ('b0000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000000', 'DPO', 'Data Protection Officer', true)
-ON CONFLICT DO NOTHING;
-
--- Permission Catalog
-INSERT INTO permissions (id, resource, action, description) VALUES
-  -- Tenancy
-  ('c0000000-0000-0000-0000-000000000001', 'tenancy.tenant', 'view', 'View tenants'),
-  ('c0000000-0000-0000-0000-000000000002', 'tenancy.tenant', 'create', 'Create tenants'),
-  ('c0000000-0000-0000-0000-000000000003', 'tenancy.tenant', 'edit', 'Edit tenants'),
-  ('c0000000-0000-0000-0000-000000000004', 'tenancy.branch', 'view', 'View branches'),
-  ('c0000000-0000-0000-0000-000000000005', 'tenancy.branch', 'create', 'Create branches'),
-  ('c0000000-0000-0000-0000-000000000006', 'tenancy.branch', 'edit', 'Edit branches'),
-  ('c0000000-0000-0000-0000-000000000007', 'tenancy.department', 'view', 'View departments'),
-  ('c0000000-0000-0000-0000-000000000008', 'tenancy.department', 'create', 'Create departments'),
-  -- Academic
-  ('c0000000-0000-0000-0000-000000000010', 'academic.school_year', 'view', 'View school years'),
-  ('c0000000-0000-0000-0000-000000000011', 'academic.school_year', 'create', 'Create school years'),
-  ('c0000000-0000-0000-0000-000000000012', 'academic.term', 'view', 'View terms'),
-  ('c0000000-0000-0000-0000-000000000013', 'academic.term', 'create', 'Create terms'),
-  ('c0000000-0000-0000-0000-000000000014', 'academic.curriculum', 'view', 'View curricula'),
-  ('c0000000-0000-0000-0000-000000000015', 'academic.curriculum', 'create', 'Create curricula'),
-  ('c0000000-0000-0000-0000-000000000016', 'academic.curriculum', 'edit', 'Edit curricula'),
-  ('c0000000-0000-0000-0000-000000000017', 'academic.curriculum', 'publish', 'Publish curricula'),
-  ('c0000000-0000-0000-0000-000000000018', 'academic.subject', 'view', 'View subjects'),
-  ('c0000000-0000-0000-0000-000000000019', 'academic.subject', 'create', 'Create subjects'),
-  -- SIS
-  ('c0000000-0000-0000-0000-000000000020', 'sis.student', 'view', 'View students'),
-  ('c0000000-0000-0000-0000-000000000021', 'sis.student', 'create', 'Create students'),
-  ('c0000000-0000-0000-0000-000000000022', 'sis.student', 'edit', 'Edit students'),
-  ('c0000000-0000-0000-0000-000000000023', 'sis.enrollment', 'view', 'View enrollments'),
-  ('c0000000-0000-0000-0000-000000000024', 'sis.enrollment', 'create', 'Create enrollments'),
-  -- Billing
-  ('c0000000-0000-0000-0000-000000000030', 'billing.fee_type', 'view', 'View fee types'),
-  ('c0000000-0000-0000-0000-000000000031', 'billing.fee_type', 'create', 'Create fee types'),
-  ('c0000000-0000-0000-0000-000000000032', 'billing.invoice', 'view', 'View invoices'),
-  -- Cashiering
-  ('c0000000-0000-0000-0000-000000000040', 'cashiering.session', 'view', 'View cashier sessions'),
-  ('c0000000-0000-0000-0000-000000000041', 'cashiering.session', 'open', 'Open cashier session'),
-  ('c0000000-0000-0000-0000-000000000042', 'cashiering.payment', 'create', 'Process payments'),
-  ('c0000000-0000-0000-0000-000000000043', 'cashiering.receipt', 'view', 'View receipts'),
-  -- Grading
-  ('c0000000-0000-0000-0000-000000000050', 'grading.system', 'view', 'View grading systems'),
-  ('c0000000-0000-0000-0000-000000000051', 'grading.system', 'create', 'Create grading systems'),
-  ('c0000000-0000-0000-0000-000000000052', 'grading.gradebook', 'view', 'View gradebook'),
-  ('c0000000-0000-0000-0000-000000000053', 'grading.gradebook', 'edit', 'Enter grades'),
-  -- Facility
-  ('c0000000-0000-0000-0000-000000000060', 'facility.building', 'view', 'View buildings'),
-  ('c0000000-0000-0000-0000-000000000061', 'facility.building', 'create', 'Create buildings'),
-  ('c0000000-0000-0000-0000-000000000062', 'facility.room', 'view', 'View rooms'),
-  ('c0000000-0000-0000-0000-000000000063', 'facility.room', 'create', 'Create rooms'),
-  -- Config
-  ('c0000000-0000-0000-0000-000000000070', 'config.lookup', 'view', 'View lookup lists'),
-  ('c0000000-0000-0000-0000-000000000071', 'config.lookup', 'edit', 'Edit lookup lists'),
-  ('c0000000-0000-0000-0000-000000000072', 'config.custom_field', 'view', 'View custom fields'),
-  ('c0000000-0000-0000-0000-000000000073', 'config.custom_field', 'edit', 'Edit custom fields'),
-  ('c0000000-0000-0000-0000-000000000074', 'config.audit_log', 'view', 'View audit log'),
-  ('c0000000-0000-0000-0000-000000000075', 'config.audit_log', 'export', 'Export audit log'),
-  -- IAM
-  ('c0000000-0000-0000-0000-000000000080', 'iam.role', 'view', 'View roles'),
-  ('c0000000-0000-0000-0000-000000000081', 'iam.role', 'create', 'Create roles'),
-  ('c0000000-0000-0000-0000-000000000082', 'iam.role', 'assign', 'Assign roles to users'),
-  ('c0000000-0000-0000-0000-000000000083', 'iam.permission', 'view', 'View permissions')
-ON CONFLICT (resource, action) DO NOTHING;
-
--- Education Levels (DepEd K-12 + College)
-INSERT INTO education_levels (id, tenant_id, code, name, sort_order) VALUES
-  ('f0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'kindergarten', 'Kindergarten', 1),
-  ('f0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'elementary', 'Elementary', 2),
-  ('f0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'jhs', 'Junior High School', 3),
-  ('f0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'shs', 'Senior High School', 4),
-  ('f0000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'college', 'College', 5),
-  ('f0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'techvoc', 'Technical-Vocational', 6)
-ON CONFLICT DO NOTHING;
-
--- Grade Levels
-INSERT INTO grade_levels (id, tenant_id, education_level_id, code, name, sort_order) VALUES
-  ('g0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000001', 'K', 'Kindergarten', 1),
-  ('g0000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000002', '1', 'Grade 1', 1),
-  ('g0000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000002', '2', 'Grade 2', 2),
-  ('g0000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000002', '3', 'Grade 3', 3),
-  ('g0000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000002', '4', 'Grade 4', 4),
-  ('g0000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000002', '5', 'Grade 5', 5),
-  ('g0000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000002', '6', 'Grade 6', 6),
-  ('g0000000-0000-0000-0000-000000000020', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000003', '7', 'Grade 7', 1),
-  ('g0000000-0000-0000-0000-000000000021', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000003', '8', 'Grade 8', 2),
-  ('g0000000-0000-0000-0000-000000000022', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000003', '9', 'Grade 9', 3),
-  ('g0000000-0000-0000-0000-000000000023', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000003', '10', 'Grade 10', 4),
-  ('g0000000-0000-0000-0000-000000000030', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000004', '11', 'Grade 11', 1),
-  ('g0000000-0000-0000-0000-000000000031', '00000000-0000-0000-0000-000000000000', 'f0000000-0000-0000-0000-000000000004', '12', 'Grade 12', 2)
-ON CONFLICT DO NOTHING;
-
--- Lookup Lists (pilot)
-INSERT INTO lookup_lists (id, tenant_id, name, code) VALUES
-  ('d0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'Room Types', 'room_types'),
-  ('d0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'Document Types', 'document_types'),
-  ('d0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'Fee Types', 'fee_types'),
-  ('d0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'Relationship Types', 'relationship_types'),
-  ('d0000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'Discount Types', 'discount_types'),
-  ('d0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'Hold Types', 'hold_types'),
-  ('d0000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000000', 'Payment Methods', 'payment_methods'),
-  ('d0000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000000', 'Employment Status', 'employment_status'),
-  ('d0000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000000', 'Asset Types', 'asset_types'),
-  ('d0000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000000', 'Notification Channels', 'notification_channels')
-ON CONFLICT DO NOTHING;
-
--- Lookup Items
-INSERT INTO lookup_items (id, tenant_id, list_id, value, label, sort_order) VALUES
-  -- Room Types
-  ('e0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000001', 'classroom', 'Classroom', 1),
-  ('e0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000001', 'laboratory', 'Laboratory', 2),
-  ('e0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000001', 'office', 'Office', 3),
-  ('e0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000001', 'clinic', 'Clinic', 4),
-  ('e0000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000001', 'cashier', 'Cashier Window', 5),
-  ('e0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000001', 'library', 'Library', 6),
-  ('e0000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000001', 'gym', 'Gymnasium', 7),
-  -- Payment Methods
-  ('e0000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000007', 'cash', 'Cash', 1),
-  ('e0000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000007', 'check', 'Check', 2),
-  ('e0000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000007', 'gcash', 'GCash', 3),
-  ('e0000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000007', 'maya', 'Maya', 4),
-  ('e0000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000007', 'bank_transfer', 'Bank Transfer', 5),
-  ('e0000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000007', 'card', 'Card', 6),
-  -- Relationship Types
-  ('e0000000-0000-0000-0000-000000000020', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000004', 'mother', 'Mother', 1),
-  ('e0000000-0000-0000-0000-000000000021', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000004', 'father', 'Father', 2),
-  ('e0000000-0000-0000-0000-000000000022', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000004', 'guardian', 'Guardian', 3),
-  ('e0000000-0000-0000-0000-000000000023', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000004', 'sibling', 'Sibling', 4),
-  -- Hold Types
-  ('e0000000-0000-0000-0000-000000000030', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000006', 'finance', 'Unpaid Balance', 1),
-  ('e0000000-0000-0000-0000-000000000031', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000006', 'discipline', 'Disciplinary', 2),
-  ('e0000000-0000-0000-0000-000000000032', '00000000-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000006', 'requirements', 'Incomplete Requirements', 3)
-ON CONFLICT DO NOTHING;
-
--- ============================================================
--- DEMO DATA (for testing)
--- ============================================================
-
--- Demo Tenant
-INSERT INTO tenants (id, name, slug, plan_id, status) VALUES
-  ('10000000-0000-0000-0000-000000000001', 'Demo School', 'demo-school', 'a0000000-0000-0000-0000-000000000002', 'active')
-ON CONFLICT DO NOTHING;
-
--- Demo Branches
-INSERT INTO branches (id, tenant_id, name, code, address, levels_offered) VALUES
-  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Main Campus', 'MAIN', '123 Education St, Manila', '{elementary,jhs,shs,college}'),
-  ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'North Campus', 'NORTH', '456 North Ave, Quezon City', '{elementary,jhs,shs}')
-ON CONFLICT DO NOTHING;
-
--- Demo Departments
-INSERT INTO departments (id, tenant_id, branch_id, name, education_level_ids, is_default) VALUES
-  ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Elementary', '{f0000000-0000-0000-0000-000000000002}', true),
-  ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Junior High School', '{f0000000-0000-0000-0000-000000000003}', false),
-  ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Senior High School', '{f0000000-0000-0000-0000-000000000004}', false),
-  ('30000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'College', '{f0000000-0000-0000-0000-000000000005}', false)
-ON CONFLICT DO NOTHING;
-
--- Demo User (password: admin123)
-INSERT INTO users (id, tenant_id, email, password_hash, status) VALUES
-  ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'admin@demo-school.ph', '$2b$10$YourHashedPasswordHere', 'active')
-ON CONFLICT DO NOTHING;
-
--- Assign Tenant Admin role to demo user
-INSERT INTO user_roles (id, user_id, role_id, tenant_id, branch_id) VALUES
-  ('50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', NULL)
-ON CONFLICT DO NOTHING;
-
--- Demo School Year
-INSERT INTO school_years (id, tenant_id, name, start_date, end_date, status) VALUES
-  ('60000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'SY 2026-2027', '2026-06-01', '2027-03-31', 'active')
-ON CONFLICT DO NOTHING;
-
--- Demo Building
-INSERT INTO buildings (id, tenant_id, branch_id, name, code, floor_count) VALUES
-  ('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Main Building', 'MB', 3)
-ON CONFLICT DO NOTHING;
-
--- Demo Floors
-INSERT INTO floors (id, tenant_id, building_id, label, floor_number) VALUES
-  ('80000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'Ground Floor', 0),
-  ('80000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'Second Floor', 1),
-  ('80000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'Third Floor', 2)
-ON CONFLICT DO NOTHING;
-
--- Demo Rooms
-INSERT INTO rooms (id, tenant_id, branch_id, floor_id, name, room_type, capacity) VALUES
-  ('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '80000000-0000-0000-0000-000000000001', 'Room 101', 'classroom', 40),
-  ('90000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '80000000-0000-0000-0000-000000000001', 'Room 102', 'classroom', 40),
-  ('90000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '80000000-0000-0000-0000-000000000002', 'Computer Lab', 'laboratory', 30)
-ON CONFLICT DO NOTHING;
-
--- ============================================================
--- PHASE 1: Workflow Engine
--- ============================================================
-
--- 34. Workflow Definitions
-CREATE TABLE IF NOT EXISTS workflow_definitions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  entity_type TEXT NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  steps JSONB DEFAULT '[]',
-  sla_hours INT DEFAULT 48,
-  escalation_to TEXT,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 35. Workflow Instances
-CREATE TABLE IF NOT EXISTS workflow_instances (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  workflow_definition_id UUID NOT NULL REFERENCES workflow_definitions(id),
-  entity_type TEXT NOT NULL,
-  entity_id UUID NOT NULL,
-  current_step INT DEFAULT 0,
-  status TEXT DEFAULT 'pending',
-  requested_by UUID REFERENCES users(id),
-  requested_at TIMESTAMPTZ,
-  reason TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 36. Workflow Approvals
-CREATE TABLE IF NOT EXISTS workflow_approvals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  instance_id UUID NOT NULL REFERENCES workflow_instances(id),
-  approver_user_id UUID NOT NULL REFERENCES users(id),
-  step_index INT NOT NULL,
-  decision TEXT NOT NULL,
-  reason TEXT,
-  decided_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 37. Idempotency Keys
+-- Shape matches the deployed table (key is the primary key; request_method /
+-- request_path / created_at are NOT NULL) plus the `id` column that
+-- IdempotencyGuard reads (`SELECT id FROM idempotency_keys`). The previous
+-- definition here had `id` as the primary key, a `response` column, and
+-- nullable request columns — none of which existed in the deployed table.
 CREATE TABLE IF NOT EXISTS idempotency_keys (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  key TEXT UNIQUE NOT NULL,
-  request_method TEXT,
-  request_path TEXT,
-  response JSONB,
-  created_at TIMESTAMPTZ DEFAULT now(),
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  key TEXT PRIMARY KEY,
+  request_method TEXT NOT NULL,
+  request_path TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at TIMESTAMPTZ NOT NULL
 );
-
--- Indexes for workflow tables
-CREATE INDEX IF NOT EXISTS idx_workflow_defs_tenant ON workflow_definitions(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_workflow_defs_entity ON workflow_definitions(entity_type);
-CREATE INDEX IF NOT EXISTS idx_workflow_instances_tenant ON workflow_instances(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_workflow_instances_entity ON workflow_instances(entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_workflow_instances_status ON workflow_instances(status);
-CREATE INDEX IF NOT EXISTS idx_workflow_approvals_instance ON workflow_approvals(instance_id);
 CREATE INDEX IF NOT EXISTS idx_idempotency_keys_key ON idempotency_keys(key);
 CREATE INDEX IF NOT EXISTS idx_idempotency_keys_expires ON idempotency_keys(expires_at);
 
--- Enable RLS on workflow tables
-ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE workflow_instances ENABLE ROW LEVEL SECURITY;
-ALTER TABLE workflow_approvals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE idempotency_keys ENABLE ROW LEVEL SECURITY;
-
--- Workflow RLS policies
-CREATE POLICY tenant_isolation_workflow_definitions ON workflow_definitions
-  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
-CREATE POLICY tenant_isolation_workflow_instances ON workflow_instances
-  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
-CREATE POLICY tenant_isolation_workflow_approvals ON workflow_approvals
-  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
-
 -- ============================================================
--- Workflow Seed Data
+-- ROW-LEVEL SECURITY
 -- ============================================================
-
--- Grade change/appeal workflow
-INSERT INTO workflow_definitions (id, tenant_id, entity_type, name, description, steps, sla_hours, escalation_to) VALUES
-  ('w0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'grade_change', 'Grade Change Request', 'Teacher requests grade change, coordinator reviews, registrar approves', '[{"role":"Teacher","action":"request"},{"role":"SubjectCoordinator","action":"review"},{"role":"Registrar","action":"approve"}]', 48, 'Principal')
-ON CONFLICT DO NOTHING;
-
--- Discount/scholarship approval
-INSERT INTO workflow_definitions (id, tenant_id, entity_type, name, description, steps, sla_hours, escalation_to) VALUES
-  ('w0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'discount', 'Discount/Scholarship Approval', 'Finance officer reviews, tenant admin approves', '[{"role":"Accounting/Finance Officer","action":"review"},{"role":"Tenant Admin","action":"approve"}]', 72, NULL)
-ON CONFLICT DO NOTHING;
-
--- Refund approval
-INSERT INTO workflow_definitions (id, tenant_id, entity_type, name, description, steps, sla_hours, escalation_to) VALUES
-  ('w0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'refund', 'Refund Approval', 'Cashier requests, finance reviews, admin approves', '[{"role":"Cashier","action":"request"},{"role":"Accounting/Finance Officer","action":"review"},{"role":"Tenant Admin","action":"approve"}]', 168, NULL)
-ON CONFLICT DO NOTHING;
-
--- Document release
-INSERT INTO workflow_definitions (id, tenant_id, entity_type, name, description, steps, sla_hours, escalation_to) VALUES
-  ('w0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'document_release', 'Document Release', 'Registrar releases documents', '[{"role":"Registrar","action":"release"}]', 24, NULL)
-ON CONFLICT DO NOTHING;
-
--- ============================================================
--- DONE
--- ============================================================
+-- Defined in 003-rls-policies.sql (all tenant-scoped tables) and refined by
+-- 012-hardening-rls-and-or-race.sql / 013-platform-admin-rls.sql /
+-- 014-rls-platform-admin-role-gate.sql. Kept out of this file so the policy
+-- names do not collide.

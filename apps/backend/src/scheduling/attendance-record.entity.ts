@@ -23,13 +23,13 @@ export class AttendanceRecord {
   @Column({ type: 'date' })
   attendanceDate: Date;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'int', nullable: true })
   periodNumber: number;
 
   @Column()
   status: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'int', nullable: true })
   minutesLate: number;
 
   @Column({ nullable: true })

@@ -23,7 +23,7 @@ export class BehaviorIncident {
   @Column({ type: 'date' })
   incidentDate: Date;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ nullable: true })
   incidentLocation: string;
 
   @Column({ nullable: true })

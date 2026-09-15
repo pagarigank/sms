@@ -20,7 +20,10 @@ export class FacultyLoadLimit {
   @Column({ type: 'numeric', default: 40 })
   maxHoursPerWeek: number;
 
-  @Column({ type: 'numeric', default: 0.8 })
+  // Raw expression, not the JS number: `default: 0.8` renders as DEFAULT '0.8'
+  // (a string literal), which never matches the numeric default the database
+  // reports, so every schema comparison flagged this column as drift.
+  @Column({ type: 'numeric', default: () => '0.8' })
   warnOnApproachPct: number;
 
   @Column({ default: true })

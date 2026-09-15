@@ -47,6 +47,24 @@ export const academicEndpoints = (client: ApiClient) => ({
   activateSchoolYear: (id: string) =>
     client.post<SchoolYear>(`/api/v1/academic/school-years/${id}/activate`),
 
+  // Academic rollover: preview what would be cloned, then roll over
+  rolloverPreview: (id: string) =>
+    client.get<{ terms: number; curricula: number; gradingSystems: number; honorRollConfigs: number }>(
+      `/api/v1/academic/school-years/${id}/rollover-preview`,
+    ),
+
+  rollover: (
+    id: string,
+    data: { name: string; startDate: string; endDate: string; createdBy?: string },
+  ) =>
+    client.post<{
+      schoolYear: SchoolYear;
+      termsCreated: number;
+      curriculaCloned: number;
+      gradingSystemsCloned: number;
+      honorRollConfigsCloned: number;
+    }>(`/api/v1/academic/school-years/${id}/rollover`, data),
+
   // Terms
   listTerms: (schoolYearId: string) =>
     client.get<Term[]>(`/api/v1/academic/school-years/${schoolYearId}/terms`),

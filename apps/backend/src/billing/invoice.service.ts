@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, DataSource } from 'typeorm';
 import { Invoice } from './invoice.entity';
 import { InvoiceItem } from './invoice-item.entity';
 import { StudentDiscountGrant } from './student-discount-grant.entity';
@@ -15,6 +15,7 @@ export class InvoiceService {
     @InjectRepository(StudentDiscountGrant) private discountGrantsRepo: Repository<StudentDiscountGrant>,
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
     private billingService: BillingService,
+    private dataSource: DataSource,
   ) {}
 
   // === Invoices ===
@@ -101,35 +102,41 @@ export class InvoiceService {
 
     const balance = Math.max(0, resolved.totalAmount - discountAmount);
 
-    const invoice = this.invoicesRepo.create({
-      tenantId: data.tenantId,
-      branchId: data.branchId,
-      studentId: data.studentId,
-      enrollmentId: data.enrollmentId,
-      termId: data.termId ?? null,
-      totalAmount: resolved.totalAmount,
-      discountAmount,
-      paidAmount: 0,
-      balance,
-      invoiceNumber: await this.generateInvoiceNumber(data.tenantId),
-      metadata: { feeStructureId: resolved.structure.id, discountGrantIds: grants.map((g) => g.id) },
+    // Invoice + items are written in ONE transaction: a mid-way failure must
+    // not leave an invoice with no (or partial) line items in AR.
+    return this.dataSource.transaction(async (manager) => {
+      const invoiceNumber = await this.generateInvoiceNumber(data.tenantId);
+      const savedInvoice = await manager.save(
+        manager.create(Invoice, {
+          tenantId: data.tenantId,
+          branchId: data.branchId,
+          studentId: data.studentId,
+          enrollmentId: data.enrollmentId,
+          termId: data.termId ?? null,
+          totalAmount: resolved.totalAmount,
+          discountAmount,
+          paidAmount: 0,
+          balance,
+          invoiceNumber,
+          metadata: { feeStructureId: resolved.structure.id, discountGrantIds: grants.map((g) => g.id) },
+        }),
+      );
+
+      for (const item of resolved.items) {
+        await manager.save(
+          manager.create(InvoiceItem, {
+            tenantId: data.tenantId,
+            invoiceId: savedInvoice.id,
+            feeTypeId: item.feeTypeId,
+            description: item.description,
+            amount: item.amount,
+            netAmount: item.amount,
+          }),
+        );
+      }
+
+      return savedInvoice;
     });
-    const savedInvoice = await this.invoicesRepo.save(invoice);
-
-    // Create invoice items
-    for (const item of resolved.items) {
-      const invoiceItem = this.invoiceItemsRepo.create({
-        tenantId: data.tenantId,
-        invoiceId: savedInvoice.id,
-        feeTypeId: item.feeTypeId,
-        description: item.description,
-        amount: item.amount,
-        netAmount: item.amount,
-      });
-      await this.invoiceItemsRepo.save(invoiceItem);
-    }
-
-    return savedInvoice;
   }
 
   async applyDiscount(invoiceId: string, tenantId: string, discountAmount: number) {
@@ -160,6 +167,66 @@ export class InvoiceService {
     }
 
     return this.invoicesRepo.save(invoice);
+  }
+
+  /**
+   * Quote (without applying) the tenant's active penalty rule against an
+   * overdue invoice. Same computation as `applyPenalty`, read-only.
+   */
+  async quotePenalty(invoiceId: string, tenantId: string) {
+    const invoice = await this.invoicesRepo.findOne({ where: { id: invoiceId, tenantId } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    const quote = await this.billingService.computePenalty(tenantId, invoiceId);
+    return {
+      invoiceId,
+      dueDate: invoice.dueDate,
+      balance: Number(invoice.balance),
+      penaltyAmount: Number(quote.penaltyAmount ?? 0),
+      daysOverdue: quote.daysOverdue ?? null,
+      rule: quote.rule,
+      penaltyDue: Number(quote.penaltyAmount ?? 0) > 0,
+    };
+  }
+
+  /**
+   * Apply the tenant's active penalty rule to an overdue invoice. The quote
+   * comes from BillingService.computePenalty (grace period, fixed vs daily
+   * percentage, cap); the ledger update happens in one transaction so the
+   * penalty and the recomputed balance can't diverge.
+   */
+  async applyPenalty(invoiceId: string, tenantId: string) {
+    const invoice = await this.invoicesRepo.findOne({ where: { id: invoiceId, tenantId } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+
+    const quote = await this.billingService.computePenalty(tenantId, invoiceId);
+    if (!quote.rule) {
+      throw new BadRequestException('No active penalty rule is configured for this tenant');
+    }
+    if (Number(quote.penaltyAmount) <= 0) {
+      throw new BadRequestException(
+        'No penalty is currently due for this invoice (not overdue, past balance is zero, or within the grace period)',
+      );
+    }
+
+    const penalty = Number(quote.penaltyAmount);
+    return this.dataSource.transaction(async (manager) => {
+      invoice.penaltyAmount = Number(invoice.penaltyAmount) + penalty;
+      invoice.balance = Math.max(
+        0,
+        Number(invoice.totalAmount) +
+          Number(invoice.penaltyAmount) -
+          Number(invoice.discountAmount) -
+          Number(invoice.paidAmount),
+      );
+      if (invoice.status === 'paid' && invoice.balance > 0) invoice.status = 'partial';
+      invoice.metadata = {
+        ...(invoice.metadata ?? {}),
+        lastPenaltyAppliedAt: new Date().toISOString(),
+        lastPenaltyRuleId: quote.rule!.id,
+        lastPenaltyDaysOverdue: quote.daysOverdue ?? null,
+      };
+      return manager.save(invoice);
+    });
   }
 
   async getStatementOfAccount(studentId: string, tenantId: string) {

@@ -151,7 +151,7 @@ export default function DashboardPage() {
   // Recent activity from the audit trail (real events, not mock data).
   const auditQuery = useQuery({
     queryKey: ['audit-events', 'dashboard', currentTenantId],
-    queryFn: () => apiClient.config.listAuditEvents({ tenantId: currentTenantId ?? undefined, limit: 6 }),
+    queryFn: () => apiClient.config.listAuditEvents({ tenantId: currentTenantId ?? undefined }),
     enabled: !!currentTenantId,
   });
 

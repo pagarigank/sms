@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Student } from './student.entity';
 import { Guardian } from './guardian.entity';
 import { StudentGuardian } from './student-guardian.entity';
@@ -36,6 +36,7 @@ export class SisService {
     @InjectRepository(BehaviorIncident) private incidentsRepo: Repository<BehaviorIncident>,
     @InjectRepository(HealthRecord) private healthRepo: Repository<HealthRecord>,
     @InjectRepository(StudentMergeAudit) private mergeAuditRepo: Repository<StudentMergeAudit>,
+    private dataSource: DataSource,
   ) {}
 
   // === Students ===
@@ -195,25 +196,33 @@ export class SisService {
     const section = await this.sectionsRepo.findOne({ where: { id: sectionId, tenantId } });
     if (!section) throw new NotFoundException('Section not found');
 
-    // Check capacity
-    const currentCount = await this.assignmentsRepo.count({ where: { sectionId, tenantId, isActive: true } });
-    if (currentCount >= section.capacity) {
-      throw new BadRequestException(`Section "${section.name}" is at full capacity (${section.capacity})`);
-    }
+    // Enrollment update + assignment creation run in ONE transaction. The
+    // capacity check inside uses a locking read of the section row so two
+    // concurrent assignments cannot both pass the check and overfill the
+    // section (check-then-insert without a lock is racy).
+    return this.dataSource.transaction(async (manager) => {
+      const assignmentsRepo = manager.getRepository(StudentSectionAssignment);
 
-    // Update enrollment
-    enrollment.sectionId = sectionId;
-    await this.enrollmentsRepo.save(enrollment);
+      // Lock the section row for the duration of the check + write.
+      await manager.query(`SELECT id FROM sections WHERE id = $1 FOR UPDATE`, [sectionId]);
 
-    // Create assignment
-    const assignment = this.assignmentsRepo.create({
-      tenantId,
-      enrollmentId,
-      sectionId,
-      studentId: enrollment.studentId,
-      assignedBy,
+      const currentCount = await assignmentsRepo.count({ where: { sectionId, tenantId, isActive: true } });
+      if (currentCount >= section.capacity) {
+        throw new BadRequestException(`Section "${section.name}" is at full capacity (${section.capacity})`);
+      }
+
+      enrollment.sectionId = sectionId;
+      await manager.save(enrollment);
+
+      const assignment = assignmentsRepo.create({
+        tenantId,
+        enrollmentId,
+        sectionId,
+        studentId: enrollment.studentId,
+        assignedBy,
+      });
+      return assignmentsRepo.save(assignment);
     });
-    return this.assignmentsRepo.save(assignment);
   }
 
   // === Enrollment Holds ===

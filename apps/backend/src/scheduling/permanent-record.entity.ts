@@ -28,7 +28,7 @@ export class PermanentRecord {
   @Column({ type: 'jsonb', default: () => "'{}'" })
   attendance: Record<string, any>;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
   generalAverage: number;
 
   @Column({ nullable: true })

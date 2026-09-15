@@ -6,17 +6,14 @@ import type {
 } from '../types';
 
 export const configEndpoints = (client: ApiClient) => ({
-  // Lookup Lists
-  listLookupLists: (params?: { tenantId?: string; search?: string }) =>
-    client.get<LookupList[]>('/api/v1/config/lookup-lists', params ? {
-      tenantId: params.tenantId ?? '',
-      search: params.search ?? '',
-    } : undefined),
+  // Lookup Lists — backend list endpoint takes no params beyond the tenant header
+  listLookupLists: (params?: { tenantId?: string }) =>
+    client.get<LookupList[]>('/api/v1/config/lookup-lists', params?.tenantId ? { tenantId: params.tenantId } : undefined),
 
   getLookupList: (id: string) =>
     client.get<LookupList>(`/api/v1/config/lookup-lists/${id}`),
 
-  createLookupList: (data: { name: string; code: string; description?: string }) =>
+  createLookupList: (data: { name: string; entityType: string; isActive?: boolean }) =>
     client.post<LookupList>('/api/v1/config/lookup-lists', data),
 
   updateLookupList: (id: string, data: Partial<LookupList>) =>
@@ -27,12 +24,9 @@ export const configEndpoints = (client: ApiClient) => ({
 
   // Lookup Items — backend route is GET /config/lookup-lists/items?lookupListId=
   listLookupItems: (params?: { listId?: string; search?: string }) =>
-    client.get<LookupItem[]>('/api/v1/config/lookup-lists/items', params ? {
-      lookupListId: params.listId ?? '',
-      search: params.search ?? '',
-    } : undefined),
+    client.get<LookupItem[]>('/api/v1/config/lookup-lists/items', params?.listId ? { lookupListId: params.listId } : undefined),
 
-  createLookupItem: (data: { listId: string; value: string; label: string; sortOrder?: number; isActive?: boolean }) =>
+  createLookupItem: (data: { lookupListId: string; value: string; label: string; sortOrder?: number; isActive?: boolean }) =>
     client.post<LookupItem>('/api/v1/config/lookup-items', data),
 
   updateLookupItem: (id: string, data: Partial<LookupItem>) =>
@@ -41,17 +35,14 @@ export const configEndpoints = (client: ApiClient) => ({
   deleteLookupItem: (id: string) =>
     client.delete<void>(`/api/v1/config/lookup-items/${id}`),
 
-  // Custom Fields
-  listCustomFields: (params?: { entityType?: string; search?: string }) =>
-    client.get<CustomFieldDefinition[]>('/api/v1/config/custom-fields', params ? {
-      entityType: params.entityType ?? '',
-      search: params.search ?? '',
-    } : undefined),
+  // Custom Fields — entity fields are fieldKey/required (not fieldName/isRequired)
+  listCustomFields: (params?: { entityType?: string; tenantId?: string }) =>
+    client.get<CustomFieldDefinition[]>('/api/v1/config/custom-fields', params?.entityType ? { entityType: params.entityType } : undefined),
 
   getCustomField: (id: string) =>
     client.get<CustomFieldDefinition>(`/api/v1/config/custom-fields/${id}`),
 
-  createCustomField: (data: { entityType: string; fieldName: string; fieldType: string; label: string; isRequired?: boolean; options?: Record<string, unknown>; validationRules?: Record<string, unknown> }) =>
+  createCustomField: (data: { entityType: string; fieldKey: string; fieldType: string; label: string; required?: boolean; options?: any[]; validationRules?: Record<string, unknown> }) =>
     client.post<CustomFieldDefinition>('/api/v1/config/custom-fields', data),
 
   updateCustomField: (id: string, data: Partial<CustomFieldDefinition>) =>
@@ -60,28 +51,21 @@ export const configEndpoints = (client: ApiClient) => ({
   deleteCustomField: (id: string) =>
     client.delete<void>(`/api/v1/config/custom-fields/${id}`),
 
-  // Numbering Schemes
+  // Numbering Schemes — entity fields are name/entityType/format/counterValue
   listNumberingSchemes: (params?: { entityName?: string; tenantId?: string; branchId?: string }) =>
-    client.get<NumberingScheme[]>('/api/v1/config/numbering-schemes', params ? {
-      entityName: params.entityName ?? '',
-      tenantId: params.tenantId ?? '',
-      branchId: params.branchId ?? '',
-    } : undefined),
+    client.get<NumberingScheme[]>('/api/v1/config/numbering-schemes', params?.tenantId ? { tenantId: params.tenantId } : undefined),
 
-  createNumberingScheme: (data: { entityName: string; prefix: string; padding: number; tenantId: string; branchId?: string }) =>
+  createNumberingScheme: (data: { name: string; entityType: string; format: string; tenantId: string; branchId?: string }) =>
     client.post<NumberingScheme>('/api/v1/config/numbering-schemes', data),
 
   updateNumberingScheme: (id: string, data: Partial<NumberingScheme>) =>
     client.put<NumberingScheme>(`/api/v1/config/numbering-schemes/${id}`, data),
 
-  // Feature Flags
+  // Feature Flags — entity fields are flagKey/enabled/rolloutPercentage
   listFeatureFlags: (params?: { tenantId?: string; branchId?: string }) =>
-    client.get<FeatureFlag[]>('/api/v1/config/feature-flags', params ? {
-      tenantId: params.tenantId ?? '',
-      branchId: params.branchId ?? '',
-    } : undefined),
+    client.get<FeatureFlag[]>('/api/v1/config/feature-flags', params?.tenantId ? { tenantId: params.tenantId } : undefined),
 
-  createFeatureFlag: (data: { flagKey: string; name: string; isEnabled?: boolean; config?: Record<string, unknown>; tenantId: string; branchId?: string }) =>
+  createFeatureFlag: (data: { flagKey: string; enabled?: boolean; rolloutPercentage?: number; tenantId: string; branchId?: string }) =>
     client.post<FeatureFlag>('/api/v1/config/feature-flags', data),
 
   updateFeatureFlag: (id: string, data: Partial<FeatureFlag>) =>
@@ -107,15 +91,13 @@ export const configEndpoints = (client: ApiClient) => ({
       status: params.status ?? '',
     } : undefined),
 
-  // Audit Events
-  listAuditEvents: (params?: { tenantId?: string; entityType?: string; entityId?: string; page?: number; limit?: number }) => {
+  // Audit Events — backend takes tenant header + entityType/entityId filters
+  listAuditEvents: (params?: { tenantId?: string; entityType?: string; entityId?: string }) => {
     const clean: Record<string, string> = {};
     if (params?.tenantId) clean.tenantId = params.tenantId;
     if (params?.entityType) clean.entityType = params.entityType;
     if (params?.entityId) clean.entityId = params.entityId;
-    clean.page = String(params?.page ?? 1);
-    clean.limit = String(params?.limit ?? 50);
-    return client.get<AuditEvent[]>('/api/v1/config/audit-events', clean);
+    return client.get<AuditEvent[]>('/api/v1/config/audit-events', Object.keys(clean).length ? clean : undefined);
   },
 
   getAuditEvent: (id: string) =>

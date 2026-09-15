@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
+import { useTenantStore } from '@/lib/store';
 import { DataTable } from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
-import { Plus, Search, Settings, Key, Hash, List, FileText, BarChart3, Bell, Shield, Wrench } from 'lucide-react';
+import { useToast, Badge, statusToVariant } from '@sms/ui';
+import { Plus, Hash, List, FileText, BarChart3, Wrench, Building2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
 import { Button } from '@sms/ui';
 import { Input } from '@sms/ui';
@@ -14,57 +15,12 @@ import { Label } from '@sms/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sms/ui';
 
-interface LookupList {
-  id: string;
-  name: string;
-  code: string;
-  description?: string;
-  tenantId: string;
-  itemCount: number;
-  createdAt: string;
-}
-
-interface LookupItem {
-  id: string;
-  listId: string;
-  value: string;
-  label: string;
-  sortOrder: number;
-  isActive: boolean;
-}
-
-interface CustomField {
-  id: string;
-  entityType: string;
-  fieldName: string;
-  label: string;
-  fieldType: string;
-  isRequired: boolean;
-  options?: Record<string, unknown>;
-  validationRules?: Record<string, unknown>;
-  tenantId: string;
-  createdAt: string;
-}
-
-interface NumberingScheme {
-  id: string;
-  entityName: string;
-  prefix: string;
-  currentSequence: number;
-  padding: number;
-  tenantId: string;
-  branchId?: string;
-}
-
-interface FeatureFlag {
-  id: string;
-  flagKey: string;
-  name: string;
-  isEnabled: boolean;
-  config?: Record<string, unknown>;
-  tenantId: string;
-  branchId?: string;
-}
+// Rows come straight from the api-client types (aligned with the backend
+// entities); only the lookup-list view needs a client-side item count.
+type LookupListView = import('@sms/api-client').LookupList & { itemCount: number };
+type CustomFieldView = import('@sms/api-client').CustomFieldDefinition;
+type NumberingSchemeView = import('@sms/api-client').NumberingScheme;
+type FeatureFlagView = import('@sms/api-client').FeatureFlag;
 
 interface AuditEvent {
   id: string;
@@ -72,9 +28,25 @@ interface AuditEvent {
   entityId: string;
   action: string;
   actorUserId?: string;
-  beforeState?: Record<string, unknown>;
-  afterState?: Record<string, unknown>;
   occurredAt: string;
+}
+
+interface Tenant {
+  id: string;
+  name: string;
+}
+
+// All /config endpoints are tenant-scoped (x-tenant-id header). A platform
+// admin must select which tenant's configuration to manage before any data
+// loads — otherwise every query would run without a tenant context.
+function useSelectedTenant(tenants: Tenant[] | undefined) {
+  const currentTenantId = useTenantStore((s) => s.currentTenantId);
+  const setCurrentTenant = useTenantStore((s) => s.setCurrentTenant);
+
+  const selectedTenantId =
+    currentTenantId ?? (tenants && tenants.length > 0 ? tenants[0].id : null);
+
+  return { selectedTenantId, setSelectedTenantId: setCurrentTenant };
 }
 
 export default function ConfigPage() {
@@ -83,76 +55,169 @@ export default function ConfigPage() {
   const [activeTab, setActiveTab] = useState<string>('lookups');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock data for demonstration - would be replaced with actual API calls
-  const mockLookupLists: LookupList[] = [
-    { id: '1', name: 'Room Types', code: 'room_types', description: 'Types of rooms in facilities', tenantId: 'tenant-1', itemCount: 9, createdAt: '2024-01-15' },
-    { id: '2', name: 'Document Types', code: 'document_types', description: 'Types of documents', tenantId: 'tenant-1', itemCount: 7, createdAt: '2024-01-15' },
-    { id: '3', name: 'Relationship Types', code: 'relationship_types', description: 'Guardian-student relationships', tenantId: 'tenant-1', itemCount: 12, createdAt: '2024-01-15' },
-    { id: '4', name: 'Fee Types', code: 'fee_types', description: 'Types of fees', tenantId: 'tenant-1', itemCount: 15, createdAt: '2024-01-16' },
-    { id: '5', name: 'Discount Types', code: 'discount_types', description: 'Types of discounts/scholarships', tenantId: 'tenant-1', itemCount: 8, createdAt: '2024-01-16' },
-    { id: '6', name: 'Hold Types', code: 'hold_types', description: 'Enrollment hold types', tenantId: 'tenant-1', itemCount: 5, createdAt: '2024-01-17' },
-    { id: '7', name: 'Payment Methods', code: 'payment_methods', description: 'Accepted payment methods', tenantId: 'tenant-1', itemCount: 7, createdAt: '2024-01-17' },
-    { id: '8', name: 'Asset Types', code: 'asset_types', description: 'Room asset types', tenantId: 'tenant-1', itemCount: 6, createdAt: '2024-01-18' },
-    { id: '9', name: 'Employment Status', code: 'employment_status', description: 'Employee employment statuses', tenantId: 'tenant-1', itemCount: 5, createdAt: '2024-01-18' },
-    { id: '10', name: 'Incident Types', code: 'incident_types', description: 'Behavior incident types', tenantId: 'tenant-1', itemCount: 8, createdAt: '2024-01-18' },
-  ];
+  const { data: tenantsRes } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => apiClient.tenants.list({ limit: 100 }),
+  });
+  const tenants: Tenant[] = tenantsRes?.data ?? [];
+  const { selectedTenantId, setSelectedTenantId } = useSelectedTenant(tenants);
 
-  const mockCustomFields: CustomField[] = [
-    { id: '1', entityType: 'student', fieldName: 'ethnicity', label: 'Ethnicity', fieldType: 'select', isRequired: false, options: { options: ['Filipino', 'Chinese', 'American', 'Other'] }, tenantId: 'tenant-1', createdAt: '2024-02-01' },
-    { id: '2', entityType: 'employee', fieldName: 'licenseNumber', label: 'Professional License #', fieldType: 'text', isRequired: false, tenantId: 'tenant-1', createdAt: '2024-02-02' },
-    { id: '3', entityType: 'enrollment', fieldName: 'shsStrand', label: 'SHS Strand', fieldType: 'select', isRequired: true, options: { options: ['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL'] }, tenantId: 'tenant-1', createdAt: '2024-02-03' },
-    { id: '4', entityType: 'invoice', fieldName: 'purchaseOrder', label: 'Purchase Order #', fieldType: 'text', isRequired: false, tenantId: 'tenant-1', createdAt: '2024-02-04' },
-  ];
+  const tenantParams = selectedTenantId ? { tenantId: selectedTenantId } : undefined;
+  const enabled = Boolean(selectedTenantId);
 
-  const mockNumberingSchemes: NumberingScheme[] = [
-    { id: '1', entityName: 'student', prefix: 'STU', currentSequence: 1247, padding: 6, tenantId: 'tenant-1', branchId: undefined },
-    { id: '2', entityName: 'invoice', prefix: 'INV', currentSequence: 342, padding: 6, tenantId: 'tenant-1', branchId: undefined },
-    { id: '3', entityName: 'official_receipt', prefix: 'OR', currentSequence: 89, padding: 7, tenantId: 'tenant-1', branchId: 'branch-1' },
-  ];
+  // === Queries (all tenant-scoped via the x-tenant-id header) ===
+  const { data: lookupListsRes, isLoading: lookupsLoading } = useQuery({
+    queryKey: ['config-lookup-lists', selectedTenantId],
+    queryFn: () => apiClient.config.listLookupLists(tenantParams),
+    enabled,
+  });
 
-  const mockFeatureFlags: FeatureFlag[] = [
-    { id: '1', flagKey: 'college_module', name: 'College Module', isEnabled: true, config: { maxPrograms: 20 }, tenantId: 'tenant-1', branchId: undefined },
-    { id: '2', flagKey: 'offline_pos', name: 'Offline POS', isEnabled: false, config: { blockSize: 50 }, tenantId: 'tenant-1', branchId: undefined },
-    { id: '3', flagKey: 'reporting_advanced', name: 'Advanced Reporting', isEnabled: true, config: {}, tenantId: 'tenant-1', branchId: undefined },
-    { id: '4', flagKey: 'guardian_portal', name: 'Guardian Portal', isEnabled: true, config: { allowRegistration: true }, tenantId: 'tenant-1', branchId: undefined },
-    { id: '5', flagKey: 'mobile_app', name: 'Mobile App Access', isEnabled: false, config: {}, tenantId: 'tenant-1', branchId: undefined },
-  ];
+  const { data: customFieldsRes, isLoading: fieldsLoading } = useQuery({
+    queryKey: ['config-custom-fields', selectedTenantId],
+    queryFn: () => apiClient.config.listCustomFields({}),
+    enabled,
+  });
 
-  const mockAuditEvents: AuditEvent[] = [
-    { id: '1', entityType: 'lookup_list', entityId: '1', action: 'create', actorUserId: 'user-1', afterState: { name: 'Room Types', code: 'room_types' }, occurredAt: '2024-01-15T10:30:00Z' },
-    { id: '2', entityType: 'custom_field', entityId: '3', action: 'update', actorUserId: 'user-2', beforeState: { fieldName: 'shsStrand' }, afterState: { fieldName: 'shsStrand', isRequired: true }, occurredAt: '2024-02-03T14:22:00Z' },
-    { id: '3', entityType: 'feature_flag', entityId: '2', action: 'update', actorUserId: 'user-1', beforeState: { isEnabled: false }, afterState: { isEnabled: true }, occurredAt: '2024-02-10T09:15:00Z' },
-    { id: '4', entityType: 'numbering_scheme', entityId: '3', action: 'create', actorUserId: 'user-3', afterState: { entityName: 'official_receipt', prefix: 'OR' }, occurredAt: '2024-02-15T11:00:00Z' },
-    { id: '5', entityType: 'lookup_item', entityId: 'item-5', action: 'delete', actorUserId: 'user-1', beforeState: { value: 'old_value' }, occurredAt: '2024-02-20T16:45:00Z' },
-  ];
+  const { data: numberingRes, isLoading: numberingLoading } = useQuery({
+    queryKey: ['config-numbering-schemes', selectedTenantId],
+    queryFn: () => apiClient.config.listNumberingSchemes(tenantParams),
+    enabled,
+  });
+
+  const { data: flagsRes, isLoading: flagsLoading } = useQuery({
+    queryKey: ['config-feature-flags', selectedTenantId],
+    queryFn: () => apiClient.config.listFeatureFlags(tenantParams),
+    enabled,
+  });
+
+  const { data: auditRes, isLoading: auditLoading } = useQuery({
+    queryKey: ['config-audit-events', selectedTenantId],
+    queryFn: () => apiClient.config.listAuditEvents({ tenantId: selectedTenantId! }),
+    enabled,
+  });
+
+  const { data: lookupItemsRes } = useQuery({
+    queryKey: ['config-lookup-items', selectedTenantId],
+    queryFn: () => apiClient.config.listLookupItems({}),
+    enabled,
+  });
+
+  // Item counts per lookup list (client-side reduce over the flat item list)
+  const itemCountByList = new Map<string, number>();
+  for (const item of lookupItemsRes?.data ?? []) {
+    itemCountByList.set(item.lookupListId, (itemCountByList.get(item.lookupListId) ?? 0) + 1);
+  }
+
+  const lookupLists: LookupListView[] = (lookupListsRes?.data ?? []).map((l) => ({
+    ...l,
+    itemCount: itemCountByList.get(l.id) ?? 0,
+  }));
+  const customFields: CustomFieldView[] = customFieldsRes?.data ?? [];
+  const numberingSchemes: NumberingSchemeView[] = numberingRes?.data ?? [];
+  const featureFlags: FeatureFlagView[] = flagsRes?.data ?? [];
+  const auditEvents: AuditEvent[] = auditRes?.data ?? [];
+
+  const invalidate = (key: string) =>
+    queryClient.invalidateQueries({ queryKey: [key, selectedTenantId] });
+
+  // === Mutations ===
+  const createLookupList = useMutation({
+    mutationFn: (data: { name: string; entityType: string }) =>
+      apiClient.config.createLookupList(data),
+    onSuccess: () => {
+      invalidate('config-lookup-lists');
+      toast({ title: 'Lookup list created' });
+      setNewLookup(null);
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  const createCustomField = useMutation({
+    mutationFn: (data: { entityType: string; fieldKey: string; label: string; fieldType: string; required: boolean }) =>
+      apiClient.config.createCustomField(data),
+    onSuccess: () => {
+      invalidate('config-custom-fields');
+      toast({ title: 'Custom field created' });
+      setNewField(null);
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  const createNumberingScheme = useMutation({
+    mutationFn: (data: { name: string; entityType: string; format: string }) =>
+      apiClient.config.createNumberingScheme({ ...data, tenantId: selectedTenantId! }),
+    onSuccess: () => {
+      invalidate('config-numbering-schemes');
+      toast({ title: 'Numbering scheme created' });
+      setNewScheme(null);
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  const createFeatureFlag = useMutation({
+    mutationFn: (data: { flagKey: string; enabled: boolean }) =>
+      apiClient.config.createFeatureFlag({ ...data, tenantId: selectedTenantId! }),
+    onSuccess: () => {
+      invalidate('config-feature-flags');
+      toast({ title: 'Feature flag created' });
+      setNewFlag(null);
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  const toggleFeatureFlag = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      apiClient.config.updateFeatureFlag(id, { enabled }),
+    onSuccess: () => invalidate('config-feature-flags'),
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  // === Dialog state ===
+  const [newLookup, setNewLookup] = useState<{ name: string; entityType: string } | null>(null);
+  const [newField, setNewField] = useState<{
+    entityType: string; fieldKey: string; label: string; fieldType: string; required: boolean;
+  } | null>(null);
+  const [newScheme, setNewScheme] = useState<{ name: string; entityType: string; format: string } | null>(null);
+  const [newFlag, setNewFlag] = useState<{ flagKey: string } | null>(null);
+
+  const q = searchQuery.trim().toLowerCase();
+  const filteredLookups = q ? lookupLists.filter((l) => `${l.name} ${l.entityType}`.toLowerCase().includes(q)) : lookupLists;
+  const filteredFields = q ? customFields.filter((f) => `${f.label} ${f.fieldKey} ${f.entityType}`.toLowerCase().includes(q)) : customFields;
 
   const lookupColumns: ColumnDef<any, any>[] = [
-    { accessorKey: 'name', header: 'Name', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><List className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.name}</p><p className="text-xs text-muted-foreground">{row.original.code}</p></div></div> },
-    { accessorKey: 'description', header: 'Description' },
+    { accessorKey: 'name', header: 'Name', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><List className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.name}</p><p className="text-xs text-muted-foreground">{row.original.entityType}</p></div></div> },
+    { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <Badge variant={statusToVariant(row.original.isActive)}>{row.original.isActive ? 'Active' : 'Inactive'}</Badge> },
     { accessorKey: 'itemCount', header: 'Items', cell: ({ row }) => <span className="font-medium">{row.original.itemCount}</span> },
-    { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString() },
+    { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString() : '—' },
   ];
 
   const customFieldColumns: ColumnDef<any, any>[] = [
-    { accessorKey: 'label', header: 'Label', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><FileText className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.label}</p><p className="text-xs text-muted-foreground">{row.original.fieldName}</p></div></div> },
+    { accessorKey: 'label', header: 'Label', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><FileText className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.label}</p><p className="text-xs text-muted-foreground">{row.original.fieldKey}</p></div></div> },
     { accessorKey: 'entityType', header: 'Entity', cell: ({ row }) => <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">{row.original.entityType}</span> },
     { accessorKey: 'fieldType', header: 'Type', cell: ({ row }) => <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">{row.original.fieldType}</span> },
-    { accessorKey: 'isRequired', header: 'Required', cell: ({ row }) => row.original.isRequired ? <span className="text-green-600">Yes</span> : <span className="text-muted-foreground">No</span> },
-    { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString() },
+    { accessorKey: 'required', header: 'Required', cell: ({ row }) => row.original.required ? <span className="text-green-600">Yes</span> : <span className="text-muted-foreground">No</span> },
+    { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString() : '—' },
   ];
 
   const numberingColumns: ColumnDef<any, any>[] = [
-    { accessorKey: 'entityName', header: 'Entity', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><Hash className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.entityName}</p><p className="text-xs text-muted-foreground">{row.original.prefix}{String(row.original.currentSequence).padStart(row.original.padding, '0')}</p></div></div> },
-    { accessorKey: 'prefix', header: 'Prefix' },
-    { accessorKey: 'currentSequence', header: 'Current #', cell: ({ row }) => <span className="font-mono">{row.original.prefix}{String(row.original.currentSequence).padStart(row.original.padding, '0')}</span> },
-    { accessorKey: 'padding', header: 'Padding' },
-    { accessorKey: 'branchId', header: 'Branch', cell: ({ row }) => row.original.branchId ? `Branch-scoped` : <span className="text-muted-foreground">Tenant-wide</span> },
+    { accessorKey: 'name', header: 'Scheme', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><Hash className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.name}</p><p className="text-xs text-muted-foreground">{row.original.entityType}</p></div></div> },
+    { accessorKey: 'format', header: 'Format', cell: ({ row }) => <span className="font-mono text-xs">{row.original.format}</span> },
+    { accessorKey: 'counterValue', header: 'Counter', cell: ({ row }) => <span className="font-mono">{row.original.counterValue}</span> },
+    { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <Badge variant={statusToVariant(row.original.isActive)}>{row.original.isActive ? 'Active' : 'Inactive'}</Badge> },
+    { accessorKey: 'branchId', header: 'Scope', cell: ({ row }) => row.original.branchId ? 'Branch-scoped' : <span className="text-muted-foreground">Tenant-wide</span> },
   ];
 
   const featureColumns: ColumnDef<any, any>[] = [
-    { accessorKey: 'name', header: 'Feature', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><Wrench className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.name}</p><p className="text-xs text-muted-foreground">{row.original.flagKey}</p></div></div> },
-    { accessorKey: 'isEnabled', header: 'Status', cell: ({ row }) => <Badge variant={statusToVariant(row.original.isEnabled)}>{row.original.isEnabled ? 'Enabled' : 'Disabled'}</Badge> },
-    { accessorKey: 'config', header: 'Config', cell: ({ row }) => <pre className="text-xs text-muted-foreground max-w-xs overflow-auto">{JSON.stringify(row.original.config || {}, null, 2)}</pre> },
+    { accessorKey: 'flagKey', header: 'Feature', cell: ({ row }) => <div className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center"><Wrench className="h-4 w-4 text-primary" /></span><div><p className="font-medium">{row.original.flagKey}</p><p className="text-xs text-muted-foreground">{row.original.rolloutPercentage ?? 100}% rollout</p></div></div> },
+    { accessorKey: 'enabled', header: 'Status', cell: ({ row }) => (
+      <button
+        className="focus:outline-none"
+        onClick={() => toggleFeatureFlag.mutate({ id: row.original.id, enabled: !row.original.enabled })}
+        title="Toggle"
+      >
+        <Badge variant={statusToVariant(row.original.enabled)}>{row.original.enabled ? 'Enabled' : 'Disabled'}</Badge>
+      </button>
+    ) },
     { accessorKey: 'branchId', header: 'Scope', cell: ({ row }) => row.original.branchId ? <Badge variant="info">Branch</Badge> : <Badge variant="neutral">Tenant</Badge> },
   ];
 
@@ -172,7 +237,24 @@ export default function ConfigPage() {
             <h1 className="text-3xl font-bold tracking-tight">Config Engine</h1>
             <p className="text-muted-foreground">Manage lookup lists, custom fields, numbering schemes, and feature flags</p>
           </div>
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedTenantId ?? ''} onValueChange={(v) => setSelectedTenantId(v)}>
+              <SelectTrigger className="w-64"><SelectValue placeholder="Select a tenant…" /></SelectTrigger>
+              <SelectContent>
+                {tenants.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        {!selectedTenantId ? (
+          <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
+            Select a tenant to manage its configuration.
+          </div>
+        ) : (
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
@@ -190,9 +272,30 @@ export default function ConfigPage() {
                 <h2 className="text-xl font-semibold">Lookup Lists</h2>
                 <p className="text-sm text-muted-foreground">Configurable reference data lists used across the platform</p>
               </div>
-              <Button><Plus className="h-4 w-4 mr-2" />New List</Button>
+              <Dialog open={newLookup !== null} onOpenChange={(open) => setNewLookup(open ? { name: '', entityType: '' } : null)}>
+                <DialogTrigger asChild>
+                  <Button><Plus className="h-4 w-4 mr-2" />New List</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>New Lookup List</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div><Label>Name</Label><Input value={newLookup?.name ?? ''} onChange={(e) => setNewLookup({ ...(newLookup ?? { name: '', entityType: '' }), name: e.target.value })} /></div>
+                    <div><Label>Entity type</Label><Input value={newLookup?.entityType ?? ''} onChange={(e) => setNewLookup({ ...(newLookup ?? { name: '', entityType: '' }), entityType: e.target.value })} placeholder="snake_case, e.g. scholarship_type" /></div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setNewLookup(null)}>Cancel</Button>
+                    <Button
+                      disabled={!newLookup?.name || !newLookup?.entityType || createLookupList.isPending}
+                      onClick={() => createLookupList.mutate({
+                        name: newLookup!.name,
+                        entityType: newLookup!.entityType,
+                      })}
+                    >Create</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-            <DataTable columns={lookupColumns as any} data={mockLookupLists} emptyMessage="No lookup lists configured" />
+            <DataTable columns={lookupColumns as any} data={filteredLookups} emptyMessage={lookupsLoading ? 'Loading…' : 'No lookup lists configured'} />
           </TabsContent>
 
           {/* Custom Fields Tab */}
@@ -202,9 +305,62 @@ export default function ConfigPage() {
                 <h2 className="text-xl font-semibold">Custom Fields</h2>
                 <p className="text-sm text-muted-foreground">EAV fields attached to Student, Employee, Enrollment, or Invoice entities</p>
               </div>
-              <Button><Plus className="h-4 w-4 mr-2" />New Field</Button>
+              <Dialog open={newField !== null} onOpenChange={(open) => setNewField(open ? { entityType: 'student', fieldKey: '', label: '', fieldType: 'text', required: false } : null)}>
+                <DialogTrigger asChild>
+                  <Button><Plus className="h-4 w-4 mr-2" />New Field</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>New Custom Field</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Entity</Label>
+                      <Select value={newField?.entityType ?? 'student'} onValueChange={(v) => setNewField({ ...(newField ?? { entityType: 'student', fieldKey: '', label: '', fieldType: 'text', required: false }), entityType: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="student">Student</SelectItem>
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="enrollment">Enrollment</SelectItem>
+                          <SelectItem value="invoice">Invoice</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div><Label>Field key</Label><Input value={newField?.fieldKey ?? ''} onChange={(e) => setNewField({ ...(newField ?? { entityType: 'student', fieldKey: '', label: '', fieldType: 'text', required: false }), fieldKey: e.target.value })} placeholder="snake_case" /></div>
+                    <div><Label>Label</Label><Input value={newField?.label ?? ''} onChange={(e) => setNewField({ ...(newField ?? { entityType: 'student', fieldKey: '', label: '', fieldType: 'text', required: false }), label: e.target.value })} /></div>
+                    <div>
+                      <Label>Type</Label>
+                      <Select value={newField?.fieldType ?? 'text'} onValueChange={(v) => setNewField({ ...(newField ?? { entityType: 'student', fieldKey: '', label: '', fieldType: 'text', required: false }), fieldType: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="text">Text</SelectItem>
+                          <SelectItem value="number">Number</SelectItem>
+                          <SelectItem value="date">Date</SelectItem>
+                          <SelectItem value="select">Select</SelectItem>
+                          <SelectItem value="boolean">Boolean</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={newField?.required ?? false} onChange={(e) => setNewField({ ...(newField ?? { entityType: 'student', fieldKey: '', label: '', fieldType: 'text', required: false }), required: e.target.checked })} />
+                      Required
+                    </label>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setNewField(null)}>Cancel</Button>
+                    <Button
+                      disabled={!newField?.fieldKey || !newField?.label || createCustomField.isPending}
+                      onClick={() => createCustomField.mutate({
+                        entityType: newField!.entityType,
+                        fieldKey: newField!.fieldKey,
+                        label: newField!.label,
+                        fieldType: newField!.fieldType,
+                        required: newField!.required,
+                      })}
+                    >Create</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-            <DataTable columns={customFieldColumns as any} data={mockCustomFields} emptyMessage="No custom fields configured" />
+            <DataTable columns={customFieldColumns as any} data={filteredFields} emptyMessage={fieldsLoading ? 'Loading…' : 'No custom fields configured'} />
           </TabsContent>
 
           {/* Numbering Schemes Tab */}
@@ -214,9 +370,32 @@ export default function ConfigPage() {
                 <h2 className="text-xl font-semibold">Numbering Schemes</h2>
                 <p className="text-sm text-muted-foreground">Auto-number formats for student numbers, OR/SI series, document references</p>
               </div>
-              <Button><Plus className="h-4 w-4 mr-2" />New Scheme</Button>
+              <Dialog open={newScheme !== null} onOpenChange={(open) => setNewScheme(open ? { name: '', entityType: '', format: '' } : null)}>
+                <DialogTrigger asChild>
+                  <Button><Plus className="h-4 w-4 mr-2" />New Scheme</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>New Numbering Scheme</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div><Label>Name</Label><Input value={newScheme?.name ?? ''} onChange={(e) => setNewScheme({ ...(newScheme ?? { name: '', entityType: '', format: '' }), name: e.target.value })} placeholder="e.g. Official Receipt Series" /></div>
+                    <div><Label>Entity type</Label><Input value={newScheme?.entityType ?? ''} onChange={(e) => setNewScheme({ ...(newScheme ?? { name: '', entityType: '', format: '' }), entityType: e.target.value })} placeholder="e.g. official_receipt" /></div>
+                    <div><Label>Format</Label><Input value={newScheme?.format ?? ''} onChange={(e) => setNewScheme({ ...(newScheme ?? { name: '', entityType: '', format: '' }), format: e.target.value })} placeholder="e.g. OR-{SEQ:7}" /></div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setNewScheme(null)}>Cancel</Button>
+                    <Button
+                      disabled={!newScheme?.name || !newScheme?.entityType || !newScheme?.format || createNumberingScheme.isPending}
+                      onClick={() => createNumberingScheme.mutate({
+                        name: newScheme!.name,
+                        entityType: newScheme!.entityType,
+                        format: newScheme!.format,
+                      })}
+                    >Create</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-            <DataTable columns={numberingColumns as any} data={mockNumberingSchemes} emptyMessage="No numbering schemes configured" />
+            <DataTable columns={numberingColumns as any} data={numberingSchemes} emptyMessage={numberingLoading ? 'Loading…' : 'No numbering schemes configured'} />
           </TabsContent>
 
           {/* Feature Flags Tab */}
@@ -226,9 +405,29 @@ export default function ConfigPage() {
                 <h2 className="text-xl font-semibold">Feature Flags</h2>
                 <p className="text-sm text-muted-foreground">Per-tenant/branch feature toggles for gradual rollouts</p>
               </div>
-              <Button><Plus className="h-4 w-4 mr-2" />New Flag</Button>
+              <Dialog open={newFlag !== null} onOpenChange={(open) => setNewFlag(open ? { flagKey: '' } : null)}>
+                <DialogTrigger asChild>
+                  <Button><Plus className="h-4 w-4 mr-2" />New Flag</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>New Feature Flag</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div><Label>Flag key</Label><Input value={newFlag?.flagKey ?? ''} onChange={(e) => setNewFlag({ ...(newFlag ?? { flagKey: '' }), flagKey: e.target.value })} placeholder="snake_case, e.g. offline_pos" /></div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setNewFlag(null)}>Cancel</Button>
+                    <Button
+                      disabled={!newFlag?.flagKey || createFeatureFlag.isPending}
+                      onClick={() => createFeatureFlag.mutate({
+                        flagKey: newFlag!.flagKey,
+                        enabled: false,
+                      })}
+                    >Create</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-            <DataTable columns={featureColumns as any} data={mockFeatureFlags} emptyMessage="No feature flags configured" />
+            <DataTable columns={featureColumns as any} data={featureFlags} emptyMessage={flagsLoading ? 'Loading…' : 'No feature flags configured'} />
           </TabsContent>
 
           {/* Audit Log Tab */}
@@ -238,62 +437,12 @@ export default function ConfigPage() {
                 <h2 className="text-xl font-semibold">Audit Log</h2>
                 <p className="text-sm text-muted-foreground">Configuration changes audit trail</p>
               </div>
-              <div className="flex gap-2">
-                <Input placeholder="Search..." className="w-64" />
-                <Select>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="All Actions" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="create">Create</SelectItem>
-                    <SelectItem value="update">Update</SelectItem>
-                    <SelectItem value="delete">Delete</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="All Entities" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="lookup_list">Lookup List</SelectItem>
-                    <SelectItem value="custom_field">Custom Field</SelectItem>
-                    <SelectItem value="feature_flag">Feature Flag</SelectItem>
-                    <SelectItem value="numbering_scheme">Numbering Scheme</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Input placeholder="Filter by entity…" className="w-64" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
-            <div className="rounded-lg border bg-card shadow-sm">
-              <div className="p-4 border-b">
-                <div className="flex items-center gap-2">
-                  <Input placeholder="Search audit events..." className="w-64" />
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-3 py-2 text-left font-medium">Entity</th>
-                      <th className="px-3 py-2 text-left font-medium">ID</th>
-                      <th className="px-3 py-2 text-left font-medium">Action</th>
-                      <th className="px-3 py-2 text-left font-medium">Actor</th>
-                      <th className="px-3 py-2 text-left font-medium">Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockAuditEvents.map((event) => (
-                      <tr key={event.id} className="border-b last:border-0 hover:bg-muted/50">
-                        <td className="px-3 py-2"><span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">{event.entityType}</span></td>
-                        <td className="px-3 py-2 font-mono text-xs">{event.entityId}</td>
-                        <td className="px-3 py-2"><Badge variant={statusToVariant(event.action)}>{event.action}</Badge></td>
-                        <td className="px-3 py-2 font-mono text-xs">{event.actorUserId || 'System'}</td>
-                        <td className="px-3 py-2">{new Date(event.occurredAt).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <DataTable columns={auditColumns as any} data={auditEvents} emptyMessage={auditLoading ? 'Loading…' : 'No audit events recorded'} />
           </TabsContent>
         </Tabs>
+        )}
 
       </div>
     </>

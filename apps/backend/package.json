@@ -7,7 +7,9 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "build": "nest build",
-    "test": "jest"
+    "test": "jest",
+    "schema:generate": "npm run build && node scripts/generate-schema-baseline.js --template scripts/schema-baseline.template.sql --out src/migrations/000-create-all-tables.sql",
+    "schema:drift": "node scripts/schema-drift-audit.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.0",

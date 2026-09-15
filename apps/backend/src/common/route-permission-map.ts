@@ -1,7 +1,12 @@
 /**
- * Route-to-Permission mapping
- * Maps frontend route paths to required backend permission codes
- * Used by the frontend to filter navigation items based on user permissions
+ * Route-to-Permission mapping (backend copy).
+ * Kept in sync with `packages/api-client/src/route-permission-map.ts` and
+ * `apps/school-portal/src/lib/route-permission-map.ts`.
+ *
+ * IMPORTANT: every code below must exist in the seeded `permissions` catalog
+ * (`apps/backend/src/migrations/001-phase1-rls-and-seed.sql` +
+ * `004-phase1-fixes.sql`). A code that is not in the catalog can never be
+ * granted to a role, so its route is hidden from *every* user.
  */
 
 export interface RoutePermission {
@@ -11,8 +16,9 @@ export interface RoutePermission {
 }
 
 export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
-  // Dashboard
-  { route: '/dashboard', permission: 'platform.dashboard:view' },
+  // Dashboard is intentionally ungated — every authenticated role gets it.
+  // (It used to require `platform.dashboard:view`, which only the platform
+  // roles hold, so tenant staff lost the Dashboard link.)
 
   // Facility
   { route: '/facility', permission: 'facility.building:view', children: [
@@ -22,11 +28,11 @@ export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
   ]},
 
   // Academic
-  { route: '/academic', permission: 'academic.structure:view', children: [
-    { route: '/academic/school-years', permission: 'academic.schoolyear:view' },
-    { route: '/academic/grade-levels', permission: 'academic.gradelevel:view' },
-    { route: '/academic/tracks', permission: 'academic.track:view' },
-    { route: '/academic/programs', permission: 'academic.program:view' },
+  { route: '/academic', permission: 'academic.curriculum:view', children: [
+    { route: '/academic/school-years', permission: 'academic.school_year:view' },
+    { route: '/academic/grade-levels', permission: 'academic.curriculum:view' },
+    { route: '/academic/tracks', permission: 'academic.curriculum:view' },
+    { route: '/academic/programs', permission: 'academic.curriculum:view' },
     { route: '/academic/subjects', permission: 'academic.subject:view' },
     { route: '/academic/curricula', permission: 'academic.curriculum:view' },
   ]},
@@ -37,7 +43,7 @@ export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
     { route: '/sis/guardians', permission: 'sis.guardian:view' },
     { route: '/sis/enrollments', permission: 'sis.enrollment:view' },
     { route: '/sis/sections', permission: 'sis.section:view' },
-    { route: '/sis/admissions', permission: 'sis.admission:view' },
+    { route: '/sis/admissions', permission: 'sis.applicant:view' },
   ]},
 
   // Scheduling
@@ -58,8 +64,8 @@ export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
   ]},
 
   // Billing
-  { route: '/billing', permission: 'billing.feetype:view', children: [
-    { route: '/billing/fee-types', permission: 'billing.feetype:view' },
+  { route: '/billing', permission: 'billing.fee_type:view', children: [
+    { route: '/billing/fee-types', permission: 'billing.fee_type:view' },
     { route: '/billing/fee-structures', permission: 'billing.feestructure:view' },
     { route: '/billing/discounts', permission: 'billing.discount:view' },
     { route: '/billing/invoices', permission: 'billing.invoice:view' },
@@ -94,7 +100,7 @@ export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
   { route: '/reports', permission: 'reporting.dashboard:view' },
 
   // Settings
-  { route: '/settings', permission: 'platform.config:view' },
+  { route: '/settings', permission: 'config.lookup:view' },
 ];
 
 /**
@@ -113,27 +119,35 @@ export function getRoutePermission(route: string): string | null {
 }
 
 /**
- * Filter navigation items based on user permissions
+ * Filter navigation items based on user permissions.
+ *
+ * A parent item is kept when the user can reach the parent itself OR any of
+ * its children, so partial-permission roles keep the section instead of losing
+ * it wholesale.
  */
 export function filterNavigationByPermissions(
   navigation: any[],
   userPermissions: string[],
 ): any[] {
-  return navigation.filter((item) => {
-    const required = getRoutePermission(item.href);
+  const isAllowed = (href: string): boolean => {
+    const required = getRoutePermission(href);
     if (!required) return true; // No permission required
     return userPermissions.includes(required);
-  }).map((item) => {
-    if (item.children) {
-      return {
-        ...item,
-        children: item.children.filter((child: any) => {
-          const required = getRoutePermission(child.href);
-          if (!required) return true;
-          return userPermissions.includes(required);
-        }),
-      };
-    }
-    return item;
-  });
+  };
+
+  return navigation
+    .map((item) => {
+      const children = Array.isArray(item.children)
+        ? item.children.filter((child: any) => isAllowed(child.href))
+        : undefined;
+      const selfAllowed = isAllowed(item.href);
+
+      if (!selfAllowed && !(children && children.length > 0)) return null;
+
+      if (children) {
+        return { ...item, children: children.length > 0 ? children : undefined };
+      }
+      return item;
+    })
+    .filter(Boolean);
 }

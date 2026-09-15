@@ -17,7 +17,7 @@ export class AttendanceExcuse {
   @Column()
   excuseType: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ nullable: true })

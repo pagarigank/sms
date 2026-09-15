@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GradingExtendedService } from './grading-extended.service';
 
@@ -17,13 +17,16 @@ export class GradingExtendedController {
 
   @Post('entries')
   @ApiOperation({ summary: 'Enter a grade for a student' })
-  async enterGrade(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
-    return this.gradingService.enterGrade({ ...data, tenantId });
+  async enterGrade(@Body() data: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    return this.gradingService.enterGrade({ ...data, tenantId }, req.user?.id ?? req.user?.userId ?? req.user?.sub);
   }
 
   @Post('entries/bulk')
   @ApiOperation({ summary: 'Bulk enter grades for a class' })
-  async bulkEnterGrades(@Body() body: { entries: any[] }, @Headers('x-tenant-id') tenantId: string) {
+  async bulkEnterGrades(@Body() body: { entries: any[] }, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    if (!body || !Array.isArray(body.entries)) {
+      throw new BadRequestException('Body must be { entries: [...] }');
+    }
     const entries = body.entries.map(e => ({ ...e, tenantId }));
     return this.gradingService.bulkEnterGrades(entries);
   }
@@ -33,9 +36,14 @@ export class GradingExtendedController {
   async finalizeGrades(
     @Param('classOfferingId') classOfferingId: string,
     @Headers('x-tenant-id') tenantId: string,
-    @Query('termId') termId: string,
+    @Query('termId') termId?: string,
+    @Body() body?: { termId?: string },
   ) {
-    return this.gradingService.finalizeGrades(classOfferingId, termId, tenantId);
+    const resolvedTermId = termId || body?.termId;
+    if (!resolvedTermId) {
+      throw new BadRequestException('termId is required (query parameter or body field)');
+    }
+    return this.gradingService.finalizeGrades(classOfferingId, resolvedTermId, tenantId);
   }
 
   @Get('students/:studentId')
@@ -91,6 +99,9 @@ export class GradingExtendedController {
   @Post('permanent-records')
   @ApiOperation({ summary: 'Create a permanent record' })
   async createPermanentRecord(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new BadRequestException('Request body must be a JSON object');
+    }
     return this.gradingService.createPermanentRecord({ ...data, tenantId });
   }
 

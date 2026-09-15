@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Request } from 'express';
 import { CommunicationsService } from './communications.service';
 
 @ApiTags('communications')
@@ -117,8 +118,17 @@ export class CommunicationsController {
 
   @Post('threads')
   @ApiOperation({ summary: 'Create message thread' })
-  async createThread(@Headers('x-tenant-id') tenantId: string, @Body() body: any) {
-    return this.commsService.createThread({ ...body, tenantId });
+  async createThread(@Headers('x-tenant-id') tenantId: string, @Body() body: any, @Req() req: any) {
+    // Author comes from the token, never the body — otherwise a caller could
+    // create a thread attributed to (and pulling in) another user.
+    const createdBy = req.user?.sub ?? req.user?.id;
+    const participants = Array.isArray(body.participantIds) ? body.participantIds : [];
+    return this.commsService.createThread({
+      ...body,
+      tenantId,
+      createdBy,
+      participantIds: Array.from(new Set([...participants.filter(Boolean), createdBy].filter(Boolean))),
+    });
   }
 
   @Get('threads/:threadId/messages')
@@ -136,8 +146,12 @@ export class CommunicationsController {
     @Param('threadId') threadId: string,
     @Headers('x-tenant-id') tenantId: string,
     @Body() body: any,
+    @Req() req: any,
   ) {
-    return this.commsService.sendMessage({ ...body, threadId, tenantId });
+    // Sender comes from the token: clients never sent it, so every message was
+    // persisted with a null sender and rendered as "not mine" for everyone.
+    const senderUserId = req.user?.sub ?? req.user?.id;
+    return this.commsService.sendMessage({ ...body, threadId, tenantId, senderUserId });
   }
 
   @Put('messages/:id/read')

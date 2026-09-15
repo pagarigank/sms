@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { Public } from '../auth/public.decorator';
 
 @Injectable()
 export class HealthService {
@@ -28,6 +29,7 @@ export class HealthService {
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Liveness/readiness probe (DB ping, uptime)' })
   async check() {

@@ -1,12 +1,16 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Headers, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AcademicService } from './academic.service';
+import { AcademicRolloverService } from '../common/academic-rollover.service';
 
 @ApiTags('academic')
 @ApiBearerAuth('access-token')
 @Controller('academic')
 export class AcademicController {
-  constructor(private readonly academicService: AcademicService) {}
+  constructor(
+    private readonly academicService: AcademicService,
+    private readonly rolloverService: AcademicRolloverService,
+  ) {}
 
   // === Education Levels ===
   @Get('education-levels')
@@ -214,5 +218,25 @@ export class AcademicController {
   @ApiOperation({ summary: 'Publish curriculum', description: 'Transition from draft → active. Validates effectiveGradingSystemId is set on all subjects.' })
   async publishCurriculum(@Param('id') id: string) {
     return this.academicService.updateCurriculum(id, { status: 'active' });
+  }
+
+  // === Academic Rollover ===
+  @Get('school-years/:id/rollover-preview')
+  @ApiOperation({ summary: 'Preview what a rollover would clone from a school year', description: 'Counts terms, curricula, grading systems and honor-roll configs that would be cloned.' })
+  rolloverPreview(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.rolloverService.getRolloverPreview(tenantId, id);
+  }
+
+  @Post('school-years/:id/rollover')
+  @ApiOperation({ summary: 'Roll over to a new school year', description: 'Creates the new year and clones terms, curricula (+subjects), grading systems (+components) and honor-roll configs in ONE transaction.' })
+  async rollover(
+    @Param('id') id: string,
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() body: { name: string; startDate: string; endDate: string; createdBy?: string },
+  ) {
+    for (const field of ['name', 'startDate', 'endDate'] as const) {
+      if (!body?.[field]) throw new BadRequestException(`body.${field} is required`);
+    }
+    return this.rolloverService.rollover(tenantId, id, body, body.createdBy ?? 'system');
   }
 }

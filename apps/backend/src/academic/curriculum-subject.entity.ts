@@ -23,7 +23,7 @@ export class CurriculumSubject {
   @Column({ type: 'uuid', nullable: true })
   coRequisiteSubjectId: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'int', nullable: true })
   order: number;
 
   @Column({ nullable: true })

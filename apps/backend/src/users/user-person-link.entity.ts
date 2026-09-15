@@ -8,7 +8,11 @@ export class UserPersonLink {
   @Column('uuid')
   userId: string;
 
-  @Column('uuid')
+  // Discriminator label, not an identifier: 'student' | 'guardian' | 'employee'.
+  // This was declared as `uuid`, which made any personType filter bind the
+  // literal as a uuid and fail (invalid input syntax for type uuid).
+  @Index()
+  @Column({ type: 'varchar', length: 20 })
   personType: 'student' | 'guardian' | 'employee';
 
   @Column('uuid')

@@ -104,6 +104,14 @@ export function Sidebar() {
     [permissions],
   );
 
+  // The route-permission map is authoritative: render only what survives
+  // filtering. (Previously the map only gated section labels while every link
+  // rendered, so a route a user lacked permission for was still shown.)
+  const visibleByHref = useMemo(
+    () => new Map<string, any>((visibleNavigation as any[]).map((item) => [item.href, item])),
+    [visibleNavigation],
+  );
+
   return (
     <div className="flex h-full w-64 shrink-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-raised))]">
       <div className="flex h-14 items-center border-b border-[hsl(var(--border))] px-4">
@@ -134,6 +142,9 @@ export function Sidebar() {
             );
           }
 
+          const visibleItem: any = visibleByHref.get(item.href);
+          if (!visibleItem) return null;
+
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/') ||
             (item.children?.some((c) => pathname === c.href.split('#')[0]));
 
@@ -154,9 +165,9 @@ export function Sidebar() {
                 <item.icon className="mr-3 h-4 w-4 shrink-0" />
                 {item.name}
               </Link>
-              {item.children && isActive && (
+              {visibleItem.children && isActive && (
                 <div className="ml-[26px] mt-0.5 space-y-0.5 border-l border-[hsl(var(--border))] pl-3">
-                  {item.children.map((child: { name: string; href: string }) => (
+                  {visibleItem.children.map((child: { name: string; href: string }) => (
                     <Link
                       key={child.name}
                       href={child.href}

@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { InvoiceService } from './invoice.service';
+import { OptionalIdempotencyGuard } from '../common/idempotency.guard';
 
 @ApiTags('invoices')
 @ApiBearerAuth('access-token')
@@ -27,6 +28,13 @@ export class InvoiceController {
     return this.invoiceService.getARAging(tenantId, branchId);
   }
 
+  @Get('penalty/quote')
+  @ApiOperation({ summary: 'Quote the tenant penalty rule against a specific invoice', description: 'Query params: invoiceId. Read-only; returns penaltyDue=false when nothing is due.' })
+  async quotePenalty(@Headers('x-tenant-id') tenantId: string, @Query('invoiceId') invoiceId: string) {
+    if (!invoiceId) throw new BadRequestException('invoiceId query parameter is required');
+    return this.invoiceService.quotePenalty(invoiceId, tenantId);
+  }
+
   @Get('student/:studentId/soa')
   @ApiOperation({ summary: 'Get Statement of Account for a student' })
   async getSOA(@Param('studentId') studentId: string, @Headers('x-tenant-id') tenantId: string) {
@@ -40,12 +48,21 @@ export class InvoiceController {
   }
 
   @Post('generate')
+  @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Generate an invoice for an enrollment' })
   async generateInvoice(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
     return this.invoiceService.generateInvoice({ ...data, tenantId });
   }
 
+  @Put(':id/apply-penalty')
+  @UseGuards(OptionalIdempotencyGuard)
+  @ApiOperation({ summary: 'Apply the computed late-payment penalty to an invoice' })
+  async applyPenalty(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.invoiceService.applyPenalty(id, tenantId);
+  }
+
   @Put(':id/apply-discount')
+  @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Apply a discount to an invoice' })
   async applyDiscount(
     @Param('id') id: string,
@@ -56,6 +73,7 @@ export class InvoiceController {
   }
 
   @Put(':id/apply-payment')
+  @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Apply a payment to an invoice' })
   async applyPayment(
     @Param('id') id: string,

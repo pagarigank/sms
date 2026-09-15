@@ -26,6 +26,13 @@ import { TenantAwareDataSource } from './common/tenant-aware-data-source';
 import { OverrideResolverService } from './common/override-resolver.service';
 import { RateLimitGuard } from './common/rate-limit.guard';
 import { HealthModule } from './common/health.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { PermissionsGuard } from './auth/permissions.guard';
+import { SelfServiceScopeGuard } from './auth/self-service-scope.guard';
+import { AccessModule } from './auth/access.module';
+import { UserRole } from './tenants/user-role.entity';
+import { RolePermission } from './tenants/role-permission.entity';
+import { Permission } from './tenants/permission.entity';
 
 @Module({
   imports: [
@@ -55,7 +62,10 @@ import { HealthModule } from './common/health.module';
         };
       },
     }),
+    // Repositories used by the global PermissionsGuard (API→permission map).
+    TypeOrmModule.forFeature([UserRole, RolePermission, Permission]),
     AuthModule,
+    AccessModule,
     UsersModule,
     IamModule,
     TenantsModule,
@@ -81,6 +91,17 @@ import { HealthModule } from './common/health.module';
     TenantAwareDataSource,
     // Global per-tenant rate limiting (100→300 req/min; health exempted).
     { provide: APP_GUARD, useClass: RateLimitGuard },
+    // Fail-closed authentication: every route requires a valid JWT unless it
+    // is marked @Public(). Registered before PermissionsGuard so request.user
+    // is populated when the permission check runs.
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Permission enforcement: explicit @RequirePermission metadata wins,
+    // otherwise the declarative API→permission map resolves the requirement.
+    { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Ownership enforcement for self-service (portal) endpoints: a caller
+    // without the route's own staff permission may only reach their own
+    // user/children/threads. Runs last so permission grants are already known.
+    { provide: APP_GUARD, useClass: SelfServiceScopeGuard },
   ],
 })
 export class AppModule implements NestModule {

@@ -78,6 +78,10 @@ export function billingEndpoints(client: ApiClient) {
 
     createWithdrawalPolicy: (data: any) =>
       client.post('/api/v1/billing/withdrawal-policies', data),
+
+    // Withdrawal / refund quote (read-only, uses the tenant's withdrawal policies)
+    quoteRefund: (params: { tenantId: string; enrollmentId: string; withdrawalDate?: string }) =>
+      client.get('/api/v1/billing/refunds/quote', params as any),
   };
 }
 
@@ -103,5 +107,12 @@ export function invoiceEndpoints(client: ApiClient) {
 
     getARAging: (params: { tenantId: string; branchId?: string }) =>
       client.get('/api/v1/invoices/reports/ar-aging', params as any),
+
+    // Penalty quote (read-only) + apply
+    quotePenalty: (params: { tenantId: string; invoiceId: string }) =>
+      client.get('/api/v1/invoices/penalty/quote', params as any),
+
+    applyPenalty: (id: string) =>
+      client.put(`/api/v1/invoices/${id}/apply-penalty`, {}),
   };
 }
