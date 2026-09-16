@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, DataSource } from 'typeorm';
+import { Repository, In, DataSource, EntityManager } from 'typeorm';
 import { Invoice } from './invoice.entity';
 import { InvoiceItem } from './invoice-item.entity';
 import { StudentDiscountGrant } from './student-discount-grant.entity';
@@ -149,8 +149,42 @@ export class InvoiceService {
   }
 
   async applyPayment(invoiceId: string, tenantId: string, amount: number) {
-    const invoice = await this.invoicesRepo.findOne({ where: { id: invoiceId, tenantId } });
-    if (!invoice) throw new NotFoundException('Invoice not found');
+    // Run in a transaction with a row lock so concurrent payments cannot
+    // read-modify-write the same invoice (lost-update on the ledger).
+    return this.dataSource.transaction(async (manager) =>
+      this.applyPaymentTx(manager, invoiceId, tenantId, amount),
+    );
+  }
+
+  /**
+   * Ledger update that JOINS the caller's transaction. Called from the
+   * cashiering money path (payment → ledger → allocation → OR) so every
+   * leg commits or rolls back together. Locks the invoice row (FOR UPDATE)
+   * to serialize concurrent applications.
+   */
+  async applyPaymentTx(
+    manager: EntityManager,
+    invoiceId: string,
+    tenantId: string,
+    amount: number,
+  ) {
+    // Lock the row before reading: two concurrent payments must not both
+    // apply against the same pre-payment balance. Set the RLS GUC manually —
+    // a raw manager.query bypasses the ALS query wrapper, so without this the
+    // GUC would be unset and RLS would silently filter the row out.
+    await manager.query("SELECT set_config('app.current_tenant_id', $1, false)", [tenantId]);
+    const locked = await manager.query(
+      `SELECT id FROM invoices WHERE id = $1 AND "tenantId" = $2 FOR UPDATE`,
+      [invoiceId, tenantId],
+    );
+    // manager.query shape is driver/version-dependent: newer TypeORM returns
+    // the rows array directly, older ones the pg { rows } result.
+    const lockedRows: Array<{ id: string }> = Array.isArray(locked) ? locked : (locked.rows ?? []);
+    if (!lockedRows.length) throw new NotFoundException('Invoice not found');
+
+    const invoice = await manager.findOne(Invoice, {
+      where: { id: invoiceId, tenantId },
+    });
 
     // Numeric columns come back as strings — coerce before arithmetic
     // (plain `+=` string-concatenates and corrupts the ledger).
@@ -166,7 +200,7 @@ export class InvoiceService {
       invoice.status = 'partial';
     }
 
-    return this.invoicesRepo.save(invoice);
+    return manager.save(invoice);
   }
 
   /**

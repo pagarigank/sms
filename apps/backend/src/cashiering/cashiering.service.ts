@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, EntityManager } from 'typeorm';
 import { CashierSession } from './cashier-session.entity';
 import { AtpSeries } from './atp-series.entity';
 import { SeriesCounter } from './series-counter.entity';
@@ -128,9 +128,37 @@ export class CashieringService {
     return new Set(cash.map((m) => m.code));
   }
 
+  /**
+   * manager.query's result shape is TypeORM/driver-version dependent (0.3.31
+   * + pg returns the rows array directly; other versions return the pg
+   * { rows } result). Normalize so row reads never crash on shape.
+   */
+  private queryRows<T>(result: unknown): T[] {
+    if (Array.isArray(result)) return result as T[];
+    if (result && typeof result === 'object' && Array.isArray((result as any).rows)) {
+      return (result as any).rows as T[];
+    }
+    return [];
+  }
+
   // === OR Numbering (gapless, transactional) ===
   async allocateOrNumber(tenantId: string, branchId: string): Promise<{ orNumber: string; orDisplay: string; seriesId: string }> {
-    return this.dataSource.transaction(async (manager) => {
+    return this.dataSource.transaction(async (manager) =>
+      this.allocateOrNumberTx(manager, tenantId, branchId),
+    );
+  }
+
+  /**
+   * OR allocation that JOINS the caller's transaction. The money path
+   * (processPayment) must issue the receipt inside the payment transaction —
+   * a standalone transaction here would burn a BIR gapless number even when
+   * the outer payment rolls back.
+   */
+  private async allocateOrNumberTx(
+    manager: EntityManager,
+    tenantId: string,
+    branchId: string,
+  ): Promise<{ orNumber: string; orDisplay: string; seriesId: string }> {
       // Find active ATP series for branch
       const series = await manager.findOne(AtpSeries, {
         where: { tenantId, branchId, isActive: true },
@@ -155,7 +183,7 @@ export class CashieringService {
          FOR UPDATE`,
         [tenantId, branchId, series.id],
       );
-      const nextValue = Number(locked.rows[0]?.counterValue ?? 0) + 1;
+      const nextValue = Number(this.queryRows<{ counterValue: number }>(locked)[0]?.counterValue ?? 0) + 1;
       if (nextValue > Number(series.rangeEnd)) {
         throw new BadRequestException('ATP series range exhausted');
       }
@@ -173,7 +201,6 @@ export class CashieringService {
         .replace('{number}', orNumber);
 
       return { orNumber, orDisplay, seriesId: series.id };
-    });
   }
 
   async reserveOrBlock(sessionId: string, tenantId: string, branchId: string, blockSize: number) {
@@ -197,7 +224,7 @@ export class CashieringService {
          FOR UPDATE`,
         [tenantId, branchId, series.id],
       );
-      const current = Number(locked.rows[0]?.counterValue ?? 0);
+      const current = Number(this.queryRows<{ counterValue: number }>(locked)[0]?.counterValue ?? 0);
 
       const blockStart = current + 1;
       const blockEnd = blockStart + blockSize - 1;
@@ -269,7 +296,10 @@ export class CashieringService {
 
       // 2) Invoice ledger + 3) allocation (invoice payments only)
       if (data.invoiceId) {
-        await this.invoiceService.applyPayment(data.invoiceId, data.tenantId, Number(data.amount));
+        // Ledger update must join THIS transaction (applyPaymentTx), not open
+        // its own — otherwise an outer rollback leaves the invoice marked
+        // paid with no payment row behind it.
+        await this.invoiceService.applyPaymentTx(manager, data.invoiceId, data.tenantId, Number(data.amount));
         await manager.save(PaymentAllocation, manager.create(PaymentAllocation, {
           tenantId: data.tenantId,
           paymentId: savedPayment.id,
@@ -279,8 +309,10 @@ export class CashieringService {
       }
 
       // 4) Official Receipt — BIR compliance requires one per collection, with
-      //    payor identity and amount (FR-CSH-4).
-      const { orNumber, orDisplay, seriesId } = await this.allocateOrNumber(
+      //    payor identity and amount (FR-CSH-4). Joins this transaction so the
+      //    gapless number is not burned if any leg above rolls back.
+      const { orNumber, orDisplay, seriesId } = await this.allocateOrNumberTx(
+        manager,
         data.tenantId,
         data.branchId,
       );
@@ -326,19 +358,24 @@ export class CashieringService {
     }
 
     const results = [];
-    for (const alloc of allocations) {
-      const allocation = this.allocationsRepo.create({
-        tenantId,
-        paymentId,
-        invoiceId: alloc.invoiceId,
-        amountApplied: alloc.amountApplied,
-      });
-      results.push(await this.allocationsRepo.save(allocation));
-      // Keep the invoice ledger in sync with the allocation
-      await this.invoiceService.applyPayment(alloc.invoiceId, tenantId, Number(alloc.amountApplied));
-    }
-
-    return results;
+    // One transaction: allocation rows + ledger updates commit or roll back
+    // together (previously each leg auto-committed — a failed ledger update
+    // left an allocation row with no balance change, and vice versa).
+    return this.dataSource.transaction(async (manager) => {
+      const results = [];
+      for (const alloc of allocations) {
+        const allocation = manager.create(PaymentAllocation, {
+          tenantId,
+          paymentId,
+          invoiceId: alloc.invoiceId,
+          amountApplied: alloc.amountApplied,
+        });
+        results.push(await manager.save(allocation));
+        // Keep the invoice ledger in sync with the allocation (row-locked).
+        await this.invoiceService.applyPaymentTx(manager, alloc.invoiceId, tenantId, Number(alloc.amountApplied));
+      }
+      return results;
+    });
   }
 
   // === Refunds ===
