@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Student } from './student.entity';
 import { Guardian } from './guardian.entity';
 import { StudentGuardian } from './student-guardian.entity';
@@ -14,6 +14,7 @@ import { PromotionDecision } from './promotion-decision.entity';
 import { BehaviorIncident } from './behavior-incident.entity';
 import { HealthRecord } from './health-record.entity';
 import { StudentMergeAudit } from './student-merge-audit.entity';
+import { GradeLevel } from '../academic/grade-level.entity';
 import { InvoiceService } from '../billing/invoice.service';
 import { Logger } from '@nestjs/common';
 
@@ -271,7 +272,34 @@ export class SisService {
   }
 
   async getPromotionDecisions(tenantId: string, schoolYearId: string) {
-    return this.promotionsRepo.find({ where: { tenantId, schoolYearId } });
+    const decisions = await this.promotionsRepo.find({ where: { tenantId, schoolYearId } });
+
+    // Enrich for display (same convention as the reporting endpoints — the
+    // portal must never render raw UUID fragments). Missing references
+    // degrade to null rather than failing the list.
+    const studentIds = [...new Set(decisions.map((d) => d.studentId))];
+    const gradeIds = [...new Set(decisions.flatMap((d) => [d.gradeLevelId, d.targetGradeLevelId].filter(Boolean)))];
+    const [students, gradeLevels] = await Promise.all([
+      studentIds.length
+        ? this.studentsRepo.find({ where: { id: In(studentIds), tenantId } })
+        : Promise.resolve([]),
+      gradeIds.length
+        ? this.dataSource.getRepository(GradeLevel).find({ where: { id: In(gradeIds) } })
+        : Promise.resolve([]),
+    ]);
+    const studentName = (id: string) => {
+      const s = students.find((st) => st.id === id);
+      return s ? `${s.lastName}, ${s.firstName}` : null;
+    };
+    const gradeName = (id: string | null) =>
+      id ? ((gradeLevels as Array<{ id: string; name: string }>).find((g) => g.id === id)?.name ?? null) : null;
+
+    return decisions.map((d) => ({
+      ...d,
+      studentName: studentName(d.studentId),
+      fromGrade: gradeName(d.gradeLevelId),
+      toGrade: gradeName(d.targetGradeLevelId),
+    }));
   }
 
   // === Behavior Incidents ===

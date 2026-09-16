@@ -169,16 +169,15 @@ export class InvoiceService {
     amount: number,
   ) {
     // Lock the row before reading: two concurrent payments must not both
-    // apply against the same pre-payment balance. Set the RLS GUC manually —
-    // a raw manager.query bypasses the ALS query wrapper, so without this the
-    // GUC would be unset and RLS would silently filter the row out.
-    await manager.query("SELECT set_config('app.current_tenant_id', $1, false)", [tenantId]);
+    // apply against the same pre-payment balance. RLS needs the tenant GUC,
+    // which the pool hook (TenantAwareDataSource) sets before any query on
+    // the connection — including raw ones — so no manual set_config here.
     const locked = await manager.query(
       `SELECT id FROM invoices WHERE id = $1 AND "tenantId" = $2 FOR UPDATE`,
       [invoiceId, tenantId],
     );
-    // manager.query shape is driver/version-dependent: newer TypeORM returns
-    // the rows array directly, older ones the pg { rows } result.
+    // manager.query's result shape is TypeORM-version dependent: 0.3.31 + pg
+    // returns the rows array directly, older versions the pg { rows } result.
     const lockedRows: Array<{ id: string }> = Array.isArray(locked) ? locked : (locked.rows ?? []);
     if (!lockedRows.length) throw new NotFoundException('Invoice not found');
 

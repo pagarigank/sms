@@ -67,21 +67,24 @@ ON CONFLICT ("id") DO NOTHING;
 
 -- ============================================================
 -- 4. Section + enrollments + section assignments
--- Grade 8 (JHS edu level f0...0003, curriculum ec0...0005), SY 2026-2027
+-- Grade 8 (grade level b0...0021, curriculum ec0...0005), SY 2026-2027
+-- NOTE: gradeLevelId must be a grade_levels row (b0...0021 = Grade 8).
+-- f0...0003 is an EDUCATION-LEVEL id (Junior High School) — using it here
+-- silently broke every grade-name join for these rows (fixed in 024).
 -- ============================================================
 INSERT INTO sections ("id", "tenantId", "branchId", "schoolYearId", "gradeLevelId", "name", "capacity", "isActive", "adviserEmployeeId", "homeroom") VALUES
   ('77000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001',
-   'a0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000003', 'Grade 8 - Sampaguita', 40, true,
+   'a0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000021', 'Grade 8 - Sampaguita', 40, true,
    'd8300000-0000-0000-0000-000000000001', 'Room 101')
 ON CONFLICT ("id") DO NOTHING;
 
 INSERT INTO enrollments ("id", "tenantId", "branchId", "studentId", "schoolYearId", "curriculumId", "sectionId", "gradeLevelId", "status") VALUES
   ('66000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001',
    '55000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'ec000000-0000-0000-0000-000000000005',
-   '77000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000003', 'enrolled'),
+   '77000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000021', 'enrolled'),
   ('66000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001',
    '55000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'ec000000-0000-0000-0000-000000000005',
-   '77000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000003', 'enrolled')
+   '77000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000021', 'enrolled')
 ON CONFLICT ("id") DO NOTHING;
 
 INSERT INTO student_section_assignments ("id", "tenantId", "enrollmentId", "sectionId", "studentId", "isActive") VALUES

@@ -25,6 +25,7 @@ const navigation = [
     { name: 'Students', href: '/sis/students' },
     { name: 'Guardians', href: '/sis/guardians' },
     { name: 'Enrollments', href: '/sis/enrollments' },
+    { name: 'Promotions', href: '/sis/promotions' },
     { name: 'Sections', href: '/sis/sections' },
     { name: 'Admissions', href: '/sis/admissions' },
   ]},
