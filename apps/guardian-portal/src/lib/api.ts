@@ -1,7 +1,7 @@
 import { ApiClient } from '@sms/api-client';
 import { useAuthStore } from './store';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export const apiClient = new ApiClient({
   baseUrl: API_BASE_URL,
