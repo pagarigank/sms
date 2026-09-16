@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
-import { FileText, CheckCircle, Clock, XCircle, Search, Plus, Loader2, AlertTriangle, ShieldCheck, Ban } from 'lucide-react';
+import { FileText, CheckCircle, Clock, XCircle, Search, Plus, Loader2, AlertTriangle, ShieldCheck, Ban, Download } from 'lucide-react';
 import { Button } from '@sms/ui';
 import { Input } from '@sms/ui';
 import { Label } from '@sms/ui';
@@ -167,6 +167,19 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({ queryKey: ['generated-docs', currentTenantId] });
     },
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Failed to void'),
+  });
+
+  const downloadDoc = useMutation({
+    mutationFn: (doc: GeneratedDoc) => apiClient.documents.downloadGenerated(doc.id),
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? 'document.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: (e: any) => setError(e?.message ?? 'Failed to download PDF'),
   });
 
   // --- New request form ---
@@ -403,6 +416,16 @@ export default function DocumentsPage() {
                   <span className={`text-xs font-mono px-2 py-0.5 rounded ${doc.isVoided ? 'bg-red-50 text-red-700 line-through' : 'bg-muted'}`}>
                     {doc.verificationCode}
                   </span>
+                  {!doc.isVoided && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={downloadDoc.isPending}
+                      onClick={() => downloadDoc.mutate(doc)}
+                    >
+                      <Download className="h-4 w-4 mr-1" /> PDF
+                    </Button>
+                  )}
                   {!doc.isVoided && (
                     <Button size="sm" variant="outline" disabled={voidDoc.isPending} onClick={() => voidDoc.mutate(doc.id)}>
                       Void

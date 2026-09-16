@@ -38,5 +38,8 @@ export function reportingEndpoints(client: ApiClient) {
 
     toggleScheduledReport: (id: string, data: { isActive: boolean }) =>
       client.put(`/api/v1/reporting/scheduled/${id}/toggle`, data),
+
+    runScheduledReport: (id: string) =>
+      client.post<{ dispatched: number; summary: string }>(`/api/v1/reporting/scheduled/${id}/run`),
   };
 }

@@ -6,6 +6,24 @@ import { SchoolCalendar } from './school-calendar.entity';
 import { CalendarEvent } from './calendar-event.entity';
 import { StudentSchedule } from './student-schedule.entity';
 import { FacultyLoadLimit } from './faculty-load-limit.entity';
+import { Subject } from '../academic/subject.entity';
+import { Room } from '../facility/room.entity';
+import { Employee } from '../hr/employee.entity';
+
+export interface StudentScheduleEntry {
+  id: string;
+  classOfferingId: string;
+  sectionId: string | null;
+  subjectId: string;
+  subjectCode: string | null;
+  subjectTitle: string | null;
+  roomId: string | null;
+  roomName: string | null;
+  teacherName: string | null;
+  day: string | null;
+  startTime: string | null;
+  endTime: string | null;
+}
 
 @Injectable()
 export class SchedulingService {
@@ -15,6 +33,9 @@ export class SchedulingService {
     @InjectRepository(CalendarEvent) private eventsRepo: Repository<CalendarEvent>,
     @InjectRepository(StudentSchedule) private schedulesRepo: Repository<StudentSchedule>,
     @InjectRepository(FacultyLoadLimit) private loadLimitsRepo: Repository<FacultyLoadLimit>,
+    @InjectRepository(Subject) private subjectsRepo: Repository<Subject>,
+    @InjectRepository(Room) private roomsRepo: Repository<Room>,
+    @InjectRepository(Employee) private employeesRepo: Repository<Employee>,
   ) {}
 
   // === Class Offerings ===
@@ -155,8 +176,71 @@ export class SchedulingService {
   }
 
   // === Student Schedule ===
-  async getStudentSchedule(studentId: string, tenantId: string) {
-    return this.schedulesRepo.find({ where: { studentId, tenantId, isActive: true } });
+  async getStudentSchedule(studentId: string, tenantId: string): Promise<StudentScheduleEntry[]> {
+    const schedules = await this.schedulesRepo.find({
+      where: { studentId, tenantId, isActive: true },
+      order: { createdAt: 'ASC' },
+    });
+
+    // Resolve display names for the grid — guardians should not have to
+    // decode uuids. Lookups are batched and missing references (subject
+    // deleted, room unassigned, offering without a teacher) degrade to null.
+    const subjectIds = [...new Set(schedules.map((s) => s.subjectId).filter(Boolean))];
+    const roomIds = [...new Set(schedules.map((s) => s.roomId).filter(Boolean))] as string[];
+    const offeringIds = [...new Set(schedules.map((s) => s.classOfferingId).filter(Boolean))];
+
+    const [subjects, rooms, offerings] = await Promise.all([
+      subjectIds.length
+        ? this.subjectsRepo.find({ where: subjectIds.map((id) => ({ id, tenantId })) })
+        : Promise.resolve([] as Subject[]),
+      roomIds.length
+        ? this.roomsRepo.find({ where: roomIds.map((id) => ({ id, tenantId })) })
+        : Promise.resolve([] as Room[]),
+      offeringIds.length
+        ? this.offeringsRepo.find({ where: offeringIds.map((id) => ({ id, tenantId })) })
+        : Promise.resolve([] as ClassOffering[]),
+    ]);
+
+    const subjectById = new Map(subjects.map((s) => [s.id, s]));
+    const roomById = new Map(rooms.map((r) => [r.id, r]));
+    const offeringById = new Map(offerings.map((o) => [o.id, o]));
+
+    // Teachers come from the offerings' facultyEmployeeId — one batched
+    // employee lookup.
+    const employeeIds = [
+      ...new Set(
+        offerings
+          .map((o) => o.facultyEmployeeId)
+          .filter((v): v is string => !!v),
+      ),
+    ];
+    const employees = employeeIds.length
+      ? await this.employeesRepo.find({ where: employeeIds.map((id) => ({ id, tenantId })) })
+      : ([] as Employee[]);
+    const employeeById = new Map(employees.map((e) => [e.id, e]));
+
+    return schedules.map((s) => {
+      const subject = subjectById.get(s.subjectId);
+      const room = s.roomId ? roomById.get(s.roomId) : undefined;
+      const offering = offeringById.get(s.classOfferingId);
+      const teacher = offering?.facultyEmployeeId
+        ? employeeById.get(offering.facultyEmployeeId)
+        : undefined;
+      return {
+        id: s.id,
+        classOfferingId: s.classOfferingId,
+        sectionId: s.sectionId ?? null,
+        subjectId: s.subjectId,
+        subjectCode: subject?.code ?? null,
+        subjectTitle: subject?.title ?? null,
+        roomId: s.roomId ?? null,
+        roomName: room?.name ?? null,
+        teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}`.trim() : null,
+        day: s.timeSlot?.day ?? null,
+        startTime: s.timeSlot?.startTime ?? null,
+        endTime: s.timeSlot?.endTime ?? null,
+      };
+    });
   }
 
   // === Timetable ===

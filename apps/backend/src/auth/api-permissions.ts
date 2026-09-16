@@ -41,6 +41,7 @@ export const SELF_SERVICE_RULES: { prefix: string; methods: string[] }[] = [
   { prefix: 'invoices/student', methods: ['GET'] },
   { prefix: 'grading/students', methods: ['GET'] },
   { prefix: 'attendance/students', methods: ['GET'] },
+  { prefix: 'scheduling/students', methods: ['GET'] },
   { prefix: 'documents/templates', methods: ['GET'] },
   { prefix: 'documents/requests', methods: ['GET', 'POST'] },
   { prefix: 'documents/generated', methods: ['GET'] },

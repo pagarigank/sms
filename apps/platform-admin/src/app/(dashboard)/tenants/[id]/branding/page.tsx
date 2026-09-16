@@ -101,6 +101,22 @@ export default function TenantBrandingPage() {
     },
   });
 
+  // Renders the branded document header (as registrar-issued PDFs will carry)
+  // from the *current draft* — so admins can check colors/logo/tagline before
+  // saving, not after. Opens the returned PDF blob in a new tab.
+  const previewMutation = useMutation({
+    mutationFn: () => apiClient.documents.previewBranding({ branding: form as Record<string, unknown> }),
+    onSuccess: ({ blob }) => {
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      // Give the new tab time to load before releasing the blob.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Preview failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const resetMutation = useMutation({
     mutationFn: () => apiClient.tenants.update(tenantId, { branding: {} }),
     onSuccess: () => {
@@ -178,6 +194,14 @@ export default function TenantBrandingPage() {
             >
               <Undo2 className="h-4 w-4 mr-2" />
               Reset to Defaults
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => previewMutation.mutate()}
+              disabled={previewMutation.isPending}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              {previewMutation.isPending ? 'Rendering…' : 'Preview PDF'}
             </Button>
             <Button
               onClick={() => updateMutation.mutate(form)}

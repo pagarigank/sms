@@ -1,6 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 @Entity({ name: 'enrollments' })
+// DB-level backstop for the in-app duplicate-enrollment checks: at most one
+// active (enrolled|pending) enrollment per student per school year, per
+// tenant. Declared here (not only in migration 021) because dev servers run
+// with synchronize:true, which drops indexes it does not know about.
+// Partial (WHERE status IN ...) so terminal statuses don't block re-enrollment.
+@Index('uq_enrollments_active_per_year', ['tenantId', 'studentId', 'schoolYearId'], { unique: true, where: "\"status\" IN ('enrolled', 'pending')" })
 export class Enrollment {
   @PrimaryGeneratedColumn('uuid')
   id: string;

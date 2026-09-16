@@ -32,8 +32,20 @@ export function documentsEndpoints(client: ApiClient) {
     getGeneratedDocs: (params: { tenantId: string; studentId?: string }) =>
       client.get('/api/v1/documents/generated', params as any),
 
+    /** Fetch the generated PDF as a Blob (auth via headers). */
+    downloadGenerated: (id: string) =>
+      client.download(`/api/v1/documents/generated/${id}/file`),
+
     verifyDocument: (code: string) =>
       client.get(`/api/v1/documents/verify/${code}`),
+
+    /**
+     * Render the branded document header as a PDF blob. Sends the editor's
+     * (possibly unsaved) branding draft; the backend falls back to the
+     * tenant's saved branding when the draft is empty.
+     */
+    previewBranding: (data: { branding?: Record<string, unknown>; sample?: string }) =>
+      client.downloadPost('/api/v1/documents/branding/preview', data),
 
     voidDocument: (id: string) =>
       client.put(`/api/v1/documents/generated/${id}/void`),

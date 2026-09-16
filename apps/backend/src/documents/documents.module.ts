@@ -5,11 +5,12 @@ import { DocumentRequest } from './document-request.entity';
 import { GeneratedDocument } from './generated-document.entity';
 import { DocumentsService } from './documents.service';
 import { DocumentsController } from './documents.controller';
+import { PdfService } from './pdf.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([DocumentTemplate, DocumentRequest, GeneratedDocument])],
   controllers: [DocumentsController],
-  providers: [DocumentsService],
+  providers: [DocumentsService, PdfService],
   exports: [DocumentsService],
 })
 export class DocumentsModule {}

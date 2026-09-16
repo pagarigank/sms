@@ -1,13 +1,17 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { SisService } from './sis.service';
+import { ReEnrollmentService } from '../scheduling/re-enrollment.service';
 
 @ApiTags('sis')
 @ApiBearerAuth('access-token')
 @Controller('sis')
 export class SisController {
-  constructor(private readonly sisService: SisService) {}
+  constructor(
+    private readonly sisService: SisService,
+    private readonly reEnrollmentService: ReEnrollmentService,
+  ) {}
 
   // === Students ===
   @Get('students')
@@ -92,6 +96,47 @@ export class SisController {
   @ApiOperation({ summary: 'List enrollments' })
   async findAllEnrollments(@Headers('x-tenant-id') tenantId: string, @Query('schoolYearId') schoolYearId?: string) {
     return this.sisService.findAllEnrollments(tenantId, schoolYearId);
+  }
+
+  // Batch re-enrollment preview + execute. MUST be declared BEFORE
+  // @Post('enrollments') — NestJS would otherwise treat it as a plain
+  // enrollment create with a batch body.
+  // NOTE: 'enrollments/batch' as a path segment is not a tenant prefix issue:
+  // the permission map's 'sis/enrollments' prefix matches it too.
+  @Post('enrollments/batch')
+  @ApiOperation({ summary: 'Execute batch re-enrollment from a source school year into a draft target year' })
+  async executeBatchReEnrollment(@Body() body: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new BadRequestException('Body must be a JSON object');
+    }
+    const { sourceSchoolYearId, targetSchoolYearId, targetCurriculumId, gradeLevelMapping, includeHolds, includeOutstandingBalances } = body;
+    const mapping: Record<string, string> = {};
+    for (const m of gradeLevelMapping ?? body.gradeLevelMappings ?? []) {
+      if (m?.sourceGradeLevelId && m?.targetGradeLevelId) mapping[m.sourceGradeLevelId] = m.targetGradeLevelId;
+    }
+    if (!sourceSchoolYearId || !targetSchoolYearId || !targetCurriculumId) {
+      throw new BadRequestException('sourceSchoolYearId, targetSchoolYearId and targetCurriculumId are required');
+    }
+    if (Object.keys(mapping).length === 0) {
+      throw new BadRequestException('At least one grade level mapping is required');
+    }
+    return this.reEnrollmentService.executeBatchReEnrollment({
+      tenantId,
+      sourceSchoolYearId,
+      targetSchoolYearId,
+      targetCurriculumId,
+      createdBy: req.user?.sub ?? req.user?.id ?? 'system',
+      gradeLevelMapping: mapping,
+      includeHolds,
+      includeOutstandingBalances,
+    });
+  }
+
+  @Get('enrollments/batch/preview')
+  @ApiOperation({ summary: 'Preview batch re-enrollment: counts, holds, grade-level breakdown' })
+  async getReEnrollmentPreview(@Headers('x-tenant-id') tenantId: string, @Query('sourceSchoolYearId') sourceSchoolYearId: string) {
+    if (!sourceSchoolYearId) throw new BadRequestException('sourceSchoolYearId is required');
+    return this.reEnrollmentService.getReEnrollmentPreview(tenantId, sourceSchoolYearId);
   }
 
   @Post('enrollments')

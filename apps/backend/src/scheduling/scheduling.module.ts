@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommunicationsModule } from '../communications/communications.module';
+import { BillingModule } from '../billing/billing.module';
 import { ClassOffering } from './class-offering.entity';
 import { SchoolCalendar } from './school-calendar.entity';
 import { CalendarEvent } from './calendar-event.entity';
@@ -23,6 +24,9 @@ import { PromotionDecision } from '../sis/promotion-decision.entity';
 import { SchoolYear } from '../academic/school-year.entity';
 import { GradeLevel } from '../academic/grade-level.entity';
 import { Curriculum } from '../academic/curriculum.entity';
+import { Subject } from '../academic/subject.entity';
+import { Room } from '../facility/room.entity';
+import { Employee } from '../hr/employee.entity';
 import { SchedulingService } from './scheduling.service';
 import { AttendanceService } from './attendance.service';
 import { GradingExtendedService } from './grading-extended.service';
@@ -56,8 +60,12 @@ import { GradingExtendedController } from './grading-extended.controller';
       Student,
       Guardian,
       StudentGuardian,
+      Subject,
+      Room,
+      Employee,
     ]),
     CommunicationsModule,
+    BillingModule,
   ],
   providers: [SchedulingService, AttendanceService, GradingExtendedService, ReEnrollmentService],
   controllers: [SchedulingController, AttendanceController, GradingExtendedController],

@@ -5,12 +5,13 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@sms/utils';
 import {
   GraduationCap, BookOpen, CreditCard, FileText, MessageSquare,
-  LayoutDashboard, ChevronDown
+  LayoutDashboard, ChevronDown, CalendarDays
 } from 'lucide-react';
 import { useStudentStore } from '@/lib/student-store';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Schedule', href: '/schedule', icon: CalendarDays },
   { name: 'Grades', href: '/grades', icon: BookOpen },
   { name: 'Attendance', href: '/attendance', icon: GraduationCap },
   { name: 'Billing', href: '/billing', icon: CreditCard },

@@ -22,10 +22,12 @@ import { SisController } from './sis.controller';
 import { AdmissionsService } from './admissions.service';
 import { AdmissionsController } from './admissions.controller';
 import { BillingModule } from '../billing/billing.module';
+import { SchedulingModule } from '../scheduling/scheduling.module';
 
 @Module({
   imports: [
     BillingModule,
+    SchedulingModule,
     TypeOrmModule.forFeature([
       Student,
       Guardian,

@@ -29,6 +29,9 @@ export class ScheduledReport {
   @Column({ nullable: true })
   lastRunStatus: string; // success | failed
 
+  @Column({ type: 'uuid', nullable: true })
+  createdBy: string | null; // JWT user who created the subscription
+
   @CreateDateColumn()
   createdAt: Date;
 }

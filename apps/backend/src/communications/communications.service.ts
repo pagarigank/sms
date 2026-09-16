@@ -65,7 +65,7 @@ export class CommunicationsService {
   // === Dispatch (stub — wires to real provider in Phase 8.1 final) ===
   async dispatch(data: {
     tenantId: string; branchId: string; eventType: string;
-    recipientUserId: string;
+    recipientUserId: string | null;
     /** Legacy single-contact form, used as fallback for every channel. */
     recipientContact?: string;
     /** Channel-specific contacts: an sms template uses the phone, an email

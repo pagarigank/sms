@@ -46,6 +46,19 @@ export function sisEndpoints(client: ApiClient) {
     createEnrollment: (data: any) =>
       client.post('/api/v1/sis/enrollments', data),
 
+    // Batch re-enrollment (preview + execute against a draft target year)
+    getReEnrollmentPreview: (sourceSchoolYearId: string) =>
+      client.get<any>('/api/v1/sis/enrollments/batch/preview', { sourceSchoolYearId }),
+
+    executeBatchReEnrollment: (data: {
+      sourceSchoolYearId: string;
+      targetSchoolYearId: string;
+      targetCurriculumId: string;
+      gradeLevelMappings: Array<{ sourceGradeLevelId: string; targetGradeLevelId: string }>;
+      includeHolds?: boolean;
+      includeOutstandingBalances?: boolean;
+    }) => client.post<any>('/api/v1/sis/enrollments/batch', data),
+
     updateEnrollment: (id: string, data: any) =>
       client.put(`/api/v1/sis/enrollments/${id}`, data),
 

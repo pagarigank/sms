@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { InvoiceService } from '../billing/invoice.service';
 import { Enrollment } from '../sis/enrollment.entity';
 import { StudentSectionAssignment } from '../sis/student-section-assignment.entity';
 import { EnrollmentHold } from '../sis/enrollment-hold.entity';
@@ -20,7 +21,7 @@ interface ReEnrollmentBatchParams {
   includeOutstandingBalances?: boolean;
 }
 
-interface ReEnrollmentResult {
+export interface ReEnrollmentResult {
   totalStudents: number;
   enrolled: number;
   skipped: number;
@@ -30,7 +31,11 @@ interface ReEnrollmentResult {
 
 @Injectable()
 export class ReEnrollmentService {
+  private readonly logger = new Logger(ReEnrollmentService.name);
+
   constructor(
+    private readonly dataSource: DataSource,
+    private readonly invoiceService: InvoiceService,
     @InjectRepository(Enrollment) private enrollmentsRepo: Repository<Enrollment>,
     @InjectRepository(StudentSectionAssignment) private assignmentsRepo: Repository<StudentSectionAssignment>,
     @InjectRepository(EnrollmentHold) private holdsRepo: Repository<EnrollmentHold>,
@@ -167,22 +172,62 @@ export class ReEnrollmentService {
           continue;
         }
 
-        // Create new enrollment
-        const newEnrollment = this.enrollmentsRepo.create({
-          tenantId: params.tenantId,
-          branchId: sourceEnrollment.branchId,
-          studentId: sourceEnrollment.studentId,
-          schoolYearId: params.targetSchoolYearId,
-          curriculumId: params.targetCurriculumId,
-          gradeLevelId: targetGradeLevelId,
-          strandId: sourceEnrollment.strandId,
-          programId: sourceEnrollment.programId,
-          previousSchoolYearId: params.sourceSchoolYearId,
-          previousGradeLevelId: sourceEnrollment.gradeLevelId,
-          status: 'enrolled',
+        // Create the enrollment atomically: the insert happens inside a
+        // transaction whose first statement takes a row lock on the
+        // student's enrollments, so concurrent batch runs (or a batch racing
+        // a single enrollment) serialize here and the dup check + insert
+        // pair can no longer both pass.
+        const savedEnrollment = await this.dataSource.transaction(async (em) => {
+          const txEnrollments = em.getRepository(Enrollment);
+
+          await em.query(
+            `SELECT id FROM enrollments WHERE "studentId" = $1 AND "tenantId" = $2 FOR UPDATE`,
+            [sourceEnrollment.studentId, params.tenantId],
+          );
+
+          const dupe = await txEnrollments.findOne({
+            where: {
+              studentId: sourceEnrollment.studentId,
+              schoolYearId: params.targetSchoolYearId,
+              tenantId: params.tenantId,
+            },
+          });
+          if (dupe) throw new Error('Already enrolled in target school year');
+
+          const newEnrollment = txEnrollments.create({
+            tenantId: params.tenantId,
+            branchId: sourceEnrollment.branchId,
+            studentId: sourceEnrollment.studentId,
+            schoolYearId: params.targetSchoolYearId,
+            curriculumId: params.targetCurriculumId,
+            gradeLevelId: targetGradeLevelId,
+            strandId: sourceEnrollment.strandId,
+            programId: sourceEnrollment.programId,
+            previousSchoolYearId: params.sourceSchoolYearId,
+            previousGradeLevelId: sourceEnrollment.gradeLevelId,
+            status: 'enrolled',
+          });
+          return txEnrollments.save(newEnrollment);
         });
 
-        const savedEnrollment = await this.enrollmentsRepo.save(newEnrollment);
+        // Auto-assess fees from the resolved fee structure — after commit,
+        // same as SisService.createEnrollment (InvoiceService runs on its
+        // own connection, so it must see the committed enrollment row).
+        // A billing configuration problem must not lose the enrollment;
+        // invoice failures are logged and the invoice can be generated
+        // manually afterwards.
+        try {
+          await this.invoiceService.generateInvoice({
+            tenantId: savedEnrollment.tenantId,
+            branchId: savedEnrollment.branchId,
+            studentId: savedEnrollment.studentId,
+            enrollmentId: savedEnrollment.id,
+          });
+        } catch (e) {
+          this.logger.warn(
+            `Auto-invoice failed for re-enrolled student ${savedEnrollment.studentId}: ${e instanceof Error ? e.message : e}`,
+          );
+        }
 
         result.enrolled++;
         result.enrollments.push({

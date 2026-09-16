@@ -38,14 +38,14 @@ export default function ReEnrollmentBatchPage() {
     enabled: !!currentTenantId && !!targetSchoolYearId,
   });
 
-  const { data: preview } = useQuery({
+  const { data: preview, isFetching: previewLoading, error: previewError } = useQuery({
     queryKey: ['re-enrollment-preview', currentTenantId, sourceSchoolYearId],
-    queryFn: () => apiClient.sis.getStudentHolds(sourceSchoolYearId),
+    queryFn: () => apiClient.sis.getReEnrollmentPreview(sourceSchoolYearId),
     enabled: !!currentTenantId && !!sourceSchoolYearId && step === 2,
   });
 
   const batchEnroll = useMutation({
-    mutationFn: () => apiClient.sis.createEnrollment({
+    mutationFn: () => apiClient.sis.executeBatchReEnrollment({
       sourceSchoolYearId,
       targetSchoolYearId,
       targetCurriculumId,
@@ -173,23 +173,50 @@ export default function ReEnrollmentBatchPage() {
         {step === 2 && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Preview</h2>
+            {previewError && (
+              <p className="text-sm text-red-600">Failed to load preview: {(previewError as Error).message}</p>
+            )}
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 border rounded-lg text-center">
-                <p className="text-3xl font-bold">—</p>
+                <p className="text-3xl font-bold">{previewLoading ? '…' : (preview?.data?.totalStudents ?? '—')}</p>
                 <p className="text-sm text-muted-foreground">Total Students</p>
               </div>
               <div className="p-4 border rounded-lg text-center">
-                <p className="text-3xl font-bold text-green-600">—</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {previewLoading ? '…' : Math.max((preview?.data?.totalStudents ?? 0) - (preview?.data?.withActiveHolds ?? 0), 0)}
+                </p>
                 <p className="text-sm text-muted-foreground">Will be Enrolled</p>
               </div>
               <div className="p-4 border rounded-lg text-center">
-                <p className="text-3xl font-bold text-yellow-600">—</p>
+                <p className="text-3xl font-bold text-yellow-600">
+                  {previewLoading ? '…' : (preview?.data?.withActiveHolds ?? '—')}
+                </p>
                 <p className="text-sm text-muted-foreground">With Holds</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Preview will show actual counts when the backend API is fully integrated.
-            </p>
+            {preview?.data?.holdDetails && Object.keys(preview.data.holdDetails).length > 0 && (
+              <div className="p-3 border rounded-lg">
+                <p className="font-medium mb-2 text-sm">Students with active holds:</p>
+                {Object.entries(preview.data.holdDetails).map(([studentId, count]) => (
+                  <p key={studentId} className="text-sm text-yellow-600">
+                    {studentId}: {String(count)} hold(s)
+                  </p>
+                ))}
+              </div>
+            )}
+            {!previewLoading && preview?.data?.gradeLevelBreakdown && (
+              <div className="p-3 border rounded-lg">
+                <p className="font-medium mb-2 text-sm">Grade level breakdown:</p>
+                {Object.entries(preview.data.gradeLevelBreakdown).map(([gradeLevelId, count]) => {
+                  const gl = (gradeLevels?.data ?? []).find((g: any) => g.id === gradeLevelId);
+                  return (
+                    <p key={gradeLevelId} className="text-sm">
+                      {gl?.name ?? gradeLevelId}: {String(count)} student(s)
+                    </p>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -272,7 +299,8 @@ export default function ReEnrollmentBatchPage() {
             onClick={() => setStep(step + 1)}
             disabled={
               (step === 0 && (!sourceSchoolYearId || !targetSchoolYearId || !targetCurriculumId)) ||
-              (step === 1 && gradeLevelMappings.length === 0)
+              (step === 1 && gradeLevelMappings.length === 0) ||
+              (step === 2 && !!sourceSchoolYearId && !preview && !previewError)
             }
             className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >

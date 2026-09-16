@@ -401,6 +401,11 @@ export class ReportingService {
     return this.scheduledRepo.save(report);
   }
 
+  /** Single subscription lookup (used by the run-now route). */
+  async findScheduledReport(id: string, tenantId: string): Promise<ScheduledReport | null> {
+    return this.scheduledRepo.findOne({ where: { id, tenantId } });
+  }
+
   async toggleScheduledReport(id: string, tenantId: string, isActive: boolean) {
     const report = await this.scheduledRepo.findOne({ where: { id, tenantId } });
     if (!report) return null;

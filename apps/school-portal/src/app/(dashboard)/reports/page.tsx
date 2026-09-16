@@ -57,6 +57,7 @@ export default function ReportsPage() {
       color: 'bg-orange-500',
       reports: [
         { name: 'Cashier Collections', href: '/cashiering/reports', description: 'Daily collection by payment method' },
+        { name: 'Scheduled Reports', href: '/reports/scheduled', description: 'Recurring report summaries by email' },
       ],
     },
   ];

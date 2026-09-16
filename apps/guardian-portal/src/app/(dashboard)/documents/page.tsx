@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useStudentStore } from '@/lib/student-store';
-import { FileText, CheckCircle, Clock, Copy, Check, Loader2, AlertTriangle, Ban } from 'lucide-react';
+import { FileText, CheckCircle, Clock, Copy, Check, Loader2, AlertTriangle, Ban, Download } from 'lucide-react';
 import { Badge } from '@sms/ui';
 
 const STATUS_CONFIG: Record<string, { variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; label: string }> = {
@@ -87,6 +87,19 @@ export default function DocumentsPage() {
     setCopied(code);
     setTimeout(() => setCopied(null), 1500);
   };
+
+  const downloadDoc = useMutation({
+    mutationFn: (doc: GeneratedDoc) => apiClient.documents.downloadGenerated(doc.id),
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? 'document.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: (e: any) => setError(e?.message ?? 'Failed to download PDF'),
+  });
 
   if (!selectedStudentId) {
     return (
@@ -189,14 +202,26 @@ export default function DocumentsPage() {
                     <p className="text-xs text-[hsl(var(--ink-300))]">{new Date(doc.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => copyCode(doc.verificationCode)}
-                  className="flex items-center gap-1.5 text-xs font-mono bg-[hsl(var(--surface-muted))] hover:bg-[hsl(var(--border))] text-[hsl(var(--ink-200))] px-2 py-1 rounded transition-colors shrink-0"
-                  title="Copy verification code"
-                >
-                  {doc.isVoided ? <span className="line-through">{doc.verificationCode}</span> : doc.verificationCode}
-                  {copied === doc.verificationCode ? <Check className="h-3.5 w-3.5 text-[hsl(var(--status-success-ink))]" /> : <Copy className="h-3.5 w-3.5 text-[hsl(var(--ink-300))]" />}
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => copyCode(doc.verificationCode)}
+                    className="flex items-center gap-1.5 text-xs font-mono bg-[hsl(var(--surface-muted))] hover:bg-[hsl(var(--border))] text-[hsl(var(--ink-200))] px-2 py-1 rounded transition-colors"
+                    title="Copy verification code"
+                  >
+                    {doc.isVoided ? <span className="line-through">{doc.verificationCode}</span> : doc.verificationCode}
+                    {copied === doc.verificationCode ? <Check className="h-3.5 w-3.5 text-[hsl(var(--status-success-ink))]" /> : <Copy className="h-3.5 w-3.5 text-[hsl(var(--ink-300))]" />}
+                  </button>
+                  {!doc.isVoided && (
+                    <button
+                      onClick={() => downloadDoc.mutate(doc)}
+                      disabled={downloadDoc.isPending}
+                      className="flex items-center gap-1 text-xs bg-[hsl(var(--accent-subtle))] hover:bg-[hsl(var(--accent))]/20 text-[hsl(var(--accent))] px-2 py-1 rounded transition-colors disabled:opacity-50"
+                      title="Download PDF"
+                    >
+                      <Download className="h-3.5 w-3.5" /> PDF
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

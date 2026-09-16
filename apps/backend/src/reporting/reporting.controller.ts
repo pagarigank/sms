@@ -1,12 +1,17 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ReportingService } from './reporting.service';
+import { ScheduledReportDispatcher } from './scheduled-report-dispatcher.service';
 
 @ApiTags('reporting')
 @ApiBearerAuth('access-token')
 @Controller('reporting')
 export class ReportingController {
-  constructor(private readonly reportingService: ReportingService) {}
+  constructor(
+    private readonly reportingService: ReportingService,
+    private readonly dispatcher: ScheduledReportDispatcher,
+  ) {}
 
   // === Dashboard ===
   @Get('dashboard')
@@ -92,8 +97,21 @@ export class ReportingController {
 
   @Post('scheduled')
   @ApiOperation({ summary: 'Create scheduled report subscription' })
-  async createScheduledReport(@Headers('x-tenant-id') tenantId: string, @Body() body: any) {
-    return this.reportingService.createScheduledReport({ ...body, tenantId });
+  async createScheduledReport(@Headers('x-tenant-id') tenantId: string, @Body() body: any, @Req() req: any) {
+    // Stamp who created it so notifications can attribute the dispatch.
+    return this.reportingService.createScheduledReport({
+      ...body,
+      tenantId,
+      createdBy: (req.user as any)?.sub ?? (req.user as any)?.id ?? null,
+    });
+  }
+
+  @Post('scheduled/:id/run')
+  @ApiOperation({ summary: 'Run a scheduled report now (dispatches immediately, stamps lastRun)' })
+  async runScheduledReport(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    const sub = await this.reportingService.findScheduledReport(id, tenantId);
+    if (!sub) throw new NotFoundException('Scheduled report not found');
+    return this.dispatcher.runSubscription(sub);
   }
 
   @Put('scheduled/:id/toggle')

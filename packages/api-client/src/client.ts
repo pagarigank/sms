@@ -136,6 +136,69 @@ export class ApiClient {
     return this.request<T>('GET', path, undefined, params as Record<string, string>);
   }
 
+  /**
+   * Binary download with auth headers (fetch → Blob). Used for generated
+   * document PDFs, where browser navigation cannot carry the Authorization
+   * header and the download route must stay authenticated.
+   */
+  async download(path: string): Promise<{ blob: Blob; filename: string | null }> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const headers: Record<string, string> = {};
+    const token = this.getToken?.();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const tenantId = this.getTenantId?.();
+    if (tenantId) headers['x-tenant-id'] = tenantId;
+
+    const response = await fetch(url.toString(), { headers });
+    if (response.status === 401) {
+      this.onUnauthorized?.();
+      throw new Error('Unauthorized');
+    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    const match = /filename="?([^";]+)"?/.exec(disposition);
+    return {
+      blob: await response.blob(),
+      filename: match?.[1] ?? null,
+    };
+  }
+
+  /**
+   * POST that returns the response body as a Blob instead of parsed JSON —
+   * same auth headers as `download`, for authenticated binary outputs
+   * produced from a request body (e.g. the branding preview PDF).
+   */
+  async downloadPost(path: string, body?: unknown): Promise<{ blob: Blob; filename: string | null }> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = this.getToken?.();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const tenantId = this.getTenantId?.();
+    if (tenantId) headers['x-tenant-id'] = tenantId;
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (response.status === 401) {
+      this.onUnauthorized?.();
+      throw new Error('Unauthorized');
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error((error as any).message || `HTTP ${response.status}`);
+    }
+
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    const match = /filename="?([^";]+)"?/.exec(disposition);
+    return {
+      blob: await response.blob(),
+      filename: match?.[1] ?? null,
+    };
+  }
+
   async post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
     return this.request<T>('POST', path, body);
   }

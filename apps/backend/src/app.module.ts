@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
 import { TenantsModule } from './tenants/tenants.module';
@@ -40,6 +41,8 @@ import { Permission } from './tenants/permission.entity';
       isGlobal: true,
       envFilePath: ['.env.development', '.env'],
     }),
+    // Cron-style intervals (ScheduledReportDispatcher.scan runs every 10 min).
+    ScheduleModule.forRoot(),
     HealthModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

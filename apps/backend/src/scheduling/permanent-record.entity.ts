@@ -20,7 +20,8 @@ export class PermanentRecord {
   @Column('uuid')
   gradeLevelId: string;
 
-  @Column({ type: 'jsonb' })  recordType: string;
+  @Column({ default: 'report_card' })
+  recordType: string;
 
   @Column({ type: 'jsonb', default: () => "'{}'" })
   grades: Record<string, any>;
