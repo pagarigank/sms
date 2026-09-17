@@ -784,7 +784,14 @@ export default function SchoolYearsPage() {
           columns={columns as any}
           data={schoolYears}
           isLoading={isLoading}
-          emptyMessage="No school years found. Click 'Add School Year' to create your first school year."
+          emptyMessage="No school years found."
+          emptyDescription="Get started by configuring your first school year."
+          emptyAction={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              <span>Create School Year</span>
+            </Button>
+          }
         />
       </div>
     </>

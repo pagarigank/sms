@@ -4,6 +4,8 @@ import { Repository, In, DataSource, EntityManager } from 'typeorm';
 import { Invoice } from './invoice.entity';
 import { InvoiceItem } from './invoice-item.entity';
 import { StudentDiscountGrant } from './student-discount-grant.entity';
+import { PaymentPlan } from './payment-plan.entity';
+import { InstallmentSchedule } from './installment-schedule.entity';
 import { Student } from '../sis/student.entity';
 import { BillingService } from './billing.service';
 import { NumberingService } from '../config/numbering.service';
@@ -15,6 +17,8 @@ export class InvoiceService {
     @InjectRepository(InvoiceItem) private invoiceItemsRepo: Repository<InvoiceItem>,
     @InjectRepository(StudentDiscountGrant) private discountGrantsRepo: Repository<StudentDiscountGrant>,
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
+    @InjectRepository(PaymentPlan) private paymentPlansRepo: Repository<PaymentPlan>,
+    @InjectRepository(InstallmentSchedule) private installmentRepo: Repository<InstallmentSchedule>,
     private billingService: BillingService,
     private dataSource: DataSource,
     private numberingService: NumberingService,
@@ -54,6 +58,8 @@ export class InvoiceService {
     studentId: string;
     enrollmentId: string;
     termId?: string;
+    paymentPlanId?: string;
+    customInstallmentsCount?: number;
   }) {
     // Check if invoice already exists for this enrollment (termId may be null;
     // match on the enrollment so one enrollment can't be double-invoiced)
@@ -69,6 +75,7 @@ export class InvoiceService {
     const educationLevelId = await this.billingService.getEducationLevelForCurriculum(enrollment.curriculumId);
 
     const resolved = await this.billingService.resolveFeeStructure(data.tenantId, {
+      enrollmentId: data.enrollmentId,
       branchId: data.branchId,
       schoolYearId: enrollment.schoolYearId,
       educationLevelId,
@@ -137,8 +144,91 @@ export class InvoiceService {
         );
       }
 
+      if (data.paymentPlanId) {
+        await this.applyPaymentPlanTx(manager, savedInvoice, data.paymentPlanId, data.tenantId);
+      } else if (data.customInstallmentsCount && data.customInstallmentsCount > 0) {
+        await this.generateCustomInstallmentsTx(manager, savedInvoice, data.customInstallmentsCount, data.tenantId);
+      }
+
       return savedInvoice;
     });
+  }
+
+  async applyPaymentPlanTx(manager: EntityManager, invoice: Invoice, paymentPlanId: string, tenantId: string) {
+    const plan = await manager.findOne(PaymentPlan, { where: { id: paymentPlanId, tenantId } });
+    if (!plan) throw new BadRequestException('Payment plan not found');
+
+    // Delete existing installments if any
+    await manager.delete(InstallmentSchedule, { invoiceId: invoice.id, tenantId });
+
+    invoice.paymentPlanId = paymentPlanId;
+    await manager.save(invoice);
+
+    const numInstallments = plan.numberOfInstallments || 1;
+    let remainingAmount = Number(invoice.balance);
+    const splitAmount = Math.floor((remainingAmount / numInstallments) * 100) / 100;
+
+    let currentDate = new Date();
+    
+    for (let i = 1; i <= numInstallments; i++) {
+      let amount = splitAmount;
+      if (i === numInstallments) {
+        amount = remainingAmount; // Remainder to last installment
+      }
+      
+      const dueDate = new Date(currentDate);
+      if (i > 1) {
+        dueDate.setMonth(dueDate.getMonth() + 1); // Simple monthly bump for now
+      }
+
+      const installment = manager.create(InstallmentSchedule, {
+        tenantId,
+        invoiceId: invoice.id,
+        installmentNumber: i,
+        amount,
+        dueDate,
+        status: 'open',
+      });
+      await manager.save(installment);
+      
+      remainingAmount = Math.max(0, remainingAmount - amount);
+      currentDate = dueDate;
+    }
+  }
+
+  async generateCustomInstallmentsTx(manager: EntityManager, invoice: Invoice, numInstallments: number, tenantId: string) {
+    // Delete existing installments if any
+    await manager.delete(InstallmentSchedule, { invoiceId: invoice.id, tenantId });
+
+    let remainingAmount = Number(invoice.balance);
+    const splitAmount = Math.floor((remainingAmount / numInstallments) * 100) / 100;
+
+    let currentDate = new Date();
+    
+    for (let i = 1; i <= numInstallments; i++) {
+      let amount = splitAmount;
+      if (i === numInstallments) {
+        amount = remainingAmount; // Remainder to last installment
+      }
+      
+      const dueDate = new Date(currentDate);
+      if (i > 1) {
+        dueDate.setMonth(dueDate.getMonth() + 1); // Simple monthly bump for now
+      }
+
+      const installment = manager.create(InstallmentSchedule, {
+        tenantId,
+        invoiceId: invoice.id,
+        installmentNumber: i,
+        amount,
+        dueDate,
+        status: 'open',
+      });
+      await manager.save(installment);
+      
+      remainingAmount = Math.max(0, remainingAmount - amount);
+      currentDate = dueDate;
+    }
   }
 
   async applyDiscount(invoiceId: string, tenantId: string, discountAmount: number) {
@@ -277,16 +367,30 @@ export class InvoiceService {
 
     return {
       studentId,
-      invoices: invoices.map(inv => ({
-        id: inv.id,
-        invoiceNumber: inv.invoiceNumber,
-        totalAmount: inv.totalAmount,
-        discountAmount: inv.discountAmount,
-        paidAmount: inv.paidAmount,
-        balance: inv.balance,
-        status: inv.status,
-        dueDate: inv.dueDate,
-        createdAt: inv.createdAt,
+      invoices: await Promise.all(invoices.map(async inv => {
+        const installments = await this.installmentRepo.find({
+          where: { invoiceId: inv.id, tenantId },
+          order: { installmentNumber: 'ASC' }
+        });
+
+        return {
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          totalAmount: inv.totalAmount,
+          discountAmount: inv.discountAmount,
+          paidAmount: inv.paidAmount,
+          balance: inv.balance,
+          status: inv.status,
+          dueDate: inv.dueDate,
+          createdAt: inv.createdAt,
+          installments: installments.map(inst => ({
+            id: inst.id,
+            installmentNumber: inst.installmentNumber,
+            amount: inst.amount,
+            dueDate: inst.dueDate,
+            status: inst.status,
+          })),
+        };
       })),
       summary: {
         totalBilled,

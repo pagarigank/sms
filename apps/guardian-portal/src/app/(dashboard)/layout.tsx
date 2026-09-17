@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import { useStudentStore } from '@/lib/student-store';
@@ -12,7 +12,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, token } = useAuthStore();
   const { setStudents } = useStudentStore();
 
+  // Prevent server/client hydration mismatch — auth store is client-only (localStorage).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
+    if (!mounted) return;
+
     if (!token) {
       router.push('/login');
       return;
@@ -40,12 +46,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     loadStudents();
-  }, [token, router, setStudents]);
+  }, [mounted, token, router, setStudents]);
+
+  if (!mounted) {
+    return <div className="flex h-screen bg-background" suppressHydrationWarning />;
+  }
 
   if (!token) return null;
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <div className="p-6">

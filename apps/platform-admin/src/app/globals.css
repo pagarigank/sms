@@ -1,133 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  /* override shared tokens for the platform-admin temperature:
-     cool-neutral light surface, same accent (blue) + secondary (indigo). */
+  /* ------------------------------------------------------------------ */
+  /*  DARK-FIRST design tokens — deep slate + blue accent               */
+  /*  Platform Admin: cool-blue accent axis                             */
+  /* ------------------------------------------------------------------ */
   :root {
-    --radius: 0.625rem;
+    /* Surface stack */
+    --surface-base:     222 30% 4%;
+    --surface-raised:   222 25% 7%;
+    --surface-overlay:  222 25% 9%;
+    --surface-input:    222 20% 10%;
+    --surface-muted:    222 20% 12%;
 
-    --surface-base: 210 25% 97%;
-    --surface-raised: 0 0% 100%;
-    --surface-overlay: 0 0% 100%;
-    --surface-input: 210 20% 94%;
-    --surface-muted: 210 15% 95%;
+    /* Ink */
+    --ink-100: 215 20% 96%;
+    --ink-200: 215 10% 65%;
+    --ink-300: 215 8%  45%;
+    --ink-inverse: 222 30% 4%;
 
-    --ink-100: 215 25% 12%;
-    --ink-200: 215 12% 42%;
-    --ink-300: 215 10% 55%;
-    --ink-inverse: 0 0% 100%;
+    /* Border */
+    --border:        222 10% 16%;
+    --border-strong: 222 10% 22%;
 
-    --border: 210 20% 91%;
-    --border-strong: 210 20% 85%;
+    /* ---- Accent: electric blue (platform) ---- */
+    --accent:          220 95% 60%;
+    --accent-ink:      0 0% 100%;
+    --accent-subtle:   220 50% 14%;
 
-    /* brand accent — blue */
-    --accent: 222.2 86% 53%;
-    --accent-ink: 0 0% 100%;
-    --accent-subtle: 222.2 86% 94%;
+    /* Gradient stops */
+    --gradient-from: 220 95% 60%;
+    --gradient-to:   240 85% 55%;
 
-    /* secondary — indigo, for data viz / highlights only */
-    --secondary: 233 82% 60%;
-    --secondary-ink: 0 0% 100%;
-    --secondary-subtle: 233 82% 94%;
+    /* Secondary (indigo) */
+    --secondary:        240 80% 62%;
+    --secondary-ink:    0 0% 100%;
+    --secondary-subtle: 240 45% 14%;
 
-    --status-success-surface: 142 71% 96%;
-    --status-success-ink: 25 20% 15%;
-    --status-warning-surface: 38 92% 95%;
-    --status-warning-ink: 38 44% 18%;
-    --status-danger-surface: 0 72% 95%;
-    --status-danger-ink: 0 50% 18%;
-    --status-info-surface: 212 92% 95%;
-    --status-info-ink: 220 30% 18%;
-    --status-neutral-surface: 210 15% 95%;
-    --status-neutral-ink: 215 12% 40%;
+    /* Glow tokens */
+    --glow-accent: 0 0 0 3px hsl(220 95% 60% / 0.22), 0 0 20px 0 hsl(220 95% 60% / 0.14);
+    --glow-danger:  0 0 0 3px hsl(0 72% 65% / 0.22),   0 0 20px 0 hsl(0 72% 65% / 0.14);
 
-    --destructive: 0 72% 50%;
+    /* Status semantic pairs */
+    --status-success-surface: 155 35% 10%;
+    --status-success-ink:     142 65% 55%;
+    --status-success-border:  142 45% 25%;
+    --status-warning-surface: 38 50% 10%;
+    --status-warning-ink:     38 92% 60%;
+    --status-warning-border:  38 55% 28%;
+    --status-danger-surface:  0 45% 10%;
+    --status-danger-ink:      0 72% 65%;
+    --status-danger-border:   0 50% 28%;
+    --status-info-surface:    212 50% 10%;
+    --status-info-ink:        212 85% 65%;
+    --status-info-border:     212 50% 28%;
+    --status-neutral-surface: 222 10% 11%;
+    --status-neutral-ink:     215 10% 55%;
+    --status-neutral-border:  222 10% 22%;
+
+    /* Destructive */
+    --destructive:            0 65% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* keep shadcn aliases working */
-    --background: var(--surface-base);
-    --foreground: var(--ink-100);
-    --card: var(--surface-raised);
-    --card-foreground: var(--ink-100);
-    --popover: var(--surface-overlay);
-    --popover-foreground: var(--ink-100);
-    --primary: var(--accent);
-    --primary-foreground: var(--accent-ink);
-    --secondary: var(--surface-muted);
-    --secondary-foreground: var(--ink-100);
-    --muted: var(--surface-muted);
-    --muted-foreground: var(--ink-200);
-    --accent: var(--surface-muted);
-    --accent-foreground: var(--ink-100);
-    --border: var(--border);
-    --input: var(--surface-input);
-    --ring: var(--accent);
+    /* Radius scale */
+    --radius: 0.625rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+
+    /* shadcn compat aliases */
+    --background:          var(--surface-base);
+    --foreground:          var(--ink-100);
+    --card:                var(--surface-raised);
+    --card-foreground:     var(--ink-100);
+    --popover:             var(--surface-overlay);
+    --popover-foreground:  var(--ink-100);
+    --primary:             var(--accent);
+    --primary-foreground:  var(--accent-ink);
+    --muted:               var(--surface-muted);
+    --muted-foreground:    var(--ink-200);
+    --accent-foreground:   var(--accent-ink);
+    --secondary-foreground:var(--secondary-ink);
+    --input:               var(--surface-input);
+    --ring:                var(--accent);
   }
 
+  /* .dark mirrors :root (already dark-first) */
   .dark {
-    --radius: 0.625rem;
-
-    --surface-base: 222.2 84% 4.9%;
-    --surface-raised: 222.2 84% 4.9%;
-    --surface-overlay: 222.2 84% 4.9%;
-    --surface-input: 222.2 84% 5.5%;
-    --surface-muted: 222.2 84% 7%;
-
-    --ink-100: 0 0% 100%;
-    --ink-200: 210 20% 80%;
-    --ink-300: 210 15% 60%;
-    --ink-inverse: 222.2 84% 4.9%;
-
-    --border: 222.2 84% 10%;
-    --border-strong: 222.2 84% 15%;
-
-    --accent: 222.2 86% 53%;
-    --accent-ink: 0 0% 100%;
-    --accent-subtle: 222.2 86% 14%;
-
-    --secondary: 233 82% 60%;
-    --secondary-ink: 0 0% 100%;
-    --secondary-subtle: 233 82% 14%;
-
-    --status-success-surface: 222.2 84% 10%;
-    --status-success-ink: 142 71% 60%;
-    --status-warning-surface: 222.2 84% 10%;
-    --status-warning-ink: 38 92% 60%;
-    --status-danger-surface: 222.2 84% 10%;
-    --status-danger-ink: 0 72% 65%;
-    --status-info-surface: 222.2 84% 10%;
-    --status-info-ink: 212 92% 65%;
-    --status-neutral-surface: 222.2 84% 10%;
-    --status-neutral-ink: 210 20% 70%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 100%;
-
-    --background: var(--surface-base);
-    --foreground: var(--ink-100);
-    --card: var(--surface-raised);
-    --card-foreground: var(--ink-100);
-    --popover: var(--surface-overlay);
-    --popover-foreground: var(--ink-100);
-    --primary: var(--accent);
-    --primary-foreground: var(--accent-ink);
-    --secondary: var(--surface-muted);
-    --secondary-foreground: var(--ink-100);
-    --muted: var(--surface-muted);
-    --muted-foreground: var(--ink-200);
-    --accent: var(--surface-muted);
-    --accent-foreground: var(--ink-100);
-    --border: var(--border);
-    --input: var(--surface-input);
-    --ring: var(--accent);
+    --background:          var(--surface-base);
+    --foreground:          var(--ink-100);
+    --card:                var(--surface-raised);
+    --card-foreground:     var(--ink-100);
+    --popover:             var(--surface-overlay);
+    --popover-foreground:  var(--ink-100);
+    --primary:             var(--accent);
+    --primary-foreground:  var(--accent-ink);
+    --muted:               var(--surface-muted);
+    --muted-foreground:    var(--ink-200);
+    --accent-foreground:   var(--accent-ink);
+    --secondary-foreground:var(--secondary-ink);
+    --input:               var(--surface-input);
+    --ring:                var(--accent);
   }
+
+  /* Surface helpers */
+  .surface-base    { background-color: hsl(var(--surface-base)); }
+  .surface-raised  { background-color: hsl(var(--surface-raised)); }
+  .surface-overlay { background-color: hsl(var(--surface-overlay)); }
+  .surface-muted   { background-color: hsl(var(--surface-muted)); }
+  .surface-input   { background-color: hsl(var(--surface-input)); }
+
+  .status-success { color: hsl(var(--status-success-ink)); }
+  .status-warning { color: hsl(var(--status-warning-ink)); }
+  .status-danger  { color: hsl(var(--status-danger-ink)); }
+  .status-info    { color: hsl(var(--status-info-ink)); }
+  .status-neutral { color: hsl(var(--status-neutral-ink)); }
+
+  .bg-status-success-surface { background-color: hsl(var(--status-success-surface)); }
+  .bg-status-warning-surface { background-color: hsl(var(--status-warning-surface)); }
+  .bg-status-danger-surface  { background-color: hsl(var(--status-danger-surface)); }
+  .bg-status-info-surface    { background-color: hsl(var(--status-info-surface)); }
+  .bg-status-neutral-surface { background-color: hsl(var(--status-neutral-surface)); }
 }
 
 @layer base {
-  * { @apply border-border; }
+  *, *::before, *::after { @apply border-border box-border; }
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   body { @apply bg-background text-foreground; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--ink-300)); }
 }
 
+/* ---- Animation keyframes ---- */
+@layer base {
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-14px); }
+  }
+  @keyframes slide-up-fade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes progress-shrink {
+    from { width: 100%; }
+    to   { width: 0%; }
+  }
+  @keyframes dot-pulse {
+    0%, 100% { transform: scale(1);   opacity: 1; }
+    50%       { transform: scale(1.7); opacity: 0.55; }
+  }
+  @keyframes gradient-shift {
+    0%   { background-position: 0%   50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0%   50%; }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+}
 
+/* ---- Utility classes ---- */
+@layer utilities {
+  .glass {
+    background-color: hsl(var(--surface-raised) / 0.72);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid hsl(var(--border));
+  }
+  .glass-strong {
+    background-color: hsl(var(--surface-raised) / 0.88);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid hsl(var(--border-strong));
+  }
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .gradient-bg {
+    background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
+  }
+  .glow-accent   { box-shadow: var(--glow-accent); }
+  .glow-danger   { box-shadow: var(--glow-danger); }
+  .shimmer {
+    background: linear-gradient(90deg,
+      hsl(var(--surface-muted)) 25%,
+      hsl(var(--border)) 50%,
+      hsl(var(--surface-muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+  .animate-float          { animation: float 6s ease-in-out infinite; }
+  .animate-slide-up-fade  { animation: slide-up-fade 0.25s ease-out both; }
+  .animate-scale-in       { animation: scale-in 0.22s ease-out both; }
+  .animate-dot-pulse      { animation: dot-pulse 2s ease-in-out infinite; }
+  .animate-gradient-shift {
+    background-size: 200% 200%;
+    animation: gradient-shift 4s ease infinite;
+  }
+  .animate-progress-shrink { animation: progress-shrink linear both; }
+}

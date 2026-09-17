@@ -29,27 +29,27 @@ export function Topbar() {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-raised))] px-4 lg:px-6">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-raised)/0.8)] backdrop-blur-xl px-4 lg:px-6">
       <div className="flex items-center gap-3">
         <TenantSwitcher />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-[hsl(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]"
+              className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-all duration-150 hover:bg-[hsl(var(--surface-overlay))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent)/0.5)] group"
               aria-label="Open user menu"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--accent-subtle))] text-sm font-semibold text-[hsl(var(--accent))]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full gradient-bg text-xs font-bold text-white shadow-md shadow-[hsl(var(--gradient-from)/0.25)] ring-2 ring-[hsl(var(--border))] group-hover:ring-[hsl(var(--accent))] transition-all">
                 {initials}
               </span>
-              <span className="hidden text-sm font-medium text-[hsl(var(--foreground))] sm:block">{displayName}</span>
+              <span className="hidden text-xs font-semibold text-[hsl(var(--ink-100))] sm:block">{displayName}</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="font-normal">
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">{displayName}</p>
+              <p className="text-sm font-semibold text-[hsl(var(--ink-100))]">{displayName}</p>
               <p className="text-xs text-[hsl(var(--ink-300))]">{user?.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -62,7 +62,7 @@ export function Topbar() {
               </DropdownMenuLabel>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut} className="cursor-pointer">
+            <DropdownMenuItem onClick={signOut} className="cursor-pointer text-[hsl(var(--status-danger-ink))] focus:text-[hsl(var(--status-danger-ink))] focus:bg-[hsl(var(--status-danger-surface))]">
               <LogOut className="mr-2 h-4 w-4" /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

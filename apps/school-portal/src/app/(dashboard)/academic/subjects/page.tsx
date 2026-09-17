@@ -455,7 +455,14 @@ export default function SubjectsPage() {
           columns={columns as any}
           data={subjects}
           isLoading={isLoading}
-          emptyMessage="No subjects found. Click 'Add Subject' to create your first subject."
+          emptyMessage="No subjects found."
+          emptyDescription="Get started by adding subjects to your academic catalog."
+          emptyAction={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              <span>Create Subject</span>
+            </Button>
+          }
         />
 
       </div>

@@ -114,11 +114,11 @@ function DataTable<TData, TValue>({
     <div className={cn('space-y-3', className)}>
       {toolbar && <div>{toolbar}</div>}
 
-      <div className="rounded-lg border bg-[hsl(var(--surface-raised))] shadow-sm">
+      <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-raised))] shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-[hsl(var(--surface-muted))]/90 backdrop-blur">
+          <TableHeader className="sticky top-0 z-10 bg-[hsl(var(--surface-input))] border-b-2 border-[hsl(var(--border-strong))]">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-b hover:bg-transparent">
+              <TableRow key={headerGroup.id} className="border-b border-[hsl(var(--border))] hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   const canSort = sortable && header.column.getCanSort();
                   const sortDir = header.column.getIsSorted();
@@ -126,7 +126,7 @@ function DataTable<TData, TValue>({
                     <TableHead
                       key={header.id}
                       className={cn(
-                        'text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--ink-300))]',
+                        'text-xs font-bold uppercase tracking-wider text-[hsl(var(--ink-100))]',
                         cellPadding
                       )}
                     >
@@ -134,16 +134,16 @@ function DataTable<TData, TValue>({
                         <button
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
-                          className="inline-flex items-center gap-1 rounded transition-colors hover:text-[hsl(var(--foreground))]"
+                          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-bold text-[hsl(var(--ink-100))] transition-colors hover:text-[hsl(var(--accent))] hover:bg-[hsl(var(--surface-raised))] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--accent))]"
                           aria-label={`Sort by ${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : header.id}`}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {sortDir === 'asc' ? (
-                            <ChevronUp className="h-3 w-3" aria-hidden="true" />
+                            <ChevronUp className="h-3.5 w-3.5 text-[hsl(var(--accent))]" aria-hidden="true" />
                           ) : sortDir === 'desc' ? (
-                            <ChevronDown className="h-3 w-3" aria-hidden="true" />
+                            <ChevronDown className="h-3.5 w-3.5 text-[hsl(var(--accent))]" aria-hidden="true" />
                           ) : (
-                            <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden="true" />
+                            <ArrowUpDown className="h-3.5 w-3.5 text-[hsl(var(--ink-200))] opacity-80 group-hover:opacity-100" aria-hidden="true" />
                           )}
                         </button>
                       ) : (
@@ -158,11 +158,11 @@ function DataTable<TData, TValue>({
           <TableBody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={`sk-${i}`}>
+                <TableRow key={`sk-${i}`} className="border-b border-[hsl(var(--border))]">
                   {Array.from({ length: colCount }).map((__, j) => (
                     <TableCell key={`sk-${i}-${j}`} className={cellPadding}>
-                      <Skeleton className="h-4 w-full max-w-[160px]" />
-                      {j === 0 && <Skeleton className="mt-1.5 h-3 w-24" />}
+                      <Skeleton className="h-4 w-full max-w-[160px] animate-pulse" />
+                      {j === 0 && <Skeleton className="mt-2 h-3 w-24 animate-pulse opacity-60" />}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -171,7 +171,11 @@ function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className={cn('transition-colors', onRowClick && 'cursor-pointer')}
+                  className={cn(
+                    'border-b border-[hsl(var(--border))] transition-colors duration-150',
+                    'hover:bg-[hsl(var(--accent)/0.04)]',
+                    onRowClick && 'cursor-pointer hover:bg-[hsl(var(--accent)/0.08)]'
+                  )}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -183,13 +187,13 @@ function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={colCount} className={cn('h-40', cellPadding)}>
-                  <div className="flex flex-col items-center justify-center gap-1.5 py-8 text-center">
-                    <p className="text-sm font-medium text-[hsl(var(--foreground))]">{emptyMessage}</p>
+                <TableCell colSpan={colCount} className={cn('h-48', cellPadding)}>
+                  <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                    <p className="text-sm font-medium text-[hsl(var(--ink-100))]">{emptyMessage}</p>
                     {emptyDescription && (
-                      <p className="max-w-sm text-sm text-[hsl(var(--ink-300))]">{emptyDescription}</p>
+                      <p className="max-w-sm text-xs text-[hsl(var(--ink-300))] leading-relaxed">{emptyDescription}</p>
                     )}
-                    {emptyAction && <div className="mt-2">{emptyAction}</div>}
+                    {emptyAction && <div className="mt-3">{emptyAction}</div>}
                   </div>
                 </TableCell>
               </TableRow>
@@ -199,18 +203,18 @@ function DataTable<TData, TValue>({
       </div>
 
       {pagination && canPaginate && (
-        <div className="flex flex-col items-center justify-between gap-2 px-1 sm:flex-row">
-          <p className="text-sm text-[hsl(var(--ink-300))]">
+        <div className="flex flex-col items-center justify-between gap-3 px-1.5 py-1 sm:flex-row">
+          <p className="text-xs text-[hsl(var(--ink-300))]">
             {showingRange ?? `Page ${pagination.pageIndex + 1} of ${pageCountSafe}`}
           </p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Select
               value={String(pageSize)}
               onValueChange={(v) =>
                 onPaginationChange?.({ pageIndex: 0, pageSize: Number(v) })
               }
             >
-              <SelectTrigger className="h-8 w-[70px] text-xs" aria-label="Rows per page">
+              <SelectTrigger className="h-8 w-[80px] rounded-lg text-xs bg-[hsl(var(--surface-raised))] border-[hsl(var(--border))]" aria-label="Rows per page">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -221,46 +225,48 @@ function DataTable<TData, TValue>({
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-              aria-label="First page"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              aria-label="Next page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-              aria-label="Last page"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center rounded-lg border border-[hsl(var(--border-strong))] bg-[hsl(var(--surface-raised))] p-0.5 shadow-xs">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-md border-0 bg-transparent text-[hsl(var(--ink-100))] hover:bg-[hsl(var(--surface-input))] hover:text-[hsl(var(--accent))] disabled:opacity-30 shadow-none"
+                onClick={() => table.setPageIndex(0)}
+                disabled={!table.getCanPreviousPage()}
+                aria-label="First page"
+              >
+                <ChevronsLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-md border-0 bg-transparent text-[hsl(var(--ink-100))] hover:bg-[hsl(var(--surface-input))] hover:text-[hsl(var(--accent))] disabled:opacity-30 shadow-none"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-md border-0 bg-transparent text-[hsl(var(--ink-100))] hover:bg-[hsl(var(--surface-input))] hover:text-[hsl(var(--accent))] disabled:opacity-30 shadow-none"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                aria-label="Next page"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-md border-0 bg-transparent text-[hsl(var(--ink-100))] hover:bg-[hsl(var(--surface-input))] hover:text-[hsl(var(--accent))] disabled:opacity-30 shadow-none"
+                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                disabled={!table.getCanNextPage()}
+                aria-label="Last page"
+              >
+                <ChevronsRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
       )}

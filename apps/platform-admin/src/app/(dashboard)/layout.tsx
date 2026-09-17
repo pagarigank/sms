@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import { Providers } from '@/components/providers';
@@ -13,11 +13,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
 
+  // Prevent server/client hydration mismatch — auth store is client-only (localStorage).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace('/login');
+    if (mounted && !isAuthenticated) {
+      const timer = setTimeout(() => {
+        router.replace('/login');
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, router]);
+  }, [mounted, isAuthenticated, router]);
+
+  if (!mounted) {
+    return <div className="flex h-screen flex-col bg-background" suppressHydrationWarning />;
+  }
 
   if (!isAuthenticated) {
     return null;

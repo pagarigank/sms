@@ -388,7 +388,14 @@ export default function ProgramsPage() {
           columns={columns as any}
           data={programs}
           isLoading={isLoading}
-          emptyMessage="No programs found. Click 'Add Program' to create your first program."
+          emptyMessage="No programs found."
+          emptyDescription="Get started by creating your first academic program."
+          emptyAction={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              <span>Create Program</span>
+            </Button>
+          }
         />
 
       </div>

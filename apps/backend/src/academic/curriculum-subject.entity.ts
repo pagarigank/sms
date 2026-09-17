@@ -18,6 +18,9 @@ export class CurriculumSubject {
   termId: string;
 
   @Column({ type: 'uuid', nullable: true })
+  yearLevelId: string;
+
+  @Column({ type: 'uuid', nullable: true })
   prerequisiteSubjectId: string;
 
   @Column({ type: 'uuid', nullable: true })

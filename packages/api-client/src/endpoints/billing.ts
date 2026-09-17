@@ -65,6 +65,12 @@ export function billingEndpoints(client: ApiClient) {
     createPaymentPlan: (data: any) =>
       client.post('/api/v1/billing/payment-plans', data),
 
+    updatePaymentPlan: (id: string, data: any) =>
+      client.put(`/api/v1/billing/payment-plans/${id}`, data),
+
+    deletePaymentPlan: (id: string) =>
+      client.delete(`/api/v1/billing/payment-plans/${id}`),
+
     // Penalty Rules
     getPenaltyRules: (params: { tenantId: string }) =>
       client.get('/api/v1/billing/penalty-rules', params as any),

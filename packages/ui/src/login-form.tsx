@@ -13,9 +13,10 @@ import { cn } from '@sms/utils';
 /* ------------------------------------------------------------------ */
 
 const fieldBase =
-  'h-12 w-full rounded-lg border bg-[hsl(var(--surface-input))] px-3.5 text-sm text-[hsl(var(--foreground))] ' +
-  'placeholder:text-[hsl(var(--ink-300))] transition-colors ' +
-  'focus-visible:outline-none focus-visible:border-[hsl(var(--accent))] focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]';
+  'h-12 w-full rounded-xl border border-[hsl(var(--input))] bg-[hsl(var(--surface-input))] px-3.5 text-sm text-[hsl(var(--ink-100))] ' +
+  'placeholder:text-[hsl(var(--ink-300))] transition-all duration-150 ' +
+  'hover:border-[hsl(var(--border-strong))] ' +
+  'focus-visible:outline-none focus-visible:border-[hsl(var(--accent))] focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent)/0.25)]';
 
 /* ------------------------------------------------------------------ */
 /*  Inline field — label + input + optional helper / error.           */
@@ -167,9 +168,55 @@ function FieldError({ message }: { message: string }) {
 
 function TrustNote({ className }: { className?: string }) {
   return (
-    <div className={cn('flex items-center justify-center gap-1.5 text-xs text-[hsl(var(--ink-300))]', className)}>
-      <Shield size={12} className="text-[hsl(var(--accent))]" />
-      <span>Your session is encrypted and monitored for security.</span>
+    <div
+      className={cn(
+        'flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-overlay)/0.4)] px-3 py-2 text-xs text-[hsl(var(--ink-300))] backdrop-blur-sm',
+        className
+      )}
+    >
+      <Shield size={13} className="shrink-0 text-[hsl(var(--accent))]" />
+      <span>Your session is encrypted and audit-logged.</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Step indicator dots for multi-step progress.                      */
+/* ------------------------------------------------------------------ */
+
+function StepIndicator({ currentStep, showTenant }: { currentStep: 'tenant' | 'credentials' | 'mfa'; showTenant: boolean }) {
+  const steps = showTenant
+    ? [
+        { key: 'tenant', label: 'School' },
+        { key: 'credentials', label: 'Account' },
+        { key: 'mfa', label: 'Security' },
+      ]
+    : [
+        { key: 'credentials', label: 'Account' },
+        { key: 'mfa', label: 'Security' },
+      ];
+
+  const currentIndex = steps.findIndex((s) => s.key === currentStep);
+
+  return (
+    <div className="mb-5 flex items-center justify-center gap-1.5" aria-hidden="true">
+      {steps.map((s, idx) => {
+        const isActive = idx === currentIndex;
+        const isPast = idx < currentIndex;
+        return (
+          <div
+            key={s.key}
+            className={cn(
+              'h-1.5 rounded-full transition-all duration-300',
+              isActive
+                ? 'w-7 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] shadow-sm shadow-[hsl(var(--accent)/0.5)]'
+                : isPast
+                ? 'w-2 bg-[hsl(var(--accent)/0.7)]'
+                : 'w-2 bg-[hsl(var(--border-strong))]'
+            )}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -179,10 +226,10 @@ function TrustNote({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 const primaryBtn =
-  'inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[hsl(var(--accent))] px-4 text-sm font-medium text-[hsl(var(--accent-ink))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl gradient-bg px-5 text-sm font-semibold text-white border border-[hsl(var(--gradient-to)/0.5)] shadow-md shadow-[hsl(var(--gradient-from)/0.30)] transition-all duration-150 hover:shadow-lg hover:shadow-[hsl(var(--gradient-from)/0.40)] hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none';
 
 const secondaryBtn =
-  'inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[hsl(var(--border-strong))] bg-[hsl(var(--surface-raised))] px-4 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--surface-muted))]';
+  'inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[hsl(var(--border-strong))] bg-[hsl(var(--surface-input))] px-4 text-sm font-medium text-[hsl(var(--ink-100))] transition-all duration-150 hover:bg-[hsl(var(--surface-muted))] hover:border-[hsl(var(--accent)/0.4)] active:scale-[0.98]';
 
 const Spinner = () => <Loader2 className="h-4 w-4 animate-spin" />;
 
@@ -352,6 +399,7 @@ export function LoginForm({
     return (
       <StepTransition stepKey="tenant">
         <form onSubmit={handleTenant} className="space-y-6" data-testid="tenant-step">
+          <StepIndicator currentStep="tenant" showTenant={showTenantStep} />
           {formError && <FieldError message={formError} />}
 
           <InlineField
@@ -367,7 +415,7 @@ export function LoginForm({
           />
           <p className="-mt-4 text-xs text-[hsl(var(--ink-300))]">
             Your school&apos;s slug (also the subdomain:{' '}
-            <code className="rounded bg-[hsl(var(--surface-muted))] px-1 py-0.5">{tenantSlug || 'school'}.schoolsuite.ph</code>)
+            <code className="rounded bg-[hsl(var(--surface-muted))] px-1.5 py-0.5 text-[hsl(var(--ink-200))] font-mono">{tenantSlug || 'school'}.schoolsuite.ph</code>)
           </p>
 
           <div className="flex gap-3">
@@ -406,23 +454,24 @@ export function LoginForm({
     return (
       <StepTransition stepKey="mfa">
         <form onSubmit={handleMfaVerify} className="space-y-5" noValidate data-testid="mfa-step">
+          <StepIndicator currentStep="mfa" showTenant={showTenantStep} />
           {formError && <FieldError message={formError} />}
 
-          <div className="flex flex-col items-center gap-3 rounded-xl bg-[hsl(var(--accent-subtle))] px-4 py-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-[hsl(var(--accent-ink))]">
-              <KeyRound size={20} />
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-raised)/0.5)] px-4 py-6 text-center backdrop-blur-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl gradient-bg text-white shadow-lg shadow-[hsl(var(--gradient-from)/0.3)]">
+              <KeyRound size={22} />
             </div>
             <div>
-              <p className="font-semibold text-[hsl(var(--foreground))]">Two-factor authentication</p>
+              <p className="font-semibold text-[hsl(var(--ink-100))]">Two-factor authentication</p>
               <p className="mt-1 text-sm text-[hsl(var(--ink-300))]">
                 Enter the 6-digit code from your authenticator app
-                {step.email ? <> for <span className="font-medium text-[hsl(var(--foreground))]">{step.email}</span></> : null}.
+                {step.email ? <> for <span className="font-medium text-[hsl(var(--ink-100))]">{step.email}</span></> : null}.
               </p>
             </div>
           </div>
 
           {step.mfaSetupRequired && (
-            <div className="flex items-start gap-2 rounded-lg bg-[hsl(var(--status-info-surface))] px-3.5 py-2.5 text-xs text-[hsl(var(--status-info-ink))]" role="status">
+            <div className="flex items-start gap-2.5 rounded-xl border border-[hsl(var(--status-info-border))] bg-[hsl(var(--status-info-surface))] px-3.5 py-2.5 text-xs text-[hsl(var(--status-info-ink))]" role="status">
               <Shield className="mt-0.5 shrink-0" size={14} />
               <span>
                 First-time setup: scan the QR code shown by your administrator to link your authenticator, then enter the
@@ -431,24 +480,46 @@ export function LoginForm({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <label htmlFor="mfa-code" className="text-sm font-medium text-[hsl(var(--foreground))]">
+          <div className="space-y-2">
+            <label htmlFor="mfa-code" className="block text-center text-sm font-medium text-[hsl(var(--ink-100))]">
               Verification code
             </label>
-            <input
-              id="mfa-code"
-              ref={mfaInputRef}
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={mfaCode}
-              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
-              aria-invalid={!!formError}
-              data-testid="mfa-code-input"
-              className={cn(fieldBase, 'text-center text-xl font-semibold tracking-[0.5em]')}
-            />
+            <div className="relative flex justify-center">
+              <div className="flex gap-2.5" aria-hidden="true">
+                {Array.from({ length: 6 }).map((_, idx) => {
+                  const char = mfaCode[idx] ?? '';
+                  const isCurrent = idx === mfaCode.length && mfaCode.length < 6;
+                  return (
+                    <div
+                      key={idx}
+                      className={cn(
+                        'flex h-13 w-11 sm:w-12 items-center justify-center rounded-xl border text-xl font-bold transition-all duration-150',
+                        char
+                          ? 'border-[hsl(var(--accent))] bg-[hsl(var(--surface-overlay))] text-[hsl(var(--ink-100))] shadow-sm shadow-[hsl(var(--accent)/0.2)]'
+                          : 'border-[hsl(var(--input))] bg-[hsl(var(--surface-input))] text-[hsl(var(--ink-300))]',
+                        isCurrent && 'ring-2 ring-[hsl(var(--accent))] border-[hsl(var(--accent))] scale-105'
+                      )}
+                    >
+                      {char || (isCurrent ? <span className="h-5 w-0.5 animate-pulse bg-[hsl(var(--accent))]" /> : '')}
+                    </div>
+                  );
+                })}
+              </div>
+              <input
+                id="mfa-code"
+                ref={mfaInputRef}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder=""
+                aria-invalid={!!formError}
+                data-testid="mfa-code-input"
+                className="absolute inset-0 h-full w-full cursor-text opacity-0"
+              />
+            </div>
           </div>
 
           <button type="submit" disabled={submitting || mfaCode.length < 6} className={primaryBtn + ' w-full'}>
@@ -488,20 +559,21 @@ export function LoginForm({
   return (
     <StepTransition stepKey="credentials">
       <form onSubmit={handleCredentials} className="space-y-5" noValidate data-testid="credentials-step">
+        <StepIndicator currentStep="credentials" showTenant={showTenantStep} />
         {formError && <FieldError message={formError} />}
 
         {tenant && (
           <div
-            className="flex items-center gap-2 rounded-lg bg-[hsl(var(--accent-subtle))] px-3.5 py-2.5 text-sm"
+            className="flex items-center gap-2.5 rounded-xl border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.08)] px-3.5 py-2.5 text-sm"
             data-testid="tenant-pill"
           >
-            <Building2 size={15} className="shrink-0 text-[hsl(var(--accent))]" />
+            <Building2 size={16} className="shrink-0 text-[hsl(var(--accent))]" />
             <span className="text-[hsl(var(--ink-300))]">Signing in to</span>
-            <span className="font-medium text-[hsl(var(--foreground))]">{tenant.name}</span>
+            <span className="font-semibold text-[hsl(var(--ink-100))]">{tenant.name}</span>
             {showTenantStep && (
               <button
                 type="button"
-                className="ml-auto text-xs text-[hsl(var(--ink-300))] underline underline-offset-2 transition-colors hover:text-[hsl(var(--foreground))]"
+                className="ml-auto rounded px-1.5 py-0.5 text-xs font-medium text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent)/0.15)] transition-colors"
                 onClick={() => setStep({ kind: 'tenant' })}
               >
                 change

@@ -1,128 +1,210 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  /* warm-temperature override of the shared semantic tokens.
-     Same accent (blue) + secondary (indigo) axis; only the surfaces/ink shift warm. */
+  /* ------------------------------------------------------------------ */
+  /*  LIGHT-BLUE design tokens — sky-blue surfaces, cerulean accent     */
+  /*  School Portal: airy, fresh, professional light-blue palette       */
+  /* ------------------------------------------------------------------ */
   :root {
-    --radius: 0.625rem;
+    /* Surface stack — layered blue-white tints for clear contrast */
+    --surface-base:     210 45% 94%;   /* icy sky page bg */
+    --surface-raised:   210 50% 98%;   /* near-white cards with blue blush */
+    --surface-overlay:  205 40% 96%;   /* slightly deeper, used for nested surfaces */
+    --surface-input:    210 38% 91%;   /* distinctly muted inputs */
+    --surface-muted:    210 35% 93%;   /* sidebar / muted areas */
 
-    --surface-base: 40 27% 98%;
-    --surface-raised: 0 0% 100%;
-    --surface-overlay: 0 0% 100%;
-    --surface-input: 36 25% 95%;
-    --surface-muted: 36 20% 96%;
-
-    --ink-100: 222.2 84% 4.9%;
-    --ink-200: 215 15% 48%;
-    --ink-300: 215 12% 58%;
+    /* Ink */
+    --ink-100: 215 40% 12%;
+    --ink-200: 215 20% 42%;
+    --ink-300: 215 15% 58%;
     --ink-inverse: 0 0% 100%;
 
-    --border: 36 18% 90%;
-    --border-strong: 36 18% 84%;
+    /* Border */
+    --border:        210 30% 87%;
+    --border-strong: 210 28% 78%;
 
-    --accent: 222.2 86% 53%;
-    --accent-ink: 0 0% 100%;
-    --accent-subtle: 222.2 86% 94%;
+    /* ---- Accent: sky-cerulean blue ---- */
+    --accent:          205 92% 40%;
+    --accent-ink:      0 0% 100%;
+    --accent-subtle:   205 80% 92%;
 
-    --secondary: 233 82% 60%;
-    --secondary-ink: 0 0% 100%;
-    --secondary-subtle: 233 82% 94%;
+    /* Gradient stops */
+    --gradient-from: 205 92% 40%;
+    --gradient-to:   218 88% 52%;
 
-    --status-success-surface: 142 71% 96%;
-    --status-success-ink: 142 71% 30%;
-    --status-warning-surface: 38 92% 95%;
-    --status-warning-ink: 38 92% 32%;
-    --status-danger-surface: 0 72% 95%;
-    --status-danger-ink: 0 74% 42%;
-    --status-info-surface: 212 92% 95%;
-    --status-info-ink: 212 92% 35%;
-    --status-neutral-surface: 36 20% 96%;
-    --status-neutral-ink: 215 12% 40%;
+    /* Secondary (indigo-blue) */
+    --secondary:        218 82% 55%;
+    --secondary-ink:    0 0% 100%;
+    --secondary-subtle: 218 70% 92%;
 
-    --destructive: 0 72% 50%;
+    /* Glow tokens */
+    --glow-accent: 0 0 0 3px hsl(205 92% 40% / 0.18), 0 0 20px 0 hsl(205 92% 40% / 0.10);
+    --glow-danger:  0 0 0 3px hsl(0 65% 50% / 0.18),   0 0 16px 0 hsl(0 65% 50% / 0.10);
+
+    /* Status semantic pairs */
+    --status-success-surface: 142 55% 93%;
+    --status-success-ink:     142 55% 26%;
+    --status-success-border:  142 45% 76%;
+    --status-warning-surface: 38 90% 93%;
+    --status-warning-ink:     38 60% 28%;
+    --status-warning-border:  38 65% 72%;
+    --status-danger-surface:  0 65% 94%;
+    --status-danger-ink:      0 55% 30%;
+    --status-danger-border:   0 50% 75%;
+    --status-info-surface:    205 80% 93%;
+    --status-info-ink:        205 75% 28%;
+    --status-info-border:     205 70% 72%;
+    --status-neutral-surface: 210 30% 94%;
+    --status-neutral-ink:     215 20% 40%;
+    --status-neutral-border:  210 25% 80%;
+
+    /* Destructive */
+    --destructive:            0 65% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --background: var(--surface-base);
-    --foreground: var(--ink-100);
-    --card: var(--surface-raised);
-    --card-foreground: var(--ink-100);
-    --popover: var(--surface-overlay);
-    --popover-foreground: var(--ink-100);
-    --primary: var(--accent);
-    --primary-foreground: var(--accent-ink);
-    --secondary: var(--surface-muted);
-    --secondary-foreground: var(--ink-100);
-    --muted: var(--surface-muted);
-    --muted-foreground: var(--ink-200);
-    --accent: var(--accent);
-    --accent-foreground: var(--accent-ink);
-    --border: var(--border);
-    --input: var(--surface-input);
-    --ring: var(--accent);
-  }
-
-  .dark {
+    /* Radius scale */
     --radius: 0.625rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
 
-    --surface-base: 36 20% 10%;
-    --surface-raised: 36 20% 10%;
-    --surface-overlay: 36 20% 10%;
-    --surface-input: 36 20% 13%;
-    --surface-muted: 36 20% 16%;
-
-    --ink-100: 40 27% 96%;
-    --ink-200: 36 15% 70%;
-    --ink-300: 36 12% 55%;
-    --ink-inverse: 36 20% 10%;
-
-    --border: 36 20% 18%;
-    --border-strong: 36 20% 24%;
-
-    --accent: 222.2 86% 60%;
-    --accent-ink: 0 0% 100%;
-    --accent-subtle: 222.2 86% 14%;
-
-    --secondary: 233 82% 66%;
-    --secondary-ink: 0 0% 100%;
-    --secondary-subtle: 233 82% 14%;
-
-    --status-success-surface: 36 20% 12%;
-    --status-success-ink: 142 71% 65%;
-    --status-warning-surface: 36 20% 12%;
-    --status-warning-ink: 38 92% 65%;
-    --status-danger-surface: 36 20% 12%;
-    --status-danger-ink: 0 72% 65%;
-    --status-info-surface: 36 20% 12%;
-    --status-info-ink: 212 92% 65%;
-    --status-neutral-surface: 36 20% 12%;
-    --status-neutral-ink: 36 15% 60%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 100%;
-
-    --background: var(--surface-base);
-    --foreground: var(--ink-100);
-    --card: var(--surface-raised);
-    --card-foreground: var(--ink-100);
-    --popover: var(--surface-overlay);
-    --popover-foreground: var(--ink-100);
-    --primary: var(--accent);
-    --primary-foreground: var(--accent-ink);
-    --secondary: var(--surface-muted);
-    --secondary-foreground: var(--ink-100);
-    --muted: var(--surface-muted);
-    --muted-foreground: var(--ink-200);
-    --accent: var(--accent);
-    --accent-foreground: var(--accent-ink);
-    --border: var(--border);
-    --input: var(--surface-input);
-    --ring: var(--accent);
+    /* shadcn compat aliases */
+    --background:          var(--surface-base);
+    --foreground:          var(--ink-100);
+    --card:                var(--surface-raised);
+    --card-foreground:     var(--ink-100);
+    --popover:             var(--surface-overlay);
+    --popover-foreground:  var(--ink-100);
+    --primary:             var(--accent);
+    --primary-foreground:  var(--accent-ink);
+    --muted:               var(--surface-muted);
+    --muted-foreground:    var(--ink-200);
+    --accent-foreground:   var(--accent-ink);
+    --secondary-foreground:var(--secondary-ink);
+    --input:               var(--surface-input);
+    --ring:                var(--accent);
   }
+
+  /* Surface helpers */
+  .surface-base    { background-color: hsl(var(--surface-base)); }
+  .surface-raised  { background-color: hsl(var(--surface-raised)); }
+  .surface-overlay { background-color: hsl(var(--surface-overlay)); }
+  .surface-muted   { background-color: hsl(var(--surface-muted)); }
+  .surface-input   { background-color: hsl(var(--surface-input)); }
+
+  .status-success { color: hsl(var(--status-success-ink)); }
+  .status-warning { color: hsl(var(--status-warning-ink)); }
+  .status-danger  { color: hsl(var(--status-danger-ink)); }
+  .status-info    { color: hsl(var(--status-info-ink)); }
+  .status-neutral { color: hsl(var(--status-neutral-ink)); }
+
+  .bg-status-success-surface { background-color: hsl(var(--status-success-surface)); }
+  .bg-status-warning-surface { background-color: hsl(var(--status-warning-surface)); }
+  .bg-status-danger-surface  { background-color: hsl(var(--status-danger-surface)); }
+  .bg-status-info-surface    { background-color: hsl(var(--status-info-surface)); }
+  .bg-status-neutral-surface { background-color: hsl(var(--status-neutral-surface)); }
 }
 
 @layer base {
-  * { @apply border-border; }
+  *, *::before, *::after { @apply border-border box-border; }
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   body { @apply bg-background text-foreground; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--ink-300)); }
+}
+
+/* ---- Animation keyframes ---- */
+@layer base {
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-14px); }
+  }
+  @keyframes slide-up-fade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes progress-shrink {
+    from { width: 100%; }
+    to   { width: 0%; }
+  }
+  @keyframes dot-pulse {
+    0%, 100% { transform: scale(1);   opacity: 1; }
+    50%       { transform: scale(1.7); opacity: 0.55; }
+  }
+  @keyframes gradient-shift {
+    0%   { background-position: 0%   50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0%   50%; }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+}
+
+/* ---- Utility classes ---- */
+@layer utilities {
+  .glass {
+    background-color: hsl(var(--surface-raised) / 0.80);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid hsl(var(--border));
+  }
+  .glass-strong {
+    background-color: hsl(var(--surface-raised) / 0.92);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid hsl(var(--border-strong));
+  }
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .gradient-bg {
+    background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
+  }
+  .glow-accent   { box-shadow: var(--glow-accent); }
+  .glow-danger   { box-shadow: var(--glow-danger); }
+  .shimmer {
+    background: linear-gradient(90deg,
+      hsl(var(--surface-muted)) 25%,
+      hsl(var(--border)) 50%,
+      hsl(var(--surface-muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+  .animate-float          { animation: float 6s ease-in-out infinite; }
+  .animate-slide-up-fade  { animation: slide-up-fade 0.25s ease-out both; }
+  .animate-scale-in       { animation: scale-in 0.22s ease-out both; }
+  .animate-dot-pulse      { animation: dot-pulse 2s ease-in-out infinite; }
+  .animate-gradient-shift {
+    background-size: 200% 200%;
+    animation: gradient-shift 4s ease infinite;
+  }
+  .animate-progress-shrink { animation: progress-shrink linear both; }
 }

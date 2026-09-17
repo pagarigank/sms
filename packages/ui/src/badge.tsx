@@ -5,27 +5,30 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@sms/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium tracking-wide transition-all duration-150 select-none',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80',
+        default:
+          'border-transparent gradient-bg text-white shadow-sm',
         secondary:
-          'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
+          'border-[hsl(var(--border))] bg-[hsl(var(--surface-muted))] text-[hsl(var(--ink-200))]',
         destructive:
-          'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
-        outline: 'text-foreground',
+          'border-[hsl(var(--status-danger-border))] bg-[hsl(var(--status-danger-surface))] text-[hsl(var(--status-danger-ink))]',
+        outline:
+          'border-[hsl(var(--border-strong))] text-[hsl(var(--ink-100))]',
         success:
-          'border-[hsl(var(--status-success-ink))]/20 bg-[hsl(var(--status-success-surface))] text-[hsl(var(--status-success-ink))]',
+          'border-[hsl(var(--status-success-border))] bg-[hsl(var(--status-success-surface))] text-[hsl(var(--status-success-ink))]',
         warning:
-          'border-[hsl(var(--status-warning-ink))]/20 bg-[hsl(var(--status-warning-surface))] text-[hsl(var(--status-warning-ink))]',
+          'border-[hsl(var(--status-warning-border))] bg-[hsl(var(--status-warning-surface))] text-[hsl(var(--status-warning-ink))]',
         danger:
-          'border-[hsl(var(--status-danger-ink))]/20 bg-[hsl(var(--status-danger-surface))] text-[hsl(var(--status-danger-ink))]',
-        info: 'border-[hsl(var(--status-info-ink))]/20 bg-[hsl(var(--status-info-surface))] text-[hsl(var(--status-info-ink))]',
+          'border-[hsl(var(--status-danger-border))] bg-[hsl(var(--status-danger-surface))] text-[hsl(var(--status-danger-ink))]',
+        info:
+          'border-[hsl(var(--status-info-border))] bg-[hsl(var(--status-info-surface))] text-[hsl(var(--status-info-ink))]',
         neutral:
-          'border-[hsl(var(--status-neutral-ink))]/20 bg-[hsl(var(--status-neutral-surface))] text-[hsl(var(--status-neutral-ink))]',
+          'border-[hsl(var(--status-neutral-border))] bg-[hsl(var(--status-neutral-surface))] text-[hsl(var(--status-neutral-ink))]',
         accent:
-          'border-[hsl(var(--accent))]/20 bg-[hsl(var(--accent-subtle))] text-[hsl(var(--accent))]',
+          'border-[hsl(var(--accent)/0.35)] bg-[hsl(var(--accent-subtle))] text-[hsl(var(--accent))]',
       },
     },
     defaultVariants: {
@@ -113,14 +116,25 @@ export function statusToVariant(
   }
 }
 
-/** Small colored dot used inside status pills. */
-export function StatusDot({ className }: { className?: string }) {
+/** Small colored dot — optionally animated — used inside status pills. */
+export function StatusDot({
+  className,
+  animate = false,
+}: {
+  className?: string;
+  animate?: boolean;
+}) {
   return (
     <span
       aria-hidden="true"
-      className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-current', className)}
+      className={cn(
+        'h-1.5 w-1.5 shrink-0 rounded-full bg-current',
+        animate && 'animate-dot-pulse',
+        className
+      )}
     />
   );
 }
 
 export { Badge, badgeVariants };
+

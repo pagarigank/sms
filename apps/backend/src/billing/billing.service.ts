@@ -14,6 +14,8 @@ import { Invoice } from './invoice.entity';
 import { Enrollment } from '../sis/enrollment.entity';
 import { SchoolYear } from '../academic/school-year.entity';
 import { Curriculum } from '../academic/curriculum.entity';
+import { Subject } from '../academic/subject.entity';
+import { EnrollmentSubject } from '../sis/enrollment-subject.entity';
 
 @Injectable()
 export class BillingService {
@@ -31,6 +33,8 @@ export class BillingService {
     @InjectRepository(Enrollment) private enrollmentsRepo: Repository<Enrollment>,
     @InjectRepository(SchoolYear) private schoolYearsRepo: Repository<SchoolYear>,
     @InjectRepository(Curriculum) private curriculaRepo: Repository<Curriculum>,
+    @InjectRepository(Subject) private subjectsRepo: Repository<Subject>,
+    @InjectRepository(EnrollmentSubject) private enrollmentSubjectsRepo: Repository<EnrollmentSubject>,
   ) {}
 
   // === Fee Types ===
@@ -117,6 +121,7 @@ export class BillingService {
   // as a match (that bug made the least-specific structure win arbitrarily).
   // Among compatible candidates, the most specific match wins.
   async resolveFeeStructure(tenantId: string, params: {
+    enrollmentId?: string;
     branchId?: string;
     schoolYearId: string;
     educationLevelId?: string;
@@ -165,10 +170,35 @@ export class BillingService {
     const bestMatch = compatible[0];
     const items = await this.getFeeStructureItems(bestMatch.id, tenantId);
 
+    let totalUnits = 0;
+    if (params.enrollmentId) {
+      const enrolledSubjects = await this.enrollmentSubjectsRepo.find({
+        where: { tenantId, enrollmentId: params.enrollmentId }
+      });
+      if (enrolledSubjects.length > 0) {
+        // Need to import In from typeorm at the top of the file, let me do that separately.
+        const subjectIds = enrolledSubjects.map(es => es.subjectId);
+        const subjects = await this.subjectsRepo.createQueryBuilder('subject')
+          .where('subject.id IN (:...subjectIds)', { subjectIds })
+          .andWhere('subject.tenantId = :tenantId', { tenantId })
+          .getMany();
+        totalUnits = subjects.reduce((sum, s) => sum + Number(s.units || 0), 0);
+      }
+    }
+
+    const resolvedItems = items.map(item => {
+      if (item.isPerUnit) {
+        // If they have 0 units (e.g. no subjects loaded yet but structure is resolved), default multiplier to 1 to show base rate, or maybe 0?
+        // Actually, if it's per-unit, and they have 0 units, they shouldn't be charged tuition. So multiply by totalUnits (even if 0).
+        return { ...item, amount: Number(item.amount) * Math.max(totalUnits, 0) };
+      }
+      return item;
+    });
+
     return {
       structure: bestMatch,
-      items,
-      totalAmount: items.reduce((sum, item) => sum + Number(item.amount), 0),
+      items: resolvedItems,
+      totalAmount: resolvedItems.reduce((sum, item) => sum + Number(item.amount), 0),
     };
   }
 
@@ -211,6 +241,27 @@ export class BillingService {
   async createPaymentPlan(data: Partial<PaymentPlan>) {
     const plan = this.paymentPlansRepo.create(data);
     return this.paymentPlansRepo.save(plan);
+  }
+
+  async updatePaymentPlan(id: string, tenantId: string, data: Partial<PaymentPlan>) {
+    const plan = await this.paymentPlansRepo.findOne({ where: { id, tenantId } });
+    if (!plan) throw new NotFoundException('Payment plan not found');
+    Object.assign(plan, data);
+    return this.paymentPlansRepo.save(plan);
+  }
+
+  async deletePaymentPlan(id: string, tenantId: string) {
+    const plan = await this.paymentPlansRepo.findOne({ where: { id, tenantId } });
+    if (!plan) throw new NotFoundException('Payment plan not found');
+    
+    // Check if used in invoices (soft delete if true)
+    const count = await this.invoicesRepo.count({ where: { paymentPlanId: id, tenantId } });
+    if (count > 0) {
+      plan.isActive = false;
+      return this.paymentPlansRepo.save(plan);
+    }
+    
+    return this.paymentPlansRepo.remove(plan);
   }
 
   async getInstallmentSchedule(invoiceId: string, tenantId: string) {

@@ -13,7 +13,12 @@ export default function LoginPage() {
   const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
-    if (token && user) router.replace('/dashboard');
+    if (token && user) {
+      const timer = setTimeout(() => {
+        router.replace('/dashboard');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
   }, [token, user, router]);
 
   if (token && user) return null;

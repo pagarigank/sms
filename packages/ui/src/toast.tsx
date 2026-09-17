@@ -5,21 +5,43 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { X, CheckCircle2, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { cn } from '@sms/utils';
 
+const VARIANT_BORDER: Record<string, string> = {
+  default:     'border-l-[hsl(var(--border-strong))]',
+  success:     'border-l-[hsl(var(--status-success-ink))]',
+  destructive: 'border-l-[hsl(var(--status-danger-ink))]',
+  warning:     'border-l-[hsl(var(--status-warning-ink))]',
+  info:        'border-l-[hsl(var(--status-info-ink))]',
+};
+
+const VARIANT_PROGRESS: Record<string, string> = {
+  default:     'bg-[hsl(var(--ink-300))]',
+  success:     'bg-[hsl(var(--status-success-ink))]',
+  destructive: 'bg-[hsl(var(--status-danger-ink))]',
+  warning:     'bg-[hsl(var(--status-warning-ink))]',
+  info:        'bg-[hsl(var(--status-info-ink))]',
+};
+
 const toastVariants = cva(
-  'pointer-events-auto relative flex w-full items-start justify-between space-x-3 overflow-hidden rounded-lg border p-4 pr-9 shadow-lg transition-all',
+  [
+    'pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden',
+    'rounded-xl border border-[hsl(var(--border))] border-l-4',
+    'bg-[hsl(var(--surface-raised))] backdrop-blur-xl',
+    'p-4 pr-10 shadow-xl shadow-[hsl(var(--ink-100)/0.10)]',
+    'transition-all duration-200',
+  ].join(' '),
   {
     variants: {
       variant: {
         default:
-          'border-[hsl(var(--border))] bg-[hsl(var(--surface-raised))] text-[hsl(var(--ink-100))]',
+          'border-l-[hsl(var(--border-strong))] text-[hsl(var(--ink-100))]',
         destructive:
-          'border-[hsl(var(--status-danger-ink))]/30 bg-[hsl(var(--status-danger-surface))] text-[hsl(var(--status-danger-ink))]',
+          'border-l-[hsl(var(--status-danger-ink))] text-[hsl(var(--ink-100))]',
         success:
-          'border-[hsl(var(--status-success-ink))]/30 bg-[hsl(var(--status-success-surface))] text-[hsl(var(--status-success-ink))]',
+          'border-l-[hsl(var(--status-success-ink))] text-[hsl(var(--ink-100))]',
         warning:
-          'border-[hsl(var(--status-warning-ink))]/30 bg-[hsl(var(--status-warning-surface))] text-[hsl(var(--status-warning-ink))]',
+          'border-l-[hsl(var(--status-warning-ink))] text-[hsl(var(--ink-100))]',
         info:
-          'border-[hsl(var(--status-info-ink))]/30 bg-[hsl(var(--status-info-surface))] text-[hsl(var(--status-info-ink))]',
+          'border-l-[hsl(var(--status-info-ink))] text-[hsl(var(--ink-100))]',
       },
     },
     defaultVariants: {
@@ -29,32 +51,44 @@ const toastVariants = cva(
 );
 
 const TOAST_ICONS: Record<string, React.ReactNode> = {
-  default: null,
-  success: <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />,
-  destructive: <XCircle className="h-5 w-5 shrink-0" aria-hidden="true" />,
-  warning: <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />,
-  info: <Info className="h-5 w-5 shrink-0" aria-hidden="true" />,
+  default:     null,
+  success:     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--status-success-ink))]" aria-hidden="true" />,
+  destructive: <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--status-danger-ink))]" aria-hidden="true" />,
+  warning:     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--status-warning-ink))]" aria-hidden="true" />,
+  info:        <Info className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--status-info-ink))]" aria-hidden="true" />,
 };
 
 interface ToastProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof toastVariants> {
   onClose?: () => void;
+  /** Duration in ms for the progress bar. 0 = no bar. */
+  duration?: number;
+  progressDuration?: number;
 }
 
 const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
-  ({ className, variant, onClose, children, ...props }, ref) => (
+  ({ className, variant, onClose, children, progressDuration, ...props }, ref) => (
     <div ref={ref} className={cn(toastVariants({ variant }), className)} {...props}>
       {TOAST_ICONS[variant ?? 'default'] ?? null}
-      <div className="grid flex-1 gap-0.5">{children}</div>
+      <div className="grid flex-1 gap-0.5 min-w-0">{children}</div>
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute right-2 top-2 rounded-md p-1 opacity-60 transition-opacity hover:opacity-100"
+          className="absolute right-2 top-2 rounded-md p-1 text-[hsl(var(--ink-300))] opacity-70 transition-opacity hover:opacity-100 hover:text-[hsl(var(--ink-100))]"
           aria-label="Dismiss notification"
         >
           <X className="h-4 w-4" />
         </button>
+      )}
+      {/* Auto-dismiss progress bar */}
+      {progressDuration && progressDuration > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden rounded-b-xl">
+          <div
+            className={cn('h-full animate-progress-shrink', VARIANT_PROGRESS[variant ?? 'default'] ?? VARIANT_PROGRESS.default)}
+            style={{ animationDuration: `${progressDuration}ms` }}
+          />
+        </div>
       )}
     </div>
   )
@@ -139,19 +173,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         aria-label="Notifications"
       >
         <div aria-live="polite" aria-atomic="false" className="flex flex-col gap-2">
-          {toasts.map((toast) => (
-            <Toast
-              key={toast.id}
-              variant={toast.variant}
-              onClose={() => removeToast(toast.id)}
-              className="animate-in slide-in-from-bottom-2 fade-in-0 duration-200"
-            >
-              {toast.title && <div className="text-sm font-semibold leading-snug">{toast.title}</div>}
-              {toast.description && (
-                <div className="text-sm leading-snug opacity-90">{toast.description}</div>
-              )}
-            </Toast>
-          ))}
+          {toasts.map((toast) => {
+            const dur = toast.duration ?? (toast.variant === 'destructive' ? DESTRUCTIVE_DURATION : DEFAULT_DURATION);
+            return (
+              <Toast
+                key={toast.id}
+                variant={toast.variant}
+                onClose={() => removeToast(toast.id)}
+                progressDuration={dur}
+                className="animate-slide-up-fade"
+              >
+                {toast.title && <div className="text-sm font-semibold leading-snug">{toast.title}</div>}
+                {toast.description && (
+                  <div className="text-sm leading-snug text-[hsl(var(--ink-200))]">{toast.description}</div>
+                )}
+              </Toast>
+            );
+          })}
         </div>
       </div>
     </ToastContext.Provider>
@@ -170,3 +208,4 @@ export function useToast() {
 }
 
 export { Toast, toastVariants };
+

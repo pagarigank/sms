@@ -4,6 +4,7 @@ import { Student } from './student.entity';
 import { Guardian } from './guardian.entity';
 import { StudentGuardian } from './student-guardian.entity';
 import { Enrollment } from './enrollment.entity';
+import { EnrollmentSubject } from './enrollment-subject.entity';
 import { Section } from './section.entity';
 import { StudentSectionAssignment } from './student-section-assignment.entity';
 import { EnrollmentHold } from './enrollment-hold.entity';
@@ -35,6 +36,7 @@ import { ConfigEngineModule } from '../config/config.module';
       Guardian,
       StudentGuardian,
       Enrollment,
+      EnrollmentSubject,
       Section,
       StudentSectionAssignment,
       EnrollmentHold,

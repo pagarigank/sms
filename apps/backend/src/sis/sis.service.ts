@@ -14,6 +14,7 @@ import { PromotionDecision } from './promotion-decision.entity';
 import { BehaviorIncident } from './behavior-incident.entity';
 import { HealthRecord } from './health-record.entity';
 import { StudentMergeAudit } from './student-merge-audit.entity';
+import { EnrollmentSubject } from './enrollment-subject.entity';
 import { GradeLevel } from '../academic/grade-level.entity';
 import { InvoiceService } from '../billing/invoice.service';
 import { NumberingService } from '../config/numbering.service';
@@ -39,6 +40,7 @@ export class SisService {
     @InjectRepository(BehaviorIncident) private incidentsRepo: Repository<BehaviorIncident>,
     @InjectRepository(HealthRecord) private healthRepo: Repository<HealthRecord>,
     @InjectRepository(StudentMergeAudit) private mergeAuditRepo: Repository<StudentMergeAudit>,
+    @InjectRepository(EnrollmentSubject) private enrollmentSubjectsRepo: Repository<EnrollmentSubject>,
     private dataSource: DataSource,
   ) {}
 
@@ -150,15 +152,27 @@ export class SisService {
     return this.enrollmentsRepo.find({ where, order: { enrolledAt: 'DESC' } });
   }
 
-  async createEnrollment(data: Partial<Enrollment>) {
+  async createEnrollment(data: Partial<Enrollment> & { subjectIds?: string[] }) {
     // Check for duplicate enrollment in same school year
     const existing = await this.enrollmentsRepo.findOne({
       where: { studentId: data.studentId, schoolYearId: data.schoolYearId, tenantId: data.tenantId },
     });
     if (existing) throw new BadRequestException('Student is already enrolled in this school year');
 
-    const enrollment = this.enrollmentsRepo.create(data);
+    const { subjectIds, ...enrollmentData } = data;
+    const enrollment = this.enrollmentsRepo.create(enrollmentData as Partial<Enrollment>);
     const saved = await this.enrollmentsRepo.save(enrollment);
+
+    if (subjectIds && subjectIds.length > 0) {
+      const enrollmentSubjects = subjectIds.map(subjectId => 
+        this.enrollmentSubjectsRepo.create({
+          tenantId: saved.tenantId,
+          enrollmentId: saved.id,
+          subjectId,
+        })
+      );
+      await this.enrollmentSubjectsRepo.save(enrollmentSubjects);
+    }
 
     // Auto-assess fees: generate the invoice from the resolved fee structure
     // (Phase 6 exit criterion). Non-fatal: enrollment must not be lost to a

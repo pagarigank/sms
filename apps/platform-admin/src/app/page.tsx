@@ -9,11 +9,14 @@ export default function Home() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/dashboard');
-    } else {
-      router.replace('/login');
-    }
+    const timer = setTimeout(() => {
+      if (isAuthenticated) {
+        router.replace('/dashboard');
+      } else {
+        router.replace('/login');
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [isAuthenticated, router]);
 
   return (

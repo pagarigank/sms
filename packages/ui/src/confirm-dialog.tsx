@@ -87,10 +87,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           <div className="flex items-start gap-4">
             <span
               className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+                'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl',
                 pending?.destructive
-                  ? 'bg-[hsl(var(--status-danger-surface))] text-[hsl(var(--status-danger-ink))]'
-                  : 'bg-[hsl(var(--accent-subtle))] text-[hsl(var(--accent))]'
+                  ? 'bg-[hsl(var(--status-danger-surface))] text-[hsl(var(--status-danger-ink))] ring-1 ring-[hsl(var(--status-danger-border))]'
+                  : 'gradient-bg text-white shadow-lg shadow-[hsl(var(--gradient-from)/0.3)]'
               )}
               aria-hidden="true"
             >

@@ -157,7 +157,7 @@ export const academicEndpoints = (client: ApiClient) => ({
   listCurriculumSubjects: (curriculumId: string) =>
     client.get<CurriculumSubject[]>(`/api/v1/academic/curricula/${curriculumId}/subjects`),
 
-  createCurriculumSubject: (data: { curriculumId: string; subjectId: string; termId?: string; prerequisiteSubjectId?: string }) =>
+  createCurriculumSubject: (data: { curriculumId: string; subjectId: string; termId?: string; yearLevelId?: string; prerequisiteSubjectId?: string }) =>
     client.post<CurriculumSubject>('/api/v1/academic/curriculum-subjects', data),
 
   deleteCurriculumSubject: (id: string) =>

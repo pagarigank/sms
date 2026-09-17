@@ -14,7 +14,12 @@ export default function LoginPage() {
 
   // Already signed in — go straight to the dashboard (run after hydration).
   useEffect(() => {
-    if (token && user) router.replace('/dashboard');
+    if (token && user) {
+      const timer = setTimeout(() => {
+        router.replace('/dashboard');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
   }, [token, user, router]);
 
   if (token && user) return null;

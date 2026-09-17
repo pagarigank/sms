@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 
@@ -138,6 +138,18 @@ export class BillingController {
   @ApiOperation({ summary: 'Create a payment plan' })
   async createPaymentPlan(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
     return this.billingService.createPaymentPlan({ ...data, tenantId });
+  }
+
+  @Put('payment-plans/:id')
+  @ApiOperation({ summary: 'Update a payment plan' })
+  async updatePaymentPlan(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.billingService.updatePaymentPlan(id, tenantId, data);
+  }
+
+  @Delete('payment-plans/:id')
+  @ApiOperation({ summary: 'Delete a payment plan' })
+  async deletePaymentPlan(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.billingService.deletePaymentPlan(id, tenantId);
   }
 
   // === Penalty Rules ===

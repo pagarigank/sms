@@ -380,7 +380,14 @@ export default function GradeLevelsPage() {
           columns={columns as any}
           data={gradeLevels}
           isLoading={isLoading}
-          emptyMessage="No grade levels found. Click 'Add Grade Level' to create your first grade level."
+          emptyMessage="No grade levels found."
+          emptyDescription="Get started by creating your first grade level."
+          emptyAction={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              <span>Create Grade Level</span>
+            </Button>
+          }
         />
 
       </div>

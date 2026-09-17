@@ -82,6 +82,7 @@ interface CurriculumSubject {
   curriculumId: string;
   subjectId: string;
   termId?: string;
+  yearLevelId?: string;
 }
 
 export default function CurriculaPage() {
@@ -226,6 +227,7 @@ export default function CurriculaPage() {
   const [subjectsFor, setSubjectsFor] = useState<Curriculum | null>(null);
   const [newSubjectId, setNewSubjectId] = useState('');
   const [newSubjectTermId, setNewSubjectTermId] = useState('');
+  const [newSubjectYearLevelId, setNewSubjectYearLevelId] = useState('');
 
   const { data: currSubjectsRes, isLoading: currSubjectsLoading } = useQuery({
     queryKey: ['curriculum-subjects', subjectsFor?.id],
@@ -247,22 +249,35 @@ export default function CurriculaPage() {
   });
   const curriculumTerms: Term[] = curriculumTermsRes?.data ?? [];
 
+  const { data: currYearLevelsRes } = useQuery({
+    queryKey: ['grade-levels', subjectsFor?.educationLevelId],
+    queryFn: () => apiClient.academic.listGradeLevels({ educationLevelId: subjectsFor!.educationLevelId, limit: 100 }),
+    enabled: !!subjectsFor && !!subjectsFor.programId,
+  });
+  const curriculumYearLevels: GradeLevel[] = (currYearLevelsRes?.data ?? []) as GradeLevel[];
+
   const subjectName = (id: string) => {
     const s = allSubjects.find((x) => x.id === id);
     return s ? `${s.code} — ${s.title}` : id.slice(0, 8);
   };
   const termName = (id?: string) => curriculumTerms.find((t) => t.id === id)?.name ?? '—';
+  const yearLevelName = (id?: string) => {
+    if (!id) return '';
+    return curriculumYearLevels.find((gl) => gl.id === id)?.name ?? 'Unknown Year';
+  };
 
   const addSubjectMutation = useMutation({
-    mutationFn: (data: { curriculumId: string; subjectId: string; termId?: string }) =>
+    mutationFn: (data: { curriculumId: string; subjectId: string; termId?: string; yearLevelId?: string }) =>
       apiClient.academic.createCurriculumSubject({
         ...data,
         termId: data.termId || undefined,
+        yearLevelId: data.yearLevelId || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['curriculum-subjects'] });
       setNewSubjectId('');
       setNewSubjectTermId('');
+      setNewSubjectYearLevelId('');
       toast({ title: 'Subject added to curriculum' });
     },
     onError: (error: Error) =>
@@ -419,6 +434,7 @@ export default function CurriculaPage() {
               onClick={() => {
                 setNewSubjectId('');
                 setNewSubjectTermId('');
+                setNewSubjectYearLevelId('');
                 setSubjectsFor(curriculum);
               }}
             >
@@ -778,7 +794,14 @@ export default function CurriculaPage() {
           columns={columns as any}
           data={curricula}
           isLoading={isLoading}
-          emptyMessage="No curricula found. Click 'Create Curriculum' to create your first curriculum."
+          emptyMessage="No curricula found."
+          emptyDescription="Get started by creating your first curriculum for this academic year."
+          emptyAction={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              <span>Create Curriculum</span>
+            </Button>
+          }
         />
 
         {/* FR-ACA-5: curriculum-subjects manager */}
@@ -811,7 +834,10 @@ export default function CurriculaPage() {
                   >
                     <div>
                       <p className="font-medium">{subjectName(cs.subjectId)}</p>
-                      <p className="text-xs text-muted-foreground">Term: {termName(cs.termId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {cs.yearLevelId && <span>{yearLevelName(cs.yearLevelId)} • </span>}
+                        Term: {termName(cs.termId)}
+                      </p>
                     </div>
                     <Button
                       variant="ghost"
@@ -835,6 +861,7 @@ export default function CurriculaPage() {
                   curriculumId: subjectsFor.id,
                   subjectId: newSubjectId,
                   termId: newSubjectTermId || undefined,
+                  yearLevelId: newSubjectYearLevelId || undefined,
                 });
               }}
               className="space-y-3 rounded-md border bg-muted/30 p-3"
@@ -856,6 +883,24 @@ export default function CurriculaPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {subjectsFor?.programId && (
+                <div>
+                  <Label htmlFor="cs-year-level">Year Level</Label>
+                  <Select value={newSubjectYearLevelId} onValueChange={setNewSubjectYearLevelId}>
+                    <SelectTrigger id="cs-year-level">
+                      <SelectValue placeholder="Select year level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No specific year level</SelectItem>
+                      {curriculumYearLevels.map((gl) => (
+                        <SelectItem key={gl.id} value={gl.id}>
+                          {gl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label htmlFor="cs-term">Term (optional)</Label>
                 <Select value={newSubjectTermId} onValueChange={setNewSubjectTermId}>

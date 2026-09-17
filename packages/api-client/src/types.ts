@@ -256,6 +256,7 @@ export interface CurriculumSubject {
   curriculumId: string;
   subjectId: string;
   termId?: string;
+  yearLevelId?: string;
   prerequisiteSubjectId?: string;
   effectiveGradingSystemId?: string;
 }

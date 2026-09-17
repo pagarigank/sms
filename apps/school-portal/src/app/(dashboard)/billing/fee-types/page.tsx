@@ -455,7 +455,14 @@ export default function FeeTypesPage() {
           columns={columns as any}
           data={feeTypes}
           isLoading={isLoading}
-          emptyMessage="No fee types found. Click 'Add Fee Type' to create your first fee type."
+          emptyMessage="No fee types found."
+          emptyDescription="Get started by configuring your school fee types."
+          emptyAction={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              <span>Create Fee Type</span>
+            </Button>
+          }
         />
 
       </div>

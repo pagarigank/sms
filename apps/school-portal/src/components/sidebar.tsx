@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { cn } from '@sms/utils';
+import { cn, getInitials } from '@sms/utils';
 import { apiClient } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { filterNavigationByPermissions } from '@/lib/permissions';
@@ -113,15 +113,20 @@ export function Sidebar() {
     [visibleNavigation],
   );
 
+  const user = useAuthStore((s) => s.user);
+  const displayName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'User';
+  const initials = user ? getInitials(`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email) : 'U';
+  const roleName = (user as any)?.roles?.[0]?.name ?? (user as any)?.role ?? 'School Staff';
+
   return (
-    <div className="flex h-full w-64 shrink-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-raised))]">
-      <div className="flex h-14 items-center border-b border-[hsl(var(--border))] px-4">
+    <div className="flex h-full w-64 shrink-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-raised)/0.85)] backdrop-blur-xl">
+      <div className="flex h-14 items-center border-b border-[hsl(var(--border))] px-4 bg-[hsl(var(--surface-base)/0.4)]">
         <Link href="/dashboard" className="flex items-center">
           <BrandLockup accent />
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3" aria-label="Main navigation">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3 scrollbar-thin" aria-label="Main navigation">
         {navigation.map((item, idx) => {
           // Section label rows
           if ('kind' in item) {
@@ -136,7 +141,7 @@ export function Sidebar() {
             return (
               <p
                 key={`label-${item.name}`}
-                className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--ink-300))]"
+                className="px-3 pb-1.5 pt-4 text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--ink-300))]"
               >
                 {item.name}
               </p>
@@ -154,34 +159,37 @@ export function Sidebar() {
               <Link
                 href={item.href}
                 className={cn(
-                  'group relative flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'group relative flex items-center rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150',
                   isActive
-                    ? 'bg-[hsl(var(--accent-subtle))] text-[hsl(var(--accent))]'
-                    : 'text-[hsl(var(--ink-200))] hover:bg-[hsl(var(--surface-muted))] hover:text-[hsl(var(--foreground))]'
+                    ? 'bg-[hsl(var(--accent)/0.12)] text-[hsl(var(--ink-100))] shadow-sm shadow-[hsl(var(--accent)/0.1)]'
+                    : 'text-[hsl(var(--ink-200))] hover:bg-[hsl(var(--surface-overlay))] hover:text-[hsl(var(--ink-100))]'
                 )}
               >
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-[hsl(var(--accent))]" />
+                  <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full gradient-bg shadow-sm shadow-[hsl(var(--gradient-from))]" />
                 )}
-                <item.icon className="mr-3 h-4 w-4 shrink-0" />
-                {item.name}
+                <item.icon className={cn('mr-3 h-4 w-4 shrink-0 transition-colors', isActive ? 'text-[hsl(var(--accent))]' : 'text-[hsl(var(--ink-300))] group-hover:text-[hsl(var(--ink-100))]')} />
+                <span className="flex-1 truncate">{item.name}</span>
               </Link>
               {visibleItem.children && isActive && (
-                <div className="ml-[26px] mt-0.5 space-y-0.5 border-l border-[hsl(var(--border))] pl-3">
-                  {visibleItem.children.map((child: { name: string; href: string }) => (
-                    <Link
-                      key={child.name}
-                      href={child.href}
-                      className={cn(
-                        'block rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
-                        pathname === child.href.split('#')[0]
-                          ? 'font-medium text-[hsl(var(--foreground))]'
-                          : 'text-[hsl(var(--ink-300))] hover:text-[hsl(var(--foreground))]'
-                      )}
-                    >
-                      {child.name}
-                    </Link>
-                  ))}
+                <div className="ml-[22px] mt-1 space-y-0.5 border-l border-[hsl(var(--border))] pl-3.5">
+                  {visibleItem.children.map((child: { name: string; href: string }) => {
+                    const isChildActive = pathname === child.href.split('#')[0];
+                    return (
+                      <Link
+                        key={child.name}
+                        href={child.href}
+                        className={cn(
+                          'block rounded-lg px-2.5 py-1.5 text-xs transition-all duration-150',
+                          isChildActive
+                            ? 'font-semibold text-[hsl(var(--accent))] bg-[hsl(var(--accent)/0.08)]'
+                            : 'text-[hsl(var(--ink-300))] hover:text-[hsl(var(--ink-100))] hover:bg-[hsl(var(--surface-overlay)/0.5)]'
+                        )}
+                      >
+                        {child.name}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -189,10 +197,17 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-[hsl(var(--border))] p-3">
-        <p className="px-2 text-[11px] leading-4 text-[hsl(var(--ink-300))]">
-          SchoolSuite SMS · v0.1
-        </p>
+      {/* User profile card at bottom */}
+      <div className="border-t border-[hsl(var(--border))] p-3 bg-[hsl(var(--surface-base)/0.3)]">
+        <div className="flex items-center gap-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-overlay)/0.4)] p-2.5 backdrop-blur">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-bg text-xs font-bold text-white shadow-md shadow-[hsl(var(--gradient-from)/0.3)]">
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-[hsl(var(--ink-100))]">{displayName}</p>
+            <p className="truncate text-[11px] text-[hsl(var(--ink-300))]">{roleName}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

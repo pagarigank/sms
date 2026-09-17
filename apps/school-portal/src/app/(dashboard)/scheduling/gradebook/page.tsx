@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { Save, Lock } from 'lucide-react';
@@ -134,8 +135,10 @@ export default function GradebookPage() {
   const { currentTenantId } = useTenantStore();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedTerm, setSelectedTerm] = useState('');
+  const searchParams = useSearchParams();
+  
+  const [selectedClass, setSelectedClass] = useState(searchParams.get('classId') ?? '');
+  const [selectedTerm, setSelectedTerm] = useState(searchParams.get('termId') ?? '');
   const [grades, setGrades] = useState<Record<string, Record<string, string>>>({});
 
   const { data: offerings } = useQuery({

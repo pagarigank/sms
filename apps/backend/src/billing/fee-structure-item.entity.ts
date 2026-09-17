@@ -20,6 +20,9 @@ export class FeeStructureItem {
   @Column({ default: true })
   isRequired: boolean;
 
+  @Column({ default: false })
+  isPerUnit: boolean;
+
   @Column({ nullable: true })
   description: string;
 

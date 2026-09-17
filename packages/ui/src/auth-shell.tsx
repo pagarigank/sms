@@ -52,45 +52,47 @@ export function AuthShell({
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[hsl(var(--surface-base))] px-4 py-10 lg:justify-end lg:px-0 lg:py-0">
-      {/* Ambient field */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      {/* Ambient background with glowing mesh and floating orbs */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
-          className="absolute -left-32 top-[-8rem] h-96 w-96 rounded-full bg-[hsl(var(--accent-subtle))] opacity-50 blur-3xl"
-          style={hue ? { filter: `hue-rotate(${hue}deg) blur(64px)` } : { filter: 'blur(64px)' }}
+          className="absolute -left-32 -top-32 h-[34rem] w-[34rem] rounded-full bg-gradient-to-br from-[hsl(var(--gradient-from)/0.3)] to-[hsl(var(--gradient-to)/0.15)] opacity-70 blur-3xl animate-float"
+          style={hue ? { filter: `hue-rotate(${hue}deg) blur(72px)` } : { filter: 'blur(72px)' }}
         />
         <div
-          className="absolute bottom-[-8rem] right-[-6rem] h-96 w-96 rounded-full bg-[hsl(var(--secondary-subtle))] opacity-40 blur-3xl"
-          style={hue ? { filter: `hue-rotate(${hue}deg) blur(64px)` } : { filter: 'blur(64px)' }}
+          className="absolute -bottom-32 -right-24 h-[34rem] w-[34rem] rounded-full bg-gradient-to-tl from-[hsl(var(--secondary)/0.25)] to-[hsl(var(--accent)/0.2)] opacity-60 blur-3xl"
+          style={hue ? { filter: `hue-rotate(${hue}deg) blur(80px)` } : { filter: 'blur(80px)' }}
         />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[hsl(var(--accent)/0.06)] via-transparent to-transparent pointer-events-none" />
       </div>
 
       {/* Brand panel — desktop only */}
       <aside
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 z-0 hidden w-1/2 flex-col justify-between gap-10 p-12 lg:flex"
+        className="absolute inset-y-0 left-0 z-0 hidden w-1/2 flex-col justify-between gap-10 p-14 lg:flex"
       >
         <div className="flex items-center gap-3">
           <BrandMark className="h-9 w-9 text-[hsl(var(--accent))]" />
-          <Wordmark className="text-xl" />
+          <Wordmark className="text-xl font-bold tracking-tight" />
         </div>
 
-        <div className="max-w-md">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[hsl(var(--accent))]">
+        <div className="max-w-md space-y-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[hsl(var(--accent)/0.25)] bg-[hsl(var(--accent)/0.08)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[hsl(var(--accent))]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))] animate-pulse" />
             {eyebrow}
-          </p>
-          <h2 className="mt-4 text-4xl font-bold leading-tight tracking-tight text-[hsl(var(--foreground))]">
+          </div>
+          <h2 className="text-4xl font-extrabold leading-tight tracking-tight text-[hsl(var(--ink-100))]">
             {headline}
           </h2>
-          <p className="mt-4 leading-relaxed text-[hsl(var(--ink-300))]">{description}</p>
+          <p className="leading-relaxed text-[hsl(var(--ink-300))] text-base">{description}</p>
         </div>
 
-        <ul className="max-w-md space-y-3">
+        <ul className="max-w-md space-y-3.5">
           {features.map((label, i) => {
             const Icon = featureIcons[i % featureIcons.length];
             return (
-              <li key={label} className="flex items-center gap-3 text-sm text-[hsl(var(--ink-300))]">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--surface-raised))] shadow-sm ring-1 ring-[hsl(var(--border))]">
-                  <Icon className="h-4 w-4 text-[hsl(var(--accent))]" />
+              <li key={label} className="flex items-center gap-3.5 text-sm font-medium text-[hsl(var(--ink-200))]">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-bg text-white shadow-lg shadow-[hsl(var(--gradient-from)/0.25)]">
+                  <Icon className="h-4 w-4" />
                 </span>
                 {label}
               </li>
@@ -98,7 +100,7 @@ export function AuthShell({
           })}
         </ul>
 
-        <p className="text-xs text-[hsl(var(--ink-300))]">{footer}</p>
+        <p className="text-xs text-[hsl(var(--ink-300))] opacity-80">{footer}</p>
       </aside>
 
       {/* Form column — centered on mobile, right half on desktop */}
@@ -107,21 +109,21 @@ export function AuthShell({
 
         {/* Mobile brand lockup */}
         <div className="mb-8 flex flex-col items-center gap-2 lg:hidden">
-          <BrandMark className="h-10 w-10 text-[hsl(var(--accent))]" />
-          <Wordmark />
-          <span className="text-xs text-[hsl(var(--ink-300))]">{mobileSubtitle}</span>
+          <BrandMark className="h-11 w-11 text-[hsl(var(--accent))]" />
+          <Wordmark className="text-xl" />
+          <span className="text-xs font-medium text-[hsl(var(--ink-300))]">{mobileSubtitle}</span>
         </div>
 
         <div
           className={cn(
-            'w-full rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-raised))] p-8 shadow-xl shadow-black/5 sm:p-10',
+            'w-full rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-raised)/0.88)] backdrop-blur-2xl p-8 shadow-xl shadow-[hsl(var(--accent)/0.08)] sm:p-10 ring-1 ring-[hsl(var(--border))]',
             cardClassName
           )}
         >
           {children}
         </div>
 
-        <p className="mt-6 text-center text-xs text-[hsl(var(--ink-300))]">{footer}</p>
+        <p className="mt-6 text-center text-xs text-[hsl(var(--ink-300))] opacity-80">{footer}</p>
       </div>
     </div>
   );

@@ -15,6 +15,8 @@ import { Enrollment } from '../sis/enrollment.entity';
 import { Student } from '../sis/student.entity';
 import { SchoolYear } from '../academic/school-year.entity';
 import { Curriculum } from '../academic/curriculum.entity';
+import { Subject } from '../academic/subject.entity';
+import { EnrollmentSubject } from '../sis/enrollment-subject.entity';
 import { ConfigEngineModule } from '../config/config.module';
 import { BillingService } from './billing.service';
 import { InvoiceService } from './invoice.service';
@@ -40,6 +42,8 @@ import { InvoiceController } from './invoice.controller';
       Student,
       SchoolYear,
       Curriculum,
+      Subject,
+      EnrollmentSubject,
     ]),
   ],
   providers: [BillingService, InvoiceService],
