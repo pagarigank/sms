@@ -23,10 +23,19 @@ export function TenantSwitcher() {
     enabled: !!token && !!isPlatformAdmin,
   });
 
+  const { data: meRes } = useQuery({
+    queryKey: ['auth-me'],
+    queryFn: () => apiClient.auth.me(),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+  });
+  const permissions = meRes?.data?.permissions ?? [];
+  const canViewBranches = permissions.includes('tenancy.branch:view');
+
   const { data: branchesRes } = useQuery({
     queryKey: ['branches', currentTenantId],
     queryFn: () => apiClient.branches.list({ tenantId: currentTenantId! }),
-    enabled: !!currentTenantId,
+    enabled: !!currentTenantId && canViewBranches,
   });
 
   const tenants = Array.isArray(tenantsRes?.data)
@@ -80,24 +89,26 @@ export function TenantSwitcher() {
         </SelectContent>
       </Select>
 
-      <Select
-        value={currentBranchId ?? 'all-branches'}
-        onValueChange={(v) => setCurrentBranch(v === 'all-branches' ? null : v)}
-      >
-        <SelectTrigger
-          className="h-9 w-44 gap-1.5 rounded-lg border-[hsl(var(--border))] bg-[hsl(var(--surface-muted))] text-sm"
-          aria-label="Select branch"
+      {canViewBranches && (
+        <Select
+          value={currentBranchId ?? 'all-branches'}
+          onValueChange={(v) => setCurrentBranch(v === 'all-branches' ? null : v)}
         >
-          <GitBranch className="h-4 w-4 shrink-0 text-[hsl(var(--ink-300))]" />
-          <SelectValue placeholder="Branch" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all-branches">All Branches</SelectItem>
-          {branches.map((b) => (
-            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <SelectTrigger
+            className="h-9 w-44 gap-1.5 rounded-lg border-[hsl(var(--border))] bg-[hsl(var(--surface-muted))] text-sm"
+            aria-label="Select branch"
+          >
+            <GitBranch className="h-4 w-4 shrink-0 text-[hsl(var(--ink-300))]" />
+            <SelectValue placeholder="Branch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all-branches">All Branches</SelectItem>
+            {branches.map((b) => (
+              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 }

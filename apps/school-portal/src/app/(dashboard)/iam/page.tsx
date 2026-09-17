@@ -184,7 +184,7 @@ export default function IAMPage() {
       setEditingUser(null);
       toast({ title: 'User updated', variant: 'success' });
     },
-    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'danger' }),
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
 
   const suspendMutation = useMutation({
@@ -312,6 +312,7 @@ export default function IAMPage() {
                 lastName: user.lastName ?? '',
                 middleName: user.middleName ?? '',
                 phone: user.phone ?? '',
+                tenantId: user.tenantId,
               });
             }}>
               Edit

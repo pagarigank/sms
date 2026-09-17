@@ -121,7 +121,6 @@ export default function GradeComponentsPage() {
               columns={columns}
               data={components}
               isLoading={isLoading}
-              searchKey="name"
             />
           ) : (
             <div className="flex h-48 items-center justify-center p-8 text-center text-sm text-muted-foreground">

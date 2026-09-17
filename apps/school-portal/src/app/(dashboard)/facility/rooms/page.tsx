@@ -52,21 +52,21 @@ export default function RoomsPage() {
     queryKey: ['branches'],
     queryFn: () => apiClient.branches.list({ limit: 100 }),
   });
-  const branches = (branchesRes?.data as any[]) ?? [];
+  const branches = branchesRes?.data?.data ?? [];
 
   const { data: buildingsRes } = useQuery({
     queryKey: ['buildings', form.branchId],
-    queryFn: () => form.branchId ? apiClient.facility.listBuildings({ branchId: form.branchId, limit: 100 }) : Promise.resolve({ data: [] } as any),
+    queryFn: () => apiClient.facility.listBuildings({ branchId: form.branchId!, limit: 100 }),
     enabled: !!form.branchId,
   });
-  const buildings = (buildingsRes?.data as any[]) ?? [];
+  const buildings = buildingsRes?.data ?? [];
 
   const { data: floorsRes } = useQuery({
     queryKey: ['floors', form.buildingId],
-    queryFn: () => form.buildingId ? apiClient.facility.listFloors({ buildingId: form.buildingId }) : Promise.resolve([]),
+    queryFn: () => apiClient.facility.listFloors({ buildingId: form.buildingId! }),
     enabled: !!form.buildingId,
   });
-  const floors = (floorsRes?.data as any[]) ?? (floorsRes as any[]) ?? [];
+  const floors = floorsRes?.data ?? [];
 
   const roomTypes = useLookupValues('room_type', ROOM_TYPES_FALLBACK);
 

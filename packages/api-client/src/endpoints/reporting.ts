@@ -41,5 +41,15 @@ export function reportingEndpoints(client: ApiClient) {
 
     runScheduledReport: (id: string) =>
       client.post<{ dispatched: number; summary: string }>(`/api/v1/reporting/scheduled/${id}/run`),
+
+    // === SF Forms (DepEd) ===
+    getSf1: (sectionId: string, params?: any) =>
+      client.get(`/api/v1/reporting/sf-forms/sf1/${sectionId}`, params as any),
+
+    getSf2: (sectionId: string, params: { month: number; year: number }) =>
+      client.get(`/api/v1/reporting/sf-forms/sf2/${sectionId}`, params as any),
+
+    getSf9: (studentId: string, params: { schoolYearId: string }) =>
+      client.get(`/api/v1/reporting/sf-forms/sf9/${studentId}`, params as any),
   };
 }

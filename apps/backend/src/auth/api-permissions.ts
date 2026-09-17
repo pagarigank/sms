@@ -152,6 +152,7 @@ export const API_PERMISSION_MAP: ApiPermissionRule[] = [
   { prefix: 'hr', view: 'hr.employee:view', write: 'hr.employee:create', update: 'hr.employee:create' },
 
   // === Reporting ===
+  { prefix: 'reporting/sf-forms', view: 'reporting.sf_forms:view', write: 'reporting.sf_forms:generate', update: 'reporting.sf_forms:generate' },
   { prefix: 'reporting', view: 'reporting.dashboard:view', write: 'reporting.export:export', update: 'reporting.export:export' },
 
   // === Config engine ===

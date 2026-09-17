@@ -40,7 +40,7 @@ export function sisEndpoints(client: ApiClient) {
     listMyChildren: () =>
       client.get('/api/v1/sis/students/my-children'),
 
-    listStudents: (params: { tenantId: string; branchId?: string }) =>
+    listStudents: (params: { tenantId: string; branchId?: string; search?: string; page?: number; limit?: number }) =>
       client.get('/api/v1/sis/students', params as any),
 
     getStudent: (id: string) =>

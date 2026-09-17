@@ -5,10 +5,30 @@ export function gradingExtendedEndpoints(client: ApiClient) {
     getGradebook: (params: { tenantId: string; classOfferingId: string }) =>
       client.get(`/api/v1/grading/class/${params.classOfferingId}/gradebook`),
 
-    enterGrade: (data: any) =>
+    enterGrade: (data: {
+      classOfferingId: string;
+      termId: string;
+      studentId: string;
+      gradeComponentId: string;
+      rawScore?: number;
+      percentage?: number;
+      descriptiveGrade?: string;
+      gradingMode?: string;
+    }) =>
       client.post('/api/v1/grading/entries', data),
 
-    bulkEnterGrades: (body: { entries: any[] }) =>
+    bulkEnterGrades: (body: { 
+      entries: Array<{
+        classOfferingId: string;
+        termId: string;
+        studentId: string;
+        gradeComponentId: string;
+        rawScore?: number;
+        percentage?: number;
+        descriptiveGrade?: string;
+        gradingMode?: string;
+      }>
+    }) =>
       client.post('/api/v1/grading/entries/bulk', body),
 
     finalizeGrades: (params: { classOfferingId: string; termId: string }) =>

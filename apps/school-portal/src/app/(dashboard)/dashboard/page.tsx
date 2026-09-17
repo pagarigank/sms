@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { useTenantStore } from '@/lib/store';
+import { useTenantStore, useAuthStore } from '@/lib/store';
 import {
   Building2, BookOpen, GraduationCap, Users, Calendar, DollarSign,
   TrendingUp, Activity, AlertTriangle, Clock,
@@ -110,6 +110,15 @@ export default function DashboardPage() {
   const [selectedBranch, setSelectedBranch] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('month');
   const currentTenantId = useTenantStore((s) => s.currentTenantId);
+  const token = useAuthStore((s) => s.token);
+
+  const { data: meRes } = useQuery({
+    queryKey: ['auth-me'],
+    queryFn: () => apiClient.auth.me(),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+  });
+  const permissions = meRes?.data?.permissions ?? [];
 
   const statsQuery = useQuery({
     queryKey: ['dashboard-stats', selectedBranch, timeRange],
@@ -125,26 +134,26 @@ export default function DashboardPage() {
   const branchesQuery = useQuery({
     queryKey: ['branches', 'all', currentTenantId],
     queryFn: () => apiClient.branches.list({ limit: 100 }),
-    enabled: !!currentTenantId,
+    enabled: !!currentTenantId && permissions.includes('tenancy.branch:view'),
   });
 
   const schoolYearsQuery = useQuery({
     queryKey: ['school-years', 'dashboard', currentTenantId],
     queryFn: () => apiClient.academic.listSchoolYears({ limit: 10 }),
-    enabled: !!currentTenantId,
+    enabled: !!currentTenantId && permissions.includes('academic.school_year:view'),
   });
 
   const curriculaQuery = useQuery({
     queryKey: ['curricula', 'dashboard', currentTenantId],
     queryFn: () => apiClient.academic.listCurricula({ limit: 10 }),
-    enabled: !!currentTenantId,
+    enabled: !!currentTenantId && permissions.includes('academic.curriculum:view'),
   });
 
   // Upcoming events: resolve the first calendar, then its events.
   const calendarsQuery = useQuery({
     queryKey: ['calendars', 'dashboard', currentTenantId],
     queryFn: () => apiClient.scheduling.listCalendars({ tenantId: currentTenantId ?? '' }),
-    enabled: !!currentTenantId,
+    enabled: !!currentTenantId && permissions.includes('scheduling.timetable:view'),
   });
   const firstCalendarId = (calendarsQuery.data?.data as unknown as { id: string }[] | undefined)?.[0]?.id;
   const eventsQuery = useQuery({
@@ -157,12 +166,11 @@ export default function DashboardPage() {
   const auditQuery = useQuery({
     queryKey: ['audit-events', 'dashboard', currentTenantId],
     queryFn: () => apiClient.config.listAuditEvents({ tenantId: currentTenantId ?? undefined }),
-    enabled: !!currentTenantId,
+    enabled: !!currentTenantId && permissions.includes('config.audit_log:view'),
   });
 
-  const isLoading =
-    statsQuery.isLoading || branchesQuery.isLoading || schoolYearsQuery.isLoading;
-  const hasError = statsQuery.isError || branchesQuery.isError || schoolYearsQuery.isError;
+  const isLoading = statsQuery.isLoading;
+  const hasError = statsQuery.isError;
 
   const branches: Branch[] = branchesQuery.data?.data?.data ?? [];
   const stats: DashboardStats = (statsQuery.data?.data as DashboardStats | undefined) ?? {
@@ -205,17 +213,19 @@ export default function DashboardPage() {
           <p className="text-[hsl(var(--ink-300))]">Branch administration overview</p>
         </div>
         <div className="flex items-center gap-4">
-          <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Branches</SelectItem>
-              {branches.map((b) => (
-                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {permissions.includes('tenancy.branch:view') && (
+            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-36">
               <SelectValue />

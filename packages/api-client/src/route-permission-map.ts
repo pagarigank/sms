@@ -103,7 +103,13 @@ export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
   { route: '/hr', permission: 'hr.employee:view' },
 
   // Reports
-  { route: '/reports', permission: 'reporting.dashboard:view' },
+  { route: '/reports', permission: 'reporting.dashboard:view', children: [
+    { route: '/reports/sf-forms', permission: 'reporting.sf_forms:view', children: [
+      { route: '/reports/sf-forms/sf1', permission: 'reporting.sf_forms:view' },
+      { route: '/reports/sf-forms/sf2', permission: 'reporting.sf_forms:view' },
+      { route: '/reports/sf-forms/sf9', permission: 'reporting.sf_forms:view' },
+    ]},
+  ]},
 
   // Settings
   { route: '/settings', permission: 'config.lookup:view' },

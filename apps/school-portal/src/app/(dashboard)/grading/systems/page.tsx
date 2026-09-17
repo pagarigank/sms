@@ -245,7 +245,6 @@ export default function GradingSystemsPage() {
             columns={columns}
             data={systems}
             isLoading={isLoading}
-            searchKey="name"
           />
         </CardContent>
       </Card>

@@ -209,6 +209,9 @@ export default function GradebookPage() {
     retry: false,
   });
   const gradingSystemId: string = (resolvedSystem?.data as any)?.id ?? '';
+  const resolvedSystemType = (resolvedSystem?.data as any)?.type;
+  const isDescriptiveKS1 = resolvedSystemType === 'deped_ks1_kinder' || resolvedSystemType === 'deped_ks1_grades1_3';
+  const isKinder = resolvedSystemType === 'deped_ks1_kinder';
 
   const { data: componentsRes } = useQuery({
     queryKey: ['grade-components', gradingSystemId],
@@ -227,12 +230,15 @@ export default function GradebookPage() {
 
   const saveGrades = useMutation({
     mutationFn: () => {
-      const entries = Object.entries(grades).flatMap(([studentId, components]) =>
-        Object.entries(components).map(([componentId, score]) => ({
+      const entries = Object.entries(grades).flatMap(([studentId, studentComps]) =>
+        Object.entries(studentComps).map(([componentId, score]) => ({
           studentId,
           classOfferingId: selectedClass,
+          termId: selectedTerm,
           gradeComponentId: componentId,
-          rawScore: parseFloat(score) || 0,
+          rawScore: isDescriptiveKS1 ? undefined : (parseFloat(score) || 0),
+          descriptiveGrade: isDescriptiveKS1 ? score : undefined,
+          gradingMode: isDescriptiveKS1 ? 'descriptive_ks1' : 'numeric',
         }))
       );
       return apiClient.grading.bulkEnterGrades({ entries });
@@ -392,30 +398,60 @@ export default function GradebookPage() {
                       </TableCell>                      {components.map((componentId) => {
                         const existing = studentGrades.find((g: any) => g.gradeComponentId === componentId);
                         // Controlled value: pending edit wins, else the saved score.
-                        // Control (instead of defaultValue) is what keeps the letter
-                        // chip live while the teacher types.
                         const pending = grades[studentId]?.[componentId];
-                        const score = pending ?? (existing?.rawScore != null ? String(existing.rawScore) : '');
-                        const pct = Number(score);
-                        const cellBand =
-                          score.trim() !== '' && !Number.isNaN(pct) ? resolveLetterGrade(pct, gradeScale) : null;
+                        const score = pending ?? (isDescriptiveKS1 ? (existing?.descriptiveGrade || '') : (existing?.rawScore != null ? String(existing.rawScore) : ''));
+                        const pct = isDescriptiveKS1 ? NaN : Number(score);
+                        const cellBand = !isDescriptiveKS1 && score.trim() !== '' && !Number.isNaN(pct) ? resolveLetterGrade(pct, gradeScale) : null;
                         return (
                           <TableCell key={componentId} className="text-center">
                             <div className="inline-flex flex-col items-center gap-0.5">
-                              <Input
-                                type="number"
-                                min={0}
-                                max={100}
-                                aria-label={`Score for student ${studentId.slice(0, 8)}, component ${componentMeta.get(componentId)?.name ?? componentId.slice(0, 8)}`}
-                                className="w-20 px-2 py-1 text-center text-sm"
-                                value={score}
-                                onChange={(e) => {
-                                  setGrades((prev) => ({
-                                    ...prev,
-                                    [studentId]: { ...(prev[studentId] ?? {}), [componentId]: e.target.value },
-                                  }));
-                                }}
-                              />
+                              {isDescriptiveKS1 ? (
+                                <Select
+                                  value={score}
+                                  onValueChange={(val) => {
+                                    setGrades((prev) => ({
+                                      ...prev,
+                                      [studentId]: { ...(prev[studentId] ?? {}), [componentId]: val },
+                                    }));
+                                  }}
+                                >
+                                  <SelectTrigger className="w-32 h-8 text-xs">
+                                    <SelectValue placeholder="Select..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {isKinder ? (
+                                      <>
+                                        <SelectItem value="beginning">Beginning</SelectItem>
+                                        <SelectItem value="developing">Developing</SelectItem>
+                                        <SelectItem value="consistent">Consistent</SelectItem>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <SelectItem value="emerging">Emerging</SelectItem>
+                                        <SelectItem value="developing">Developing</SelectItem>
+                                        <SelectItem value="approaching">Approaching</SelectItem>
+                                        <SelectItem value="meeting">Meeting</SelectItem>
+                                        <SelectItem value="advancing">Advancing</SelectItem>
+                                      </>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  aria-label={`Score for student ${studentId.slice(0, 8)}, component ${componentMeta.get(componentId)?.name ?? componentId.slice(0, 8)}`}
+                                  className="w-20 px-2 py-1 text-center text-sm"
+                                  value={score}
+                                  onChange={(e) => {
+                                    setGrades((prev) => ({
+                                      ...prev,
+                                      [studentId]: { ...(prev[studentId] ?? {}), [componentId]: e.target.value },
+                                    }));
+                                  }}
+                                />
+                              )}
                               {cellBand && (
                                 <Badge
                                   variant={cellBand.min == null ? 'danger' : 'accent'}
