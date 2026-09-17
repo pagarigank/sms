@@ -48,6 +48,7 @@ export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
     { route: '/sis/students', permission: 'sis.student:view' },
     { route: '/sis/guardians', permission: 'sis.guardian:view' },
     { route: '/sis/enrollments', permission: 'sis.enrollment:view' },
+    { route: '/sis/promotions', permission: 'sis.promotion:view' },
     { route: '/sis/sections', permission: 'sis.section:view' },
     // Catalog code is `sis.applicant` (not `sis.admission`).
     { route: '/sis/admissions', permission: 'sis.applicant:view' },

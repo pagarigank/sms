@@ -22,8 +22,8 @@ export class FacilityService {
     return this.buildingsRepo.find({ where, relations: ['floors'] });
   }
 
-  async findOneBuilding(id: string): Promise<Building> {
-    const building = await this.buildingsRepo.findOne({ where: { id }, relations: ['floors', 'floors.rooms'] });
+  async findOneBuilding(id: string, tenantId: string): Promise<Building> {
+    const building = await this.buildingsRepo.findOne({ where: { id, tenantId }, relations: ['floors', 'floors.rooms'] });
     if (!building) throw new NotFoundException(`Building ${id} not found`);
     return building;
   }
@@ -33,23 +33,23 @@ export class FacilityService {
     return this.buildingsRepo.save(building);
   }
 
-  async updateBuilding(id: string, data: Partial<Building>): Promise<Building> {
-    await this.buildingsRepo.update(id, data);
-    return this.findOneBuilding(id);
+  async updateBuilding(id: string, tenantId: string, data: Partial<Building>): Promise<Building> {
+    await this.buildingsRepo.update({ id, tenantId }, data);
+    return this.findOneBuilding(id, tenantId);
   }
 
-  async removeBuilding(id: string): Promise<void> {
-    const result = await this.buildingsRepo.delete(id);
+  async removeBuilding(id: string, tenantId: string): Promise<void> {
+    const result = await this.buildingsRepo.delete({ id, tenantId });
     if (result.affected === 0) throw new NotFoundException(`Building ${id} not found`);
   }
 
   // === Floors ===
-  async findFloorsByBuilding(buildingId: string): Promise<Floor[]> {
-    return this.floorsRepo.find({ where: { buildingId }, relations: ['rooms'] });
+  async findFloorsByBuilding(buildingId: string, tenantId: string): Promise<Floor[]> {
+    return this.floorsRepo.find({ where: { buildingId, tenantId }, relations: ['rooms'] });
   }
 
-  async findOneFloor(id: string): Promise<Floor> {
-    const floor = await this.floorsRepo.findOne({ where: { id }, relations: ['rooms'] });
+  async findOneFloor(id: string, tenantId: string): Promise<Floor> {
+    const floor = await this.floorsRepo.findOne({ where: { id, tenantId }, relations: ['rooms'] });
     if (!floor) throw new NotFoundException(`Floor ${id} not found`);
     return floor;
   }
@@ -58,7 +58,7 @@ export class FacilityService {
     // Check uniqueness of (buildingId, floorNumber)
     if (data.floorNumber !== undefined) {
       const existing = await this.floorsRepo.findOne({
-        where: { buildingId: data.buildingId, floorNumber: data.floorNumber },
+        where: { buildingId: data.buildingId, floorNumber: data.floorNumber, tenantId: data.tenantId },
       });
       if (existing) throw new ConflictException(`Floor number ${data.floorNumber} already exists in this building`);
     }
@@ -66,13 +66,13 @@ export class FacilityService {
     return this.floorsRepo.save(floor);
   }
 
-  async updateFloor(id: string, data: Partial<Floor>): Promise<Floor> {
-    const floor = await this.floorsRepo.findOneBy({ id });
+  async updateFloor(id: string, tenantId: string, data: Partial<Floor>): Promise<Floor> {
+    const floor = await this.floorsRepo.findOneBy({ id, tenantId });
     if (!floor) throw new NotFoundException(`Floor ${id} not found`);
     // Enforce uniqueness when changing floor number within the same building.
     if (data.floorNumber !== undefined && data.floorNumber !== floor.floorNumber) {
       const existing = await this.floorsRepo.findOne({
-        where: { buildingId: floor.buildingId, floorNumber: data.floorNumber },
+        where: { buildingId: floor.buildingId, floorNumber: data.floorNumber, tenantId },
       });
       if (existing) throw new ConflictException(`Floor number ${data.floorNumber} already exists in this building`);
     }
@@ -80,22 +80,35 @@ export class FacilityService {
     return this.floorsRepo.save(floor);
   }
 
-  async removeFloor(id: string): Promise<void> {
-    const result = await this.floorsRepo.delete(id);
+  async removeFloor(id: string, tenantId: string): Promise<void> {
+    const result = await this.floorsRepo.delete({ id, tenantId });
     if (result.affected === 0) throw new NotFoundException(`Floor ${id} not found`);
   }
 
   // === Rooms ===
-  async findRooms(branchId: string): Promise<Room[]> {
-    return this.roomsRepo.find({ where: { branchId }, relations: ['floor', 'assets'] });
+  async findRooms(filters: { tenantId: string; branchId?: string; floorId?: string; search?: string; status?: string; roomType?: string }): Promise<Room[]> {
+    const qb = this.roomsRepo.createQueryBuilder('r')
+      .where('r.tenantId = :tenantId', { tenantId: filters.tenantId })
+      .leftJoinAndSelect('r.floor', 'floor')
+      .leftJoinAndSelect('r.assets', 'assets');
+
+    if (filters.branchId) qb.andWhere('r.branchId = :branchId', { branchId: filters.branchId });
+    if (filters.floorId) qb.andWhere('r.floorId = :floorId', { floorId: filters.floorId });
+    if (filters.status) qb.andWhere('r.status = :status', { status: filters.status });
+    if (filters.roomType) qb.andWhere('r.roomType = :roomType', { roomType: filters.roomType });
+    if (filters.search) {
+      qb.andWhere('r.name ILIKE :search', { search: `%${filters.search}%` });
+    }
+
+    return qb.getMany();
   }
 
-  async findRoomsByFloor(floorId: string): Promise<Room[]> {
-    return this.roomsRepo.find({ where: { floorId }, relations: ['assets'] });
+  async findRoomsByFloor(floorId: string, tenantId: string): Promise<Room[]> {
+    return this.roomsRepo.find({ where: { floorId, tenantId }, relations: ['assets'] });
   }
 
-  async findOneRoom(id: string): Promise<Room> {
-    const room = await this.roomsRepo.findOne({ where: { id }, relations: ['floor', 'assets'] });
+  async findOneRoom(id: string, tenantId: string): Promise<Room> {
+    const room = await this.roomsRepo.findOne({ where: { id, tenantId }, relations: ['floor', 'assets'] });
     if (!room) throw new NotFoundException(`Room ${id} not found`);
     return room;
   }
@@ -105,19 +118,19 @@ export class FacilityService {
     return this.roomsRepo.save(room);
   }
 
-  async updateRoom(id: string, data: Partial<Room>): Promise<Room> {
-    await this.roomsRepo.update(id, data);
-    return this.findOneRoom(id);
+  async updateRoom(id: string, tenantId: string, data: Partial<Room>): Promise<Room> {
+    await this.roomsRepo.update({ id, tenantId }, data);
+    return this.findOneRoom(id, tenantId);
   }
 
-  async removeRoom(id: string): Promise<void> {
-    const result = await this.roomsRepo.delete(id);
+  async removeRoom(id: string, tenantId: string): Promise<void> {
+    const result = await this.roomsRepo.delete({ id, tenantId });
     if (result.affected === 0) throw new NotFoundException(`Room ${id} not found`);
   }
 
   // === Room Assets ===
-  async findAssetsByRoom(roomId: string): Promise<RoomAsset[]> {
-    return this.roomAssetsRepo.find({ where: { roomId } });
+  async findAssetsByRoom(roomId: string, tenantId: string): Promise<RoomAsset[]> {
+    return this.roomAssetsRepo.find({ where: { roomId, tenantId } });
   }
 
   async createRoomAsset(data: Partial<RoomAsset>): Promise<RoomAsset> {
@@ -125,8 +138,8 @@ export class FacilityService {
     return this.roomAssetsRepo.save(asset);
   }
 
-  async removeRoomAsset(id: string): Promise<void> {
-    const result = await this.roomAssetsRepo.delete(id);
+  async removeRoomAsset(id: string, tenantId: string): Promise<void> {
+    const result = await this.roomAssetsRepo.delete({ id, tenantId });
     if (result.affected === 0) throw new NotFoundException(`Room asset ${id} not found`);
   }
 
@@ -137,6 +150,7 @@ export class FacilityService {
    * Signature: isRoomFree(branch_id, room_id, day, start, end, term_id, exclude_offering_id)
    */
   async isRoomFree(
+    tenantId: string,
     branchId: string,
     roomId: string,
     dayOfWeek: string,

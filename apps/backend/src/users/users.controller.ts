@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, NotFoundException, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, NotFoundException, BadRequestException, UseGuards, Req } from '@nestjs/common';
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
@@ -49,21 +49,29 @@ export class UsersController {
   @Post()
   @RequirePermission('platform.user', 'create')
   @ApiOperation({ summary: 'Create a staff user' })
-  async create(@Body() body: {
-    email: string;
-    password: string;
-    firstName?: string;
-    lastName?: string;
-    middleName?: string;
-    tenantId?: string;
-    phone?: string;
-    roleIds?: string[];
-  }): Promise<User> {
+  async create(
+    @Body() body: {
+      email: string;
+      password: string;
+      firstName?: string;
+      lastName?: string;
+      middleName?: string;
+      tenantId?: string;
+      phone?: string;
+      roleIds?: string[];
+    },
+    @Req() req: any,
+  ): Promise<User> {
     if (!body?.email || !body?.password) {
       throw new BadRequestException('email and password are required');
     }
+
+    const creatorTenantId = req.user?.tenantId;
+    const assignedTenantId = creatorTenantId ? creatorTenantId : body.tenantId;
+
     const user = await this.usersService.create({
       ...body,
+      tenantId: assignedTenantId,
       passwordHash: await bcrypt.hash(body.password, 12),
     });
     // Assign roles if provided

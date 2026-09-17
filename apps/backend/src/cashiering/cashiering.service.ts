@@ -262,12 +262,13 @@ export class CashieringService {
    */
   async processPayment(data: {
     tenantId: string; branchId: string; invoiceId?: string;
+    allocations?: { invoiceId: string; amountApplied: number; installmentId?: string }[];
     adHocSaleId?: string; cashierSessionId?: string; amount: number;
     method: string; gatewayReference?: string; idempotencyKey?: string;
     denominationBreakdown?: Record<string, any>;
   }) {
-    if (!data.invoiceId && !data.adHocSaleId) {
-      throw new BadRequestException('Either invoiceId or adHocSaleId is required');
+    if (!data.invoiceId && !data.adHocSaleId && (!data.allocations || data.allocations.length === 0)) {
+      throw new BadRequestException('Either invoiceId, adHocSaleId, or allocations is required');
     }
     if (!(Number(data.amount) > 0)) {
       throw new BadRequestException('Payment amount must be greater than zero');
@@ -300,10 +301,22 @@ export class CashieringService {
       const savedPayment = await manager.save(payment);
 
       // 2) Invoice ledger + 3) allocation (invoice payments only)
-      if (data.invoiceId) {
-        // Ledger update must join THIS transaction (applyPaymentTx), not open
-        // its own — otherwise an outer rollback leaves the invoice marked
-        // paid with no payment row behind it.
+      if (data.allocations && data.allocations.length > 0) {
+        const sumAlloc = data.allocations.reduce((acc, curr) => acc + Number(curr.amountApplied), 0);
+        if (sumAlloc > Number(data.amount)) {
+          throw new BadRequestException('Allocations exceed total payment amount');
+        }
+        for (const alloc of data.allocations) {
+          await this.invoiceService.applyPaymentTx(manager, alloc.invoiceId, data.tenantId, Number(alloc.amountApplied), alloc.installmentId);
+          await manager.save(PaymentAllocation, manager.create(PaymentAllocation, {
+            tenantId: data.tenantId,
+            paymentId: savedPayment.id,
+            invoiceId: alloc.invoiceId,
+            installmentId: alloc.installmentId,
+            amountApplied: alloc.amountApplied,
+          }));
+        }
+      } else if (data.invoiceId) {
         await this.invoiceService.applyPaymentTx(manager, data.invoiceId, data.tenantId, Number(data.amount));
         await manager.save(PaymentAllocation, manager.create(PaymentAllocation, {
           tenantId: data.tenantId,
@@ -322,9 +335,15 @@ export class CashieringService {
         data.branchId,
       );
       let payorName = 'Walk-in';
-      if (data.invoiceId) {
+      
+      let primaryInvoiceId = data.invoiceId;
+      if (!primaryInvoiceId && data.allocations && data.allocations.length > 0) {
+        primaryInvoiceId = data.allocations[0].invoiceId;
+      }
+      
+      if (primaryInvoiceId) {
         const invoice = await manager.findOne(Invoice, {
-          where: { id: data.invoiceId, tenantId: data.tenantId },
+          where: { id: primaryInvoiceId, tenantId: data.tenantId },
         });
         if (invoice) {
           const student = await manager.findOne(Student, { where: { id: invoice.studentId } });

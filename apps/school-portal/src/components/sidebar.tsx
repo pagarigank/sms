@@ -212,3 +212,5 @@ export function Sidebar() {
     </div>
   );
 }
+
+// force reload

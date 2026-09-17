@@ -417,7 +417,7 @@ export default function SectionsPage() {
           </div>
 
           {/* Roster list */}
-          <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
+          <div className="min-h-[300px] max-h-[500px] space-y-1 overflow-y-auto rounded-md border p-2">
             {rosterLoading ? (
               <p className="p-2 text-sm text-muted-foreground">Loading roster…</p>
             ) : roster.length === 0 ? (

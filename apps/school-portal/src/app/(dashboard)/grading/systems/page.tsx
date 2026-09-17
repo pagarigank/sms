@@ -2,295 +2,424 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api';
-import type { GradeScaleBand } from '@sms/api-client';
+import { Plus, Edit2, Wand2, BookOpen, GraduationCap, CheckCircle2 } from 'lucide-react';
 import {
-  Badge,
+  PageHeader,
   Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  DataTable,
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  Input,
+  DialogFooter,
   Label,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
   useToast,
+  Badge,
 } from '@sms/ui';
-import { Plus, Trash2 } from 'lucide-react';
+import { apiClient } from '@/lib/api';
+import { useTenantStore } from '@/lib/store';
 
-/**
- * Sensible starting point when a school has no scale yet (US-style letter
- * grades). Schools edit bands to match their own scale — e.g. Philippine
- * DepEd descriptors — before saving.
- */
-const STARTER_SCALE: GradeScaleBand[] = [
-  { label: 'A', min: 90, descriptor: 'Outstanding' },
-  { label: 'B', min: 80, descriptor: 'Very good' },
-  { label: 'C', min: 70, descriptor: 'Satisfactory' },
-  { label: 'D', min: 60, descriptor: 'Needs improvement' },
-  { label: 'F', min: null, descriptor: 'Fail' },
+// DepEd grading type metadata
+const GRADING_TYPES = [
+  { value: 'numeric',            label: 'Numeric (0–100)',              badge: 'info',    description: 'Traditional numeric grading with transmutation table (DO 8 s.2015).' },
+  { value: 'numeric_zero_based', label: 'Numeric Zero-Based',           badge: 'info',    description: 'Raw percentage IS the grade — no transmutation table (DO 015 s.2026, G4–G12).' },
+  { value: 'descriptive_ks1',    label: 'Descriptive KS1 (Kinder–G3)', badge: 'warning', description: 'Qualitative descriptors only — no numeric grade issued (DO 015 s.2026).' },
+  { value: 'gpa',                label: 'GPA (1.0–5.0)',                badge: 'neutral', description: 'College-style GPA grading scale.' },
+  { value: 'pass_fail',          label: 'Pass / Fail',                  badge: 'neutral', description: 'Binary pass or fail assessment.' },
 ];
 
-/** Normalize for storage: numeric bands sorted high→low, catch-all (min: null) last. */
-function normalizeBands(bands: GradeScaleBand[]): GradeScaleBand[] {
-  const numeric = bands
-    .filter((b) => b.label.trim() !== '' && b.min != null)
-    .map((b) => ({ ...b, min: Number(b.min) }))
-    .sort((a, b) => Number(b.min) - Number(a.min));
-  const catchAll = bands.filter((b) => b.label.trim() !== '' && b.min == null);
-  return [...numeric, ...catchAll];
-}
-
-function ScaleSummary({ bands }: { bands: GradeScaleBand[] }) {
-  if (bands.length === 0) {
-    return <span className="text-sm text-muted-foreground">Not set</span>;
-  }
-  const shown = bands.slice(0, 3);
-  const rest = bands.length - shown.length;
-  return (
-    <span className="text-sm text-muted-foreground" title={bands.map((b) => `${b.label}${b.min != null ? ` ≥ ${b.min}` : ' (below)'}`).join(' · ')}>
-      {shown.map((b, i) => (
-        <span key={`${b.label}-${i}`}>
-          {i > 0 && ' · '}
-          {b.label} ≥ {b.min ?? '—'}
-        </span>
-      ))}
-      {rest > 0 && ` · +${rest} more`}
-    </span>
-  );
-}
+const DEPED_TIERS = [
+  { value: 'kindergarten', label: 'Kindergarten',      description: 'Beginning / Developing / Consistent',              icon: '🐣' },
+  { value: 'grades1to3',   label: 'Grades 1–3',        description: 'Emerging → Advancing (5-point descriptors)',       icon: '📚' },
+  { value: 'grades4to10',  label: 'Grades 4–10',       description: 'WW 25% + PT 50% + QA 25%, 3 terms, zero-based',   icon: '🎓' },
+  { value: 'grades11to12', label: 'Grades 11–12 (SHS)', description: 'WW 25% + PT 50% + QA 25%, 3 terms, zero-based',  icon: '🏫' },
+];
 
 export default function GradingSystemsPage() {
-  const queryClient = useQueryClient();
+  const currentTenantId = useTenantStore((s) => s.currentTenantId);
   const { toast } = useToast();
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ educationLevelId: '', schoolYearId: '', name: '', type: 'numeric' });
+  const queryClient = useQueryClient();
 
-  // Scale editor state: which system is open + its working band rows.
-  const [editing, setEditing] = useState<{ systemId: string; systemName: string } | null>(null);
-  const [bands, setBands] = useState<GradeScaleBand[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const { data: systems, isLoading } = useQuery({
-    queryKey: ['grading-systems'],
+  // Form State
+  const [name, setName] = useState('');
+  const [type, setType] = useState('numeric');
+  const [educationLevelId, setEducationLevelId] = useState('');
+  const [schoolYearId, setSchoolYearId] = useState('');
+
+  // Preset State
+  const [selectedTier, setSelectedTier] = useState('');
+  const [presetEducationLevelId, setPresetEducationLevelId] = useState('');
+  const [presetSchoolYearId, setPresetSchoolYearId] = useState('');
+
+  const { data: systemsRes, isLoading } = useQuery({
+    queryKey: ['grading-systems', currentTenantId],
     queryFn: () => apiClient.grading.listGradingSystems(),
+    enabled: !!currentTenantId,
   });
 
-  const { data: levels } = useQuery({ queryKey: ['education-levels'], queryFn: () => apiClient.academic.listEducationLevels() });
-  const { data: schoolYears } = useQuery({ queryKey: ['school-years'], queryFn: () => apiClient.academic.listSchoolYears() });
+  const { data: edLevelsRes } = useQuery({
+    queryKey: ['education-levels', currentTenantId],
+    queryFn: () => apiClient.academic.listEducationLevels(),
+    enabled: !!currentTenantId,
+  });
 
-  const createMutation = useMutation({
-    mutationFn: (data: typeof form) => apiClient.grading.createGradingSystem(data),
+  const { data: syRes } = useQuery({
+    queryKey: ['school-years', currentTenantId],
+    queryFn: () => apiClient.academic.listSchoolYears(),
+    enabled: !!currentTenantId,
+  });
+
+  const { data: presetsRes } = useQuery({
+    queryKey: ['grading-presets'],
+    queryFn: () => apiClient.grading.getPresets(),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (data: any) =>
+      editingId
+        ? apiClient.grading.updateGradingSystem(editingId, data)
+        : apiClient.grading.createGradingSystem(data),
     onSuccess: () => {
+      toast({ title: 'Grading System saved', variant: 'success' });
       queryClient.invalidateQueries({ queryKey: ['grading-systems'] });
-      setShowCreate(false);
+      setIsModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast({ title: 'Error saving grading system', description: err.message, variant: 'destructive' });
     },
   });
 
-  const scaleMutation = useMutation({
-    mutationFn: ({ id, scale }: { id: string; scale: GradeScaleBand[] }) =>
-      apiClient.grading.updateGradingSystem(id, { config: { gradeScale: scale } }),
-    onSuccess: () => {
+  const seedMutation = useMutation({
+    mutationFn: (data: any) => apiClient.grading.seedDepEdSystem(data),
+    onSuccess: (res: any) => {
+      const sysName = res?.data?.system?.name ?? 'Grading system';
+      toast({ title: `"${sysName}" seeded from DepEd preset!`, variant: 'success' });
       queryClient.invalidateQueries({ queryKey: ['grading-systems'] });
-      setEditing(null);
-      toast({ title: 'Grade scale saved', description: 'Letter grades in the gradebook now use this scale.' });
+      setIsPresetModalOpen(false);
+      setSelectedTier('');
+      setPresetEducationLevelId('');
+      setPresetSchoolYearId('');
     },
-    onError: (error: Error) => {
-      toast({ title: 'Could not save scale', description: error.message, variant: 'destructive' });
+    onError: (err: any) => {
+      toast({ title: 'Error seeding preset', description: err.message, variant: 'destructive' });
     },
   });
 
-  const openScaleEditor = (systemId: string, systemName: string, current: GradeScaleBand[]) => {
-    setEditing({ systemId, systemName });
-    setBands(current.length > 0 ? current.map((b) => ({ ...b })) : STARTER_SCALE.map((b) => ({ ...b })));
-  };
+  const systems = (systemsRes?.data ?? []) as any[];
+  const educationLevels = (edLevelsRes?.data ?? []) as any[];
+  const schoolYears = (syRes?.data ?? []) as any[];
 
-  const updateBand = (index: number, patch: Partial<GradeScaleBand>) => {
-    setBands((prev) => prev.map((b, i) => (i === index ? { ...b, ...patch } : b)));
-  };
-
-  const saveScale = () => {
-    if (!editing) return;
-    const normalized = normalizeBands(bands);
-    if (normalized.length === 0) {
-      toast({ title: 'Add at least one band', description: 'Each band needs a label (e.g. "A").', variant: 'destructive' });
-      return;
+  const handleOpenModal = (sys?: any) => {
+    if (sys) {
+      setEditingId(sys.id);
+      setName(sys.name);
+      setType(sys.type);
+      setEducationLevelId(sys.educationLevelId);
+      setSchoolYearId(sys.schoolYearId);
+    } else {
+      setEditingId(null);
+      setName('');
+      setType('numeric');
+      setEducationLevelId('');
+      setSchoolYearId('');
     }
-    scaleMutation.mutate({ id: editing.systemId, scale: normalized });
+    setIsModalOpen(true);
   };
+
+  const getTypeInfo = (typeVal: string) => GRADING_TYPES.find(t => t.value === typeVal);
+
+  const columns = [
+    { header: 'Name', accessorKey: 'name' },
+    {
+      header: 'Type',
+      accessorKey: 'type',
+      cell: ({ row }: any) => {
+        const info = getTypeInfo(row.original.type);
+        return (
+          <Badge variant={(info?.badge as any) ?? 'neutral'}>
+            {info?.label ?? row.original.type}
+          </Badge>
+        );
+      },
+    },
+    {
+      header: 'Education Level',
+      accessorKey: 'educationLevelId',
+      cell: ({ row }: any) => {
+        const lv = educationLevels.find((e: any) => e.id === row.original.educationLevelId);
+        return lv?.name ?? '—';
+      },
+    },
+    {
+      header: 'School Year',
+      accessorKey: 'schoolYearId',
+      cell: ({ row }: any) => {
+        const sy = schoolYears.find((s: any) => s.id === row.original.schoolYearId);
+        return sy?.name ?? '—';
+      },
+    },
+    {
+      header: 'Terms',
+      accessorKey: 'config',
+      cell: ({ row }: any) => {
+        const terms = row.original.config?.terms;
+        return terms ? `${terms} terms` : '—';
+      },
+    },
+    {
+      header: 'Policy',
+      accessorKey: 'config',
+      id: 'policy',
+      cell: ({ row }: any) => {
+        const ref = row.original.config?.policyRef;
+        return ref ? <span className="text-xs font-mono text-muted-foreground">{ref}</span> : '—';
+      },
+    },
+    {
+      header: 'Status',
+      accessorKey: 'isActive',
+      cell: ({ row }: any) => (
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${row.original.isActive ? 'bg-[hsl(var(--status-success-bg))] text-[hsl(var(--status-success-ink))]' : 'bg-muted text-muted-foreground'}`}>
+          {row.original.isActive ? 'Active' : 'Archived'}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }: any) => (
+        <Button variant="ghost" size="sm" onClick={() => handleOpenModal(row.original)}>
+          <Edit2 className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Grading Systems</h1>
-          <p className="text-muted-foreground">Configure grading systems per education level</p>
+      <PageHeader
+        title="Grading Systems"
+        description="Configure grading systems per education level. Apply DepEd DO 015 s.2026 presets for Key Stage 1 (descriptive) or Grades 4–12 (zero-based numeric)."
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsPresetModalOpen(true)}>
+              <Wand2 className="mr-2 h-4 w-4" />
+              Use DepEd Preset
+            </Button>
+            <Button onClick={() => handleOpenModal()}>
+              <Plus className="mr-2 h-4 w-4" /> New Grading System
+            </Button>
+          </div>
+        }
+      />
+
+      {/* DepEd Info Banner */}
+      <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 flex items-start gap-3 text-sm">
+        <BookOpen className="h-5 w-5 text-blue-400 mt-0.5 shrink-0" />
+        <div className="space-y-1">
+          <p className="font-semibold text-blue-300">DepEd Order 015, s. 2026 — Three-Term Assessment System</p>
+          <p className="text-blue-200/80">
+            <strong>Kinder–Grade 3:</strong> Descriptive qualitative grading (no numerical grades or honor roll). &nbsp;
+            <strong>Grades 4–12:</strong> Zero-based numeric (raw percentage = grade, no transmutation table). &nbsp;
+            School year is now divided into <strong>3 terms</strong> per DepEd Order 009 s.2026.
+          </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>Add Grading System</Button>
       </div>
 
-      {showCreate && (
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Create Grading System</h2>
-          <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }} className="mt-4 space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium">Education Level</label>
-                <select value={form.educationLevelId} onChange={(e) => setForm({ ...form, educationLevelId: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2" required>
-                  <option value="">Select...</option>
-                  {levels?.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium">School Year</label>
-                <select value={form.schoolYearId} onChange={(e) => setForm({ ...form, schoolYearId: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2" required>
-                  <option value="">Select...</option>
-                  {schoolYears?.data?.map((sy) => <option key={sy.id} value={sy.id}>{sy.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Name</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Type</label>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="mt-1 block w-full rounded-md border px-3 py-2">
-                  <option value="numeric">Numeric (60-100)</option>
-                  <option value="descriptive">Descriptive</option>
-                  <option value="gpa">GPA/QPI</option>
-                  <option value="pass_fail">Pass/Fail</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex space-x-2">
-              <button type="submit" disabled={createMutation.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                Create
-              </button>
-              <button type="button" onClick={() => setShowCreate(false)} className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">Cancel</button>
-            </div>
-          </form>
-        </div>
-      )}
+      <Card className="glass-panel">
+        <CardContent className="p-0">
+          <DataTable
+            columns={columns}
+            data={systems}
+            isLoading={isLoading}
+            searchKey="name"
+          />
+        </CardContent>
+      </Card>
 
-      <div className="rounded-lg border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium">Name</th>
-              <th className="px-4 py-3 text-left font-medium">Type</th>
-              <th className="px-4 py-3 text-left font-medium">Active</th>
-              <th className="px-4 py-3 text-left font-medium">Grade Scale</th>
-              <th className="px-4 py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
-            ) : systems?.data?.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No grading systems found</td></tr>
-            ) : (
-              systems?.data?.map((gs) => {
-                const scale = ((gs.config?.gradeScale ?? []) as GradeScaleBand[]).filter(
-                  (b) => b && typeof b.label === 'string'
-                );
-                return (
-                  <tr key={gs.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="px-4 py-3 font-medium">{gs.name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{gs.type}</td>
-                    <td className="px-4 py-3">
-                      {gs.isActive ? (
-                        <Badge variant="success">Active</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Inactive</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ScaleSummary bands={scale} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openScaleEditor(gs.id, gs.name, scale)}
-                      >
-                        Edit Scale
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent className="sm:max-w-lg">
+      {/* DepEd Preset Modal */}
+      <Dialog open={isPresetModalOpen} onOpenChange={setIsPresetModalOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Grade Scale — {editing?.systemName}</DialogTitle>
-            <DialogDescription>
-              Bands are checked top-down; a student&apos;s weighted average gets the first band whose
-              minimum it meets. Leave one minimum empty as the catch-all failing band.
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-accent" />
+              Apply DepEd Standard Preset (DO 015, s.2026)
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <div className="grid grid-cols-[6rem_7rem_1fr_2rem] gap-2 text-xs font-medium text-muted-foreground">
-              <span>Grade</span>
-              <span>Minimum %</span>
-              <span>Descriptor (optional)</span>
-              <span />
-            </div>
-            {bands.map((band, i) => (
-              <div key={i} className="grid grid-cols-[6rem_7rem_1fr_2rem] items-center gap-2">
-                <Input
-                  aria-label="Grade label"
-                  value={band.label}
-                  onChange={(e) => updateBand(i, { label: e.target.value })}
-                  placeholder="A"
-                />
-                <Input
-                  aria-label="Minimum percentage"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={band.min ?? ''}
-                  onChange={(e) => updateBand(i, { min: e.target.value === '' ? null : Number(e.target.value) })}
-                  placeholder="—"
-                />
-                <Input
-                  aria-label="Descriptor"
-                  value={band.descriptor ?? ''}
-                  onChange={(e) => updateBand(i, { descriptor: e.target.value || undefined })}
-                  placeholder="Outstanding"
-                />
-                <Button
+          <div className="space-y-6 py-2">
+            <p className="text-sm text-muted-foreground">
+              Select a grade tier to automatically create the correct grading system with the official DepEd components, weights, and descriptor sets.
+            </p>
+
+            {/* Tier Selector Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              {DEPED_TIERS.map(tier => (
+                <button
+                  key={tier.value}
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Remove band ${band.label || i + 1}`}
-                  onClick={() => setBands((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => setSelectedTier(tier.value)}
+                  className={`rounded-xl border p-4 text-left transition-all ${
+                    selectedTier === tier.value
+                      ? 'border-accent bg-accent/10 ring-2 ring-accent/30'
+                      : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                  }`}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{tier.icon}</span>
+                    <div>
+                      <p className="font-semibold text-sm">{tier.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{tier.description}</p>
+                    </div>
+                  </div>
+                  {selectedTier === tier.value && (
+                    <CheckCircle2 className="mt-2 h-4 w-4 text-accent" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {selectedTier && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Education Level</Label>
+                  <Select value={presetEducationLevelId} onValueChange={setPresetEducationLevelId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select level..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {educationLevels.map((l: any) => (
+                        <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>School Year</Label>
+                  <Select value={presetSchoolYearId} onValueChange={setPresetSchoolYearId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select year..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schoolYears.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setBands((prev) => [...prev, { label: '', min: null }])}
-            >
-              <Plus className="h-4 w-4" /> Add Band
-            </Button>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={saveScale} disabled={scaleMutation.isPending}>
-              {scaleMutation.isPending ? 'Saving...' : 'Save Scale'}
+            <Button variant="outline" onClick={() => setIsPresetModalOpen(false)}>Cancel</Button>
+            <Button
+              disabled={!selectedTier || !presetEducationLevelId || !presetSchoolYearId || seedMutation.isPending}
+              onClick={() => seedMutation.mutate({ tier: selectedTier, educationLevelId: presetEducationLevelId, schoolYearId: presetSchoolYearId })}
+            >
+              <Wand2 className="mr-2 h-4 w-4" />
+              {seedMutation.isPending ? 'Creating...' : 'Create Grading System'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Edit Grading System' : 'New Grading System'}</DialogTitle>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveMutation.mutate({ name, type, educationLevelId, schoolYearId });
+            }}
+            className="space-y-4 py-2"
+          >
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. DepEd K-12 Standard 2026" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Grading Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRADING_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>
+                      <div>
+                        <span>{t.label}</span>
+                        <p className="text-xs text-muted-foreground">{t.description}</p>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {type === 'descriptive_ks1' && (
+                <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
+                  ⚠️ KS1 Descriptive — No numeric scores or transmutation table will be used. Grade entry will show descriptor dropdowns instead.
+                </p>
+              )}
+              {type === 'numeric_zero_based' && (
+                <p className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2">
+                  ℹ️ Zero-Based — Raw percentage score (score ÷ max × 100) is the term grade. No transmutation applied.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Education Level</Label>
+              <Select value={educationLevelId} onValueChange={setEducationLevelId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select education level..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {educationLevels.map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>School Year</Label>
+              <Select value={schoolYearId} onValueChange={setSchoolYearId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select school year..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {schoolYears.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? 'Saving...' : editingId ? 'Save Changes' : 'Create System'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

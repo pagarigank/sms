@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTenantStore } from '@/lib/store';
+import { useTenantStore, useAuthStore } from '@/lib/store';
 import { apiClient } from '@/lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { Building2, GitBranch } from 'lucide-react';
@@ -13,9 +13,14 @@ export function TenantSwitcher() {
   const setCurrentTenant = useTenantStore((s) => s.setCurrentTenant);
   const setCurrentBranch = useTenantStore((s) => s.setCurrentBranch);
 
+  const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
+  const isPlatformAdmin = user && !user.tenantId;
+
   const { data: tenantsRes } = useQuery({
     queryKey: ['tenants'],
     queryFn: () => apiClient.tenants.list(),
+    enabled: !!token && !!isPlatformAdmin,
   });
 
   const { data: branchesRes } = useQuery({
@@ -33,10 +38,13 @@ export function TenantSwitcher() {
 
   // Auto-select first tenant if none selected
   useEffect(() => {
-    if (!currentTenantId && tenants.length > 0) {
+    if (currentTenantId) return;
+    if (user?.tenantId) {
+      setCurrentTenant(user.tenantId);
+    } else if (tenants.length > 0) {
       setCurrentTenant(tenants[0].id);
     }
-  }, [currentTenantId, tenants, setCurrentTenant]);
+  }, [currentTenantId, user?.tenantId, tenants, setCurrentTenant]);
 
   // Auto-select first branch if none selected
   useEffect(() => {
@@ -48,7 +56,7 @@ export function TenantSwitcher() {
   return (
     <div className="flex items-center gap-2">
       <Select
-        value={currentTenantId ?? undefined}
+        value={currentTenantId || ""}
         onValueChange={(v) => {
           setCurrentTenant(v);
           setCurrentBranch(null);
@@ -62,9 +70,13 @@ export function TenantSwitcher() {
           <SelectValue placeholder="Tenant" />
         </SelectTrigger>
         <SelectContent>
-          {tenants.map((t) => (
-            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-          ))}
+          {user?.tenantId ? (
+            <SelectItem value={user.tenantId}>My Tenant</SelectItem>
+          ) : (
+            tenants.map((t) => (
+              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+            ))
+          )}
         </SelectContent>
       </Select>
 

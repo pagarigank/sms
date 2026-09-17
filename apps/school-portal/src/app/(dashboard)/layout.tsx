@@ -22,8 +22,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
 
-  // Prevent server/client mismatch: the auth store is only populated on the
-  // client (from localStorage). Render a neutral placeholder until after hydration.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -36,25 +34,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [mounted, isAuthenticated, router]);
 
-  // Before hydration completes: render the same empty shell on both server and client.
-  if (!mounted) {
-    return <div className="flex h-screen flex-col bg-background" suppressHydrationWarning />;
-  }
-
-  // After mount: gate on auth.
-  if (!isAuthenticated) return null;
-
+  // To prevent hydration errors, we always render the shell with providers.
+  // We only conditionally hide the content when unmounted or unauthenticated.
   return (
     <DashboardProviders>
       <ToastProvider>
         <ConfirmProvider>
-          <div className="flex h-screen flex-col">
+          <div className="flex h-screen flex-col bg-background">
             <ImpersonationBanner />
             <div className="flex flex-1 overflow-hidden">
               <Sidebar />
               <div className="flex flex-1 flex-col overflow-hidden">
                 <Topbar />
-                <main className="flex-1 overflow-y-auto p-6">{children}</main>
+                <main className="flex-1 overflow-y-auto p-6">
+                  {mounted && isAuthenticated ? children : null}
+                </main>
               </div>
             </div>
           </div>

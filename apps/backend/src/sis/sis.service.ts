@@ -45,10 +45,34 @@ export class SisService {
   ) {}
 
   // === Students ===
-  async findAllStudents(tenantId: string, branchId?: string) {
-    const where: any = { tenantId };
-    if (branchId) where.branchId = branchId;
-    return this.studentsRepo.find({ where, order: { lastName: 'ASC', firstName: 'ASC' } });
+  async isFacultyOnly(userId: string): Promise<boolean> {
+    const roles = await this.dataSource.query(
+      `SELECT r.name FROM "roles" r JOIN "user_roles" ur ON r.id = ur."roleId" WHERE ur."userId" = $1`,
+      [userId]
+    );
+    const roleNames = roles.map((r: any) => r.name.toLowerCase());
+    const isFaculty = roleNames.includes('faculty') || roleNames.includes('teacher');
+    const isAdmin = roleNames.includes('tenant admin') || roleNames.includes('platform admin') || roleNames.includes('registrar') || roleNames.includes('principal');
+    return isFaculty && !isAdmin;
+  }
+
+  async findAllStudents(tenantId: string, branchId?: string, facultyUserId?: string) {
+    const qb = this.studentsRepo.createQueryBuilder('s')
+      .where('s.tenantId = :tenantId', { tenantId });
+      
+    if (branchId) {
+      qb.andWhere('s.branchId = :branchId', { branchId });
+    }
+
+    if (facultyUserId) {
+      qb.innerJoin('enrollments', 'e', 'e."studentId" = s.id AND e."status" = \'active\'')
+        .innerJoin('student_section_assignments', 'ssa', 'ssa."enrollmentId" = e.id AND ssa."isActive" = true')
+        .innerJoin('sections', 'sec', 'sec.id = ssa."sectionId"')
+        .leftJoin('class_offerings', 'co', 'co."sectionId" = sec.id')
+        .andWhere('(sec."adviserEmployeeId" = :facultyId OR co."facultyEmployeeId" = :facultyId)', { facultyId: facultyUserId });
+    }
+
+    return qb.orderBy('s.lastName', 'ASC').addOrderBy('s.firstName', 'ASC').getMany();
   }
 
   async findStudentById(id: string, tenantId: string) {
@@ -201,12 +225,18 @@ export class SisService {
   }
 
   // === Sections ===
-  async findAllSections(tenantId: string, branchId?: string, schoolYearId?: string) {
-    const where: any = { tenantId };
-    if (branchId) where.branchId = branchId;
-    if (schoolYearId) where.schoolYearId = schoolYearId;
+  async findAllSections(tenantId: string, branchId?: string, schoolYearId?: string, facultyUserId?: string) {
+    const qb = this.sectionsRepo.createQueryBuilder('s')
+      .where('s.tenantId = :tenantId', { tenantId });
 
-    const sections = await this.sectionsRepo.find({ where, order: { name: 'ASC' } });
+    if (branchId) qb.andWhere('s.branchId = :branchId', { branchId });
+    if (schoolYearId) qb.andWhere('s.schoolYearId = :schoolYearId', { schoolYearId });
+    if (facultyUserId) {
+      qb.leftJoin('class_offerings', 'co', 'co."sectionId" = s.id')
+        .andWhere('(s."adviserEmployeeId" = :facultyId OR co."facultyEmployeeId" = :facultyId)', { facultyId: facultyUserId });
+    }
+
+    const sections = await qb.orderBy('s.name', 'ASC').getMany();
 
     // Seat counts in ONE grouped query (not one COUNT per row): the sections
     // table renders "18/40" inline, so N+1 counts would scale badly with the

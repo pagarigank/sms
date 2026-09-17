@@ -5,9 +5,9 @@ import { SchoolYear } from '../academic/school-year.entity';
 import { Term } from '../academic/term.entity';
 import { Curriculum } from '../academic/curriculum.entity';
 import { CurriculumSubject } from '../academic/curriculum-subject.entity';
-import { GradingSystem } from '../academic/grading-system.entity';
-import { GradeComponent } from '../academic/grade-component.entity';
-import { HonorRollConfig } from '../academic/honor-roll-config.entity';
+import { GradingSystem } from '../grading/entities/grading-system.entity';
+import { GradeComponent } from '../grading/entities/grade-component.entity';
+import { HonorRollConfig } from '../grading/entities/honor-roll-config.entity';
 
 export interface RolloverResult {
   schoolYear: SchoolYear;

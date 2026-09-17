@@ -259,6 +259,7 @@ export class InvoiceService {
     invoiceId: string,
     tenantId: string,
     amount: number,
+    installmentId?: string,
   ) {
     // Lock the row before reading: two concurrent payments must not both
     // apply against the same pre-payment balance. RLS needs the tenant GUC,
@@ -289,6 +290,22 @@ export class InvoiceService {
       invoice.status = 'paid';
     } else if (Number(invoice.paidAmount) > 0) {
       invoice.status = 'partial';
+    }
+
+    if (installmentId) {
+      const installment = await manager.findOne(InstallmentSchedule, {
+        where: { id: installmentId, tenantId, invoiceId },
+      });
+      if (installment) {
+        installment.paidAmount = Number(installment.paidAmount) + amount;
+        if (Number(installment.paidAmount) >= Number(installment.amount)) {
+          installment.status = 'paid';
+          installment.paidAt = new Date();
+        } else if (Number(installment.paidAmount) > 0) {
+          installment.status = 'partial';
+        }
+        await manager.save(installment);
+      }
     }
 
     return manager.save(invoice);

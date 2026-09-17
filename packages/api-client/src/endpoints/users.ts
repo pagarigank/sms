@@ -57,4 +57,27 @@ export const userEndpoints = (client: ApiClient) => ({
 
   listRoles: () =>
     client.get<Role[]>('/api/v1/iam/roles'),
+
+  // Aliased names used by the IAM Users & Roles page
+  listUsers: (params?: { tenantId?: string; search?: string; status?: string }) =>
+    client.get<User[]>('/api/v1/users', params ? {
+      tenantId: params.tenantId ?? '',
+      search: params.search ?? '',
+      status: params.status ?? '',
+    } : undefined),
+
+  createUser: (data: { email: string; password: string; firstName?: string; lastName?: string; middleName?: string; phone?: string; tenantId?: string }) =>
+    client.post<User>('/api/v1/users', data),
+
+  updateUser: (id: string, data: Partial<User>) =>
+    client.put<User>(`/api/v1/users/${id}`, data),
+
+  suspendUser: (id: string) =>
+    client.post<User>(`/api/v1/users/${id}/suspend`, {}),
+
+  activateUser: (id: string) =>
+    client.post<User>(`/api/v1/users/${id}/activate`, {}),
+
+  getUserRoles: (userId: string) =>
+    client.get<UserRole[]>(`/api/v1/iam/users/${userId}/roles`),
 });

@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
-import { PlayCircle, StopCircle, Receipt, DollarSign, AlertTriangle } from 'lucide-react';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
+import { PlayCircle, StopCircle, Receipt, DollarSign, AlertTriangle, CreditCard, PieChart, Activity, X } from 'lucide-react';
+import { useToast, Badge, Button, Label, Input } from '@sms/ui';
+import { cn } from '@sms/utils';
 
 export default function CashieringPage() {
   const { currentTenantId, currentBranchId } = useTenantStore();
@@ -71,162 +72,282 @@ export default function CashieringPage() {
     },
   });
 
-  if (isLoading) return <div className="flex items-center justify-center p-8"><div className="animate-spin h-8 w-8 border-b-2 border-primary rounded-full" /></div>;
+  if (isLoading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" /></div>;
 
   const summary = (sessionSummary?.data as any) ?? null;
+  const methodsList = ((methods?.data as any[]) ?? []);
 
   return (
-    <>
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cashiering</h1>
-          <p className="text-muted-foreground">Manage cashier sessions, payments, and receipts</p>
+          <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600">
+            Cashiering
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your daily till, monitor transactions, and process payments.
+          </p>
         </div>
         {!session ? (
-          <button
+          <Button
+            size="lg"
             onClick={() => setShowOpenForm(true)}
-            className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+            className="group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-emerald-700 text-white shadow-lg hover:shadow-emerald-500/25 transition-all"
           >
-            <PlayCircle className="mr-2 h-4 w-4" /> Open Session
-          </button>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+            <PlayCircle className="mr-2 h-5 w-5 relative z-10" /> 
+            <span className="relative z-10 font-semibold tracking-wide">Open Session</span>
+          </Button>
         ) : (
-          <button
+          <Button
+            size="lg"
             onClick={() => setShowCloseForm(true)}
-            className="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            className="group relative overflow-hidden bg-gradient-to-r from-rose-500 to-rose-700 text-white shadow-lg hover:shadow-rose-500/25 transition-all"
           >
-            <StopCircle className="mr-2 h-4 w-4" /> Close Session
-          </button>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+            <StopCircle className="mr-2 h-5 w-5 relative z-10" /> 
+            <span className="relative z-10 font-semibold tracking-wide">Close Session</span>
+          </Button>
         )}
       </div>
 
-      {/* Session Status */}
+      {/* Session Status Banner */}
       {session ? (
-        <div className="rounded-lg border bg-green-50 p-4">
-          <div className="flex items-center gap-2">
-            <PlayCircle className="h-5 w-5 text-green-600" />
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 backdrop-blur-sm shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Activity className="h-24 w-24" />
+          </div>
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 animate-pulse">
+              <PlayCircle className="h-6 w-6" />
+            </div>
             <div>
-              <p className="font-semibold text-green-800">Session Active</p>
-              <p className="text-sm text-green-600">
-                Opened: {new Date(session.openedAt).toLocaleString()} | Float: ₱{Number(session.openingFloat).toLocaleString()}
-              </p>
+              <h2 className="text-xl font-bold text-emerald-400">Session Active</h2>
+              <div className="flex items-center gap-3 mt-1 text-sm text-emerald-200/80">
+                <span>Opened: {new Date(session.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="h-1 w-1 rounded-full bg-emerald-500/50" />
+                <span>Float: ₱{Number(session.openingFloat).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
             </div>
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border bg-yellow-50 p-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-yellow-600" />
+        <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 backdrop-blur-sm shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <AlertTriangle className="h-24 w-24" />
+          </div>
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/20 text-amber-400">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
             <div>
-              <p className="font-semibold text-yellow-800">No Active Session</p>
-              <p className="text-sm text-yellow-600">Open a session to start processing payments.</p>
+              <h2 className="text-xl font-bold text-amber-400">Drawer Closed</h2>
+              <p className="mt-1 text-sm text-amber-200/80">
+                Open a new session to begin accepting payments and processing receipts.
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Session Summary */}
-      {summary && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm text-muted-foreground">Total Payments</p>
-            <p className="text-2xl font-bold">{summary.totalPayments}</p>
+      {/* Quick Actions (Main focus of dashboard) */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Link 
+          href={session ? "/cashiering/payment" : "#"} 
+          className={cn(
+            "group relative overflow-hidden rounded-2xl border bg-card/50 p-6 backdrop-blur-md transition-all duration-300",
+            session ? "hover:border-primary/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:-translate-y-1 cursor-pointer" : "opacity-50 cursor-not-allowed pointer-events-none"
+          )}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="relative z-10">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Receipt className="h-6 w-6" />
+            </div>
+            <h3 className="text-xl font-bold">Process Payment</h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Accept tuition payments, settle outstanding invoices, and generate official receipts.
+            </p>
           </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm text-muted-foreground">Total Collected</p>
-            <p className="text-2xl font-bold">₱{Number(summary.totalAmount).toLocaleString()}</p>
+        </Link>
+        
+        <Link 
+          href={session ? "/cashiering/ad-hoc" : "#"} 
+          className={cn(
+            "group relative overflow-hidden rounded-2xl border bg-card/50 p-6 backdrop-blur-md transition-all duration-300",
+            session ? "hover:border-indigo-500/50 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] hover:-translate-y-1 cursor-pointer" : "opacity-50 cursor-not-allowed pointer-events-none"
+          )}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="relative z-10">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+              <DollarSign className="h-6 w-6" />
+            </div>
+            <h3 className="text-xl font-bold">Ad-Hoc Sales</h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Process over-the-counter transactions for items like uniforms, books, or miscellaneous fees.
+            </p>
           </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm text-muted-foreground">Expected in Drawer</p>
-            <p className="text-2xl font-bold">₱{Number(session?.openingFloat || 0) + Number(summary.totalAmount || 0)}</p>
+        </Link>
+        
+        <Link 
+          href={session ? "/cashiering/reports" : "#"} 
+          className={cn(
+            "group relative overflow-hidden rounded-2xl border bg-card/50 p-6 backdrop-blur-md transition-all duration-300",
+            session ? "hover:border-teal-500/50 hover:shadow-[0_0_20px_rgba(20,184,166,0.15)] hover:-translate-y-1 cursor-pointer" : "opacity-50 cursor-not-allowed pointer-events-none"
+          )}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="relative z-10">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 text-teal-400">
+              <PieChart className="h-6 w-6" />
+            </div>
+            <h3 className="text-xl font-bold">Daily Report</h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Review your end-of-day collection summary, transaction logs, and cash position.
+            </p>
           </div>
-        </div>
-      )}
+        </Link>
+      </div>
 
-      {/* Payment Methods */}
-      {methods?.data && (
-        <div className="rounded-lg border bg-card p-4">
-          <h2 className="text-lg font-semibold mb-3">Payment Methods</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {((methods.data as any[]) ?? []).map((m: any) => (
-              <div key={m.id} className="flex items-center gap-2 rounded-lg border p-3">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">{m.name}</p>
-                  <p className="text-xs text-muted-foreground">{m.code}</p>
-                </div>
+      {/* Session Stats & Methods */}
+      {session && summary && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          
+          {/* Main KPIs */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border bg-card/40 p-5 backdrop-blur-sm">
+                <p className="text-sm font-medium text-muted-foreground">Transactions</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{summary.totalPayments}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Payments */}
-      {summary?.session && (
-        <div className="rounded-lg border bg-card p-4">
-          <h2 className="text-lg font-semibold mb-3">Payment Breakdown by Method</h2>
-          <div className="space-y-2">
-            {Object.entries(summary.byMethod as Record<string, { count: number; total: number }> || {}).map(([method, data]) => (
-              <div key={method} className="flex items-center justify-between rounded-lg border p-3">
-                <span className="font-medium capitalize">{method}</span>
-                <div className="text-right">
-                  <span className="text-sm text-muted-foreground">{data.count} payment(s)</span>
-                  <span className="ml-3 font-semibold">₱{Number(data.total).toLocaleString()}</span>
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 backdrop-blur-sm relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 opacity-10">
+                  <DollarSign className="h-20 w-20 text-primary" />
                 </div>
+                <p className="text-sm font-medium text-primary/80">Total Collected</p>
+                <p className="mt-2 text-3xl font-bold text-primary">
+                  <span className="text-lg opacity-70">₱</span>{Number(summary.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
               </div>
-            ))}
-            {Object.keys(summary.byMethod || {}).length === 0 && (
-              <p className="text-muted-foreground text-sm">No payments recorded this session.</p>
-            )}
-          </div>
-        </div>
-      )}
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 backdrop-blur-sm relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 opacity-10">
+                  <Receipt className="h-20 w-20 text-emerald-500" />
+                </div>
+                <p className="text-sm font-medium text-emerald-500/80">Expected in Drawer</p>
+                <p className="mt-2 text-3xl font-bold text-emerald-500">
+                  <span className="text-lg opacity-70">₱</span>{Number(Number(session.openingFloat) + Number(summary.totalAmount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
 
-      {/* Quick Actions */}
-      {session && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Link href="/cashiering/payment" className="rounded-lg border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
-            <Receipt className="h-8 w-8 text-primary" />
-            <h3 className="mt-4 font-semibold">Process Payment</h3>
-            <p className="text-sm text-muted-foreground mt-1">Record a payment against an invoice</p>
-          </Link>
-          <Link href="/cashiering/ad-hoc" className="rounded-lg border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
-            <DollarSign className="h-8 w-8 text-primary" />
-            <h3 className="mt-4 font-semibold">Ad-Hoc Sale</h3>
-            <p className="text-sm text-muted-foreground mt-1">Non-tuition sales (uniforms, supplies, etc.)</p>
-          </Link>
-          <Link href="/cashiering/reports" className="rounded-lg border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
-            <AlertTriangle className="h-8 w-8 text-primary" />
-            <h3 className="mt-4 font-semibold">Daily Report</h3>
-            <p className="text-sm text-muted-foreground mt-1">View collection and cash position report</p>
-          </Link>
+            {/* Methods breakdown */}
+            <div className="rounded-2xl border bg-card/40 p-6 backdrop-blur-sm">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                Collection by Method
+              </h2>
+              {Object.keys(summary.byMethod || {}).length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center rounded-xl border border-dashed text-muted-foreground">
+                  <Receipt className="mb-2 h-8 w-8 opacity-20" />
+                  <p className="text-sm">No payments recorded yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {Object.entries(summary.byMethod as Record<string, { count: number; total: number }>).map(([method, data]) => {
+                    const methodObj = methodsList.find(m => m.id === method || m.code === method || m.name.toLowerCase() === method.toLowerCase());
+                    const name = methodObj ? methodObj.name : method;
+                    
+                    return (
+                      <div key={method} className="group flex items-center justify-between rounded-xl border border-transparent bg-background/50 p-3 transition-colors hover:border-border hover:bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                            <CreditCard className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="font-medium capitalize">{name}</p>
+                            <p className="text-xs text-muted-foreground">{data.count} transaction{data.count !== 1 && 's'}</p>
+                          </div>
+                        </div>
+                        <p className="text-right font-bold tracking-tight">
+                          ₱{Number(data.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Configured Methods Sidebar */}
+          <div className="rounded-2xl border bg-card/40 p-6 backdrop-blur-sm">
+            <h2 className="text-lg font-semibold mb-4">Accepted Methods</h2>
+            <div className="flex flex-col gap-3">
+              {methodsList.map((m: any) => (
+                <div key={m.id} className="flex items-center justify-between rounded-xl border bg-background/50 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                    <span className="font-medium text-sm">{m.name}</span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground uppercase">{m.code}</Badge>
+                </div>
+              ))}
+              {methodsList.length === 0 && (
+                <p className="text-sm text-muted-foreground">No payment methods configured.</p>
+              )}
+            </div>
+          </div>
+
         </div>
       )}
 
       {/* Open Session Modal */}
       {showOpenForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg p-6 w-full max-w-md shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold">Open Cashier Session</h2>
-            <div>
-              <label className="text-sm font-medium">Opening Float (₱)</label>
-              <input
-                type="number"
-                value={openingFloat}
-                onChange={(e) => setOpeningFloat(e.target.value)}
-                className="flex h-9 w-full rounded-md border px-3 py-1 text-sm mt-1"
-                placeholder="0.00"
-              />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity" onClick={() => setShowOpenForm(false)} />
+          <div className="relative w-full max-w-md scale-100 overflow-hidden rounded-2xl border border-border/50 bg-card p-6 shadow-2xl transition-all">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                  <PlayCircle className="h-5 w-5" />
+                </div>
+                <h2 className="text-xl font-bold">Open Session</h2>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowOpenForm(false)} className="h-8 w-8 rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowOpenForm(false)} className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">Cancel</button>
-              <button
-                onClick={() => openMutation.mutate()}
-                disabled={openMutation.isPending}
-                className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                {openMutation.isPending ? 'Opening...' : 'Open Session'}
-              </button>
+            
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="openingFloat" className="text-muted-foreground">Starting Cash Float (Drawer Base)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₱</span>
+                  <Input
+                    id="openingFloat"
+                    type="number"
+                    value={openingFloat}
+                    onChange={(e) => setOpeningFloat(e.target.value)}
+                    className="pl-8 text-lg font-medium"
+                    placeholder="0.00"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Enter the total cash amount currently in the drawer.</p>
+              </div>
+              
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-border/50">
+                <Button variant="outline" onClick={() => setShowOpenForm(false)}>Cancel</Button>
+                <Button
+                  onClick={() => openMutation.mutate()}
+                  disabled={openMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-32"
+                >
+                  {openMutation.isPending ? 'Opening...' : 'Start Session'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -234,42 +355,73 @@ export default function CashieringPage() {
 
       {/* Close Session Modal */}
       {showCloseForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg p-6 w-full max-w-md shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold">Close Cashier Session</h2>
-            <div className="rounded-lg bg-muted p-3 text-sm">
-              <p>Expected in drawer: <strong>₱{Number(session?.openingFloat || 0) + Number(summary?.totalAmount || 0)}</strong></p>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Actual Cash in Drawer (₱)</label>
-              <input
-                type="number"
-                value={closingActual}
-                onChange={(e) => setClosingActual(e.target.value)}
-                className="flex h-9 w-full rounded-md border px-3 py-1 text-sm mt-1"
-                placeholder="0.00"
-              />
-            </div>
-            {closingActual && (
-              <div className={`rounded-lg p-3 text-sm ${parseFloat(closingActual) === Number(session?.openingFloat || 0) + Number(summary?.totalAmount || 0) ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-                <p>Variance: <strong>₱{parseFloat(closingActual) - (Number(session?.openingFloat || 0) + Number(summary?.totalAmount || 0))}</strong></p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity" onClick={() => setShowCloseForm(false)} />
+          <div className="relative w-full max-w-md scale-100 overflow-hidden rounded-2xl border border-border/50 bg-card p-6 shadow-2xl transition-all">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-500/20 text-rose-400">
+                  <StopCircle className="h-5 w-5" />
+                </div>
+                <h2 className="text-xl font-bold">Close Session</h2>
               </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowCloseForm(false)} className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">Cancel</button>
-              <button
-                onClick={() => closeMutation.mutate()}
-                disabled={closeMutation.isPending || !summary}
-                title={summary ? undefined : 'Loading session totals…'}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {closeMutation.isPending ? 'Closing...' : 'Close Session'}
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setShowCloseForm(false)} className="h-8 w-8 rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-5">
+              <div className="rounded-xl bg-muted/50 p-4 border border-border/50 flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Expected Drawer Total:</span>
+                <span className="text-xl font-bold">
+                  ₱{Number(Number(session?.openingFloat || 0) + Number(summary?.totalAmount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="closingActual" className="text-muted-foreground">Actual Cash Count</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₱</span>
+                  <Input
+                    id="closingActual"
+                    type="number"
+                    value={closingActual}
+                    onChange={(e) => setClosingActual(e.target.value)}
+                    className="pl-8 text-lg font-medium"
+                    placeholder="0.00"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              
+              {closingActual && (
+                <div className={cn(
+                  "rounded-xl p-4 border flex justify-between items-center transition-colors",
+                  parseFloat(closingActual) === Number(session?.openingFloat || 0) + Number(summary?.totalAmount || 0) 
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                    : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                )}>
+                  <span className="text-sm font-medium">Variance (Over/Short):</span>
+                  <span className="font-bold">
+                    ₱{(parseFloat(closingActual) - (Number(session?.openingFloat || 0) + Number(summary?.totalAmount || 0))).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+              
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-border/50">
+                <Button variant="outline" onClick={() => setShowCloseForm(false)}>Cancel</Button>
+                <Button
+                  onClick={() => closeMutation.mutate()}
+                  disabled={closeMutation.isPending || !summary || !closingActual}
+                  className="bg-rose-600 hover:bg-rose-700 text-white min-w-32"
+                >
+                  {closeMutation.isPending ? 'Closing...' : 'Close Drawer'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
     </div>
-    </>
   );
 }

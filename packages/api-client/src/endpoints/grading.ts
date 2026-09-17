@@ -31,4 +31,11 @@ export const gradingEndpoints = (client: ApiClient) => ({
 
   createHonorRollConfig: (data: { educationLevelId: string; schoolYearId: string; withHonorsThreshold: number; withHighHonorsThreshold: number; withHighestHonorsThreshold: number }) =>
     client.post<HonorRollConfig>('/api/v1/grading/honor-roll', data),
+
+  // DepEd Presets (DO 015 s.2026)
+  getPresets: (tier?: string) =>
+    client.get<any[]>('/api/v1/grading/presets', tier ? { tier } : undefined),
+
+  seedDepEdSystem: (data: { tier: string; educationLevelId: string; schoolYearId: string; branchId?: string }) =>
+    client.post<{ system: any; components: any[] }>('/api/v1/grading/systems/seed-deped', data),
 });

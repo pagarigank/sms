@@ -14,6 +14,9 @@ export class PaymentAllocation {
   @Column('uuid')
   invoiceId: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  installmentId: string;
+
   @Column({ type: 'numeric', precision: 12, scale: 2 })
   amountApplied: number;
 

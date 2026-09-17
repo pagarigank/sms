@@ -16,8 +16,15 @@ export class SisController {
   // === Students ===
   @Get('students')
   @ApiOperation({ summary: 'List all students for a tenant' })
-  async findAllStudents(@Headers('x-tenant-id') tenantId: string, @Query('branchId') branchId?: string) {
-    return this.sisService.findAllStudents(tenantId, branchId);
+  async findAllStudents(
+    @Headers('x-tenant-id') tenantId: string, 
+    @Query('branchId') branchId?: string,
+    @Req() req?: any
+  ) {
+    const userId = req?.user?.sub ?? req?.user?.id;
+    const isFacultyOnly = userId ? await this.sisService.isFacultyOnly(userId) : false;
+    const facultyUserId = isFacultyOnly ? userId : undefined;
+    return this.sisService.findAllStudents(tenantId, branchId, facultyUserId);
   }
 
   // Guardian portal: resolve "my children" from the authenticated user.
@@ -158,8 +165,12 @@ export class SisController {
     @Headers('x-tenant-id') tenantId: string,
     @Query('branchId') branchId?: string,
     @Query('schoolYearId') schoolYearId?: string,
+    @Req() req?: any
   ) {
-    return this.sisService.findAllSections(tenantId, branchId, schoolYearId);
+    const userId = req?.user?.sub ?? req?.user?.id;
+    const isFacultyOnly = userId ? await this.sisService.isFacultyOnly(userId) : false;
+    const facultyUserId = isFacultyOnly ? userId : undefined;
+    return this.sisService.findAllSections(tenantId, branchId, schoolYearId, facultyUserId);
   }
 
   @Post('sections')

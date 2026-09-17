@@ -6,8 +6,8 @@ import { GradeChangeRequest } from './grade-change-request.entity';
 import { PermanentRecord } from './permanent-record.entity';
 import { ClassOffering } from './class-offering.entity';
 import { Subject } from '../academic/subject.entity';
-import { GradeComponent } from '../academic/grade-component.entity';
-import { GradingSystem } from '../academic/grading-system.entity';
+import { GradeComponent } from '../grading/entities/grade-component.entity';
+import { GradingSystem } from '../grading/entities/grading-system.entity';
 import { Enrollment } from '../sis/enrollment.entity';
 
 @Injectable()

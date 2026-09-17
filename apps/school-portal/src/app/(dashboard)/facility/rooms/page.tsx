@@ -1,10 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useLookupValues } from '@/lib/use-lookup';
-import { Plus } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -25,8 +26,7 @@ import {
   StatusDot,
   statusToVariant,
   useToast,
-  // ColumnDef from @sms/ui so it matches the DataTable prop type
-  // (the workspace has duplicate react-table majors; this avoids variance errors).
+  useConfirm,
   type ColumnDef,
 } from '@sms/ui';
 
@@ -35,15 +35,39 @@ const ROOM_TYPES_FALLBACK = ['classroom', 'laboratory', 'office', 'clinic', 'cas
 export default function RoomsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const confirm = useConfirm();
+  
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ floorId: '', branchId: '', name: '', roomType: 'classroom', capacity: '' });
+  const [editingRoom, setEditingRoom] = useState<any | null>(null);
+  
+  const defaultForm = { branchId: '', buildingId: '', floorId: '', name: '', roomType: 'classroom', capacity: '', status: 'active' };
+  const [form, setForm] = useState(defaultForm);
 
   const { data: rooms, isLoading } = useQuery({
     queryKey: ['rooms'],
     queryFn: () => apiClient.facility.listRooms(),
   });
 
-  // Room types are a tenant-configurable Lookup List (spec §8) — not a hardcode.
+  const { data: branchesRes } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => apiClient.branches.list({ limit: 100 }),
+  });
+  const branches = (branchesRes?.data as any[]) ?? [];
+
+  const { data: buildingsRes } = useQuery({
+    queryKey: ['buildings', form.branchId],
+    queryFn: () => form.branchId ? apiClient.facility.listBuildings({ branchId: form.branchId, limit: 100 }) : Promise.resolve({ data: [] } as any),
+    enabled: !!form.branchId,
+  });
+  const buildings = (buildingsRes?.data as any[]) ?? [];
+
+  const { data: floorsRes } = useQuery({
+    queryKey: ['floors', form.buildingId],
+    queryFn: () => form.buildingId ? apiClient.facility.listFloors({ buildingId: form.buildingId }) : Promise.resolve([]),
+    enabled: !!form.buildingId,
+  });
+  const floors = (floorsRes?.data as any[]) ?? (floorsRes as any[]) ?? [];
+
   const roomTypes = useLookupValues('room_type', ROOM_TYPES_FALLBACK);
 
   const createMutation = useMutation({
@@ -55,7 +79,7 @@ export default function RoomsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       setShowCreate(false);
-      setForm({ floorId: '', branchId: '', name: '', roomType: 'classroom', capacity: '' });
+      setForm(defaultForm);
       toast({ title: 'Room created', description: 'The room has been added to the facility registry.' });
     },
     onError: (error: Error) => {
@@ -63,7 +87,59 @@ export default function RoomsPage() {
     },
   });
 
-  const columns: ColumnDef<any, any>[] = [
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<typeof form> }) =>
+      apiClient.facility.updateRoom(id, {
+        ...data,
+        capacity: data.capacity ? parseInt(data.capacity as string) : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      setEditingRoom(null);
+      setForm(defaultForm);
+      setShowCreate(false);
+      toast({ title: 'Room updated', description: 'The room has been updated.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiClient.facility.deleteRoom(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast({ title: 'Room deleted' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const handleEdit = React.useCallback((room: any) => {
+    setEditingRoom(room);
+    setForm({
+      branchId: room.branchId || '',
+      buildingId: room.floor?.buildingId || '',
+      floorId: room.floorId || '',
+      name: room.name || '',
+      roomType: room.roomType || 'classroom',
+      capacity: room.capacity ? room.capacity.toString() : '',
+      status: room.status || 'active',
+    });
+    setShowCreate(true);
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingRoom) {
+      updateMutation.mutate({ id: editingRoom.id, data: form });
+    } else {
+      createMutation.mutate(form);
+    }
+  };
+
+  const columns = React.useMemo<ColumnDef<any, any>[]>(() => [
     {
       accessorKey: 'name',
       header: 'Name',
@@ -86,6 +162,13 @@ export default function RoomsPage() {
       ),
     },
     {
+      accessorKey: 'floor',
+      header: 'Floor',
+      cell: ({ row }) => (
+        <span className="text-[hsl(var(--ink-200))]">{row.original.floor?.label || '—'}</span>
+      ),
+    },
+    {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => (
@@ -97,7 +180,45 @@ export default function RoomsPage() {
         </Badge>
       ),
     },
-  ];
+    {
+      header: 'Actions',
+      cell: ({ row }) => {
+        const room = row.original;
+        return (
+          <div className="flex items-center space-x-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleEdit(room)}
+              className="h-8 w-8 p-0"
+              aria-label="Edit room"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: `Delete ${room.name}?`,
+                  description: "This action cannot be undone.",
+                  confirmLabel: "Delete",
+                  destructive: true,
+                });
+                if (ok) deleteMutation.mutate(room.id);
+              }}
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+              aria-label="Delete room"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ], [handleEdit, confirm, deleteMutation]);
+
+  const dataList = Array.isArray(rooms) ? rooms : ((rooms as any)?.data as any[]) ?? [];
 
   return (
     <div className="space-y-6">
@@ -106,39 +227,90 @@ export default function RoomsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Rooms</h1>
           <p className="text-muted-foreground">Manage rooms across all buildings</p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
+        <Button onClick={() => {
+          setEditingRoom(null);
+          setForm(defaultForm);
+          setShowCreate(true);
+        }}>
           <Plus className="h-4 w-4" /> Add Room
         </Button>
       </div>
 
       <DataTable
         columns={columns}
-        data={(rooms?.data as any[]) ?? []}
+        data={dataList}
         isLoading={isLoading}
         emptyMessage="No rooms found."
         emptyDescription="Add your first room to start mapping the campus."
         emptyAction={
-          <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Button size="sm" onClick={() => {
+            setEditingRoom(null);
+            setForm(defaultForm);
+            setShowCreate(true);
+          }}>
             <Plus className="h-4 w-4" /> Add Room
           </Button>
         }
       />
 
-      {/* Create Room dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(open) => {
+        if (!open) {
+          setShowCreate(false);
+          setEditingRoom(null);
+          setForm(defaultForm);
+        } else {
+          setShowCreate(true);
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create Room</DialogTitle>
-            <DialogDescription>Register a new room under a floor.</DialogDescription>
+            <DialogTitle>{editingRoom ? 'Edit Room' : 'Create Room'}</DialogTitle>
+            <DialogDescription>{editingRoom ? 'Update room details.' : 'Register a new room under a floor.'}</DialogDescription>
           </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              createMutation.mutate(form);
-            }}
-            className="space-y-4"
-          >
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <Label htmlFor="branchId">Branch</Label>
+                <Select value={form.branchId} onValueChange={(v) => setForm({ ...form, branchId: v, buildingId: '', floorId: '' })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select Branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="buildingId">Building</Label>
+                <Select disabled={!form.branchId} value={form.buildingId} onValueChange={(v) => setForm({ ...form, buildingId: v, floorId: '' })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select Building" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {buildings.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="floorId">Floor</Label>
+                <Select disabled={!form.buildingId} value={form.floorId} onValueChange={(v) => setForm({ ...form, floorId: v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select Floor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {floors.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.label || `Floor ${f.floorNumber}`}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div>
                 <Label htmlFor="room-name">Name</Label>
                 <Input
@@ -149,6 +321,7 @@ export default function RoomsPage() {
                   required
                 />
               </div>
+
               <div>
                 <Label>Room Type</Label>
                 <Select value={form.roomType} onValueChange={(v) => setForm({ ...form, roomType: v })}>
@@ -164,16 +337,7 @@ export default function RoomsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="room-floor">Floor ID</Label>
-                <Input
-                  id="room-floor"
-                  value={form.floorId}
-                  onChange={(e) => setForm({ ...form, floorId: e.target.value })}
-                  className="mt-1"
-                  required
-                />
-              </div>
+
               <div>
                 <Label htmlFor="room-capacity">Capacity</Label>
                 <Input
@@ -185,13 +349,32 @@ export default function RoomsPage() {
                   className="mt-1"
                 />
               </div>
+
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="under_maintenance">Under Maintenance</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setShowCreate(false);
+                setEditingRoom(null);
+                setForm(defaultForm);
+              }}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Creating...' : 'Create'}
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
               </Button>
             </DialogFooter>
           </form>

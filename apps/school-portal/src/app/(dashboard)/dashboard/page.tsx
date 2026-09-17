@@ -119,27 +119,32 @@ export default function DashboardPage() {
         branchId: selectedBranch === 'all' ? undefined : selectedBranch,
         range: timeRange,
       }),
+    enabled: !!currentTenantId,
   });
 
   const branchesQuery = useQuery({
-    queryKey: ['branches', 'all'],
+    queryKey: ['branches', 'all', currentTenantId],
     queryFn: () => apiClient.branches.list({ limit: 100 }),
+    enabled: !!currentTenantId,
   });
 
   const schoolYearsQuery = useQuery({
-    queryKey: ['school-years', 'dashboard'],
+    queryKey: ['school-years', 'dashboard', currentTenantId],
     queryFn: () => apiClient.academic.listSchoolYears({ limit: 10 }),
+    enabled: !!currentTenantId,
   });
 
   const curriculaQuery = useQuery({
-    queryKey: ['curricula', 'dashboard'],
+    queryKey: ['curricula', 'dashboard', currentTenantId],
     queryFn: () => apiClient.academic.listCurricula({ limit: 10 }),
+    enabled: !!currentTenantId,
   });
 
   // Upcoming events: resolve the first calendar, then its events.
   const calendarsQuery = useQuery({
-    queryKey: ['calendars', 'dashboard'],
+    queryKey: ['calendars', 'dashboard', currentTenantId],
     queryFn: () => apiClient.scheduling.listCalendars({ tenantId: currentTenantId ?? '' }),
+    enabled: !!currentTenantId,
   });
   const firstCalendarId = (calendarsQuery.data?.data as unknown as { id: string }[] | undefined)?.[0]?.id;
   const eventsQuery = useQuery({
