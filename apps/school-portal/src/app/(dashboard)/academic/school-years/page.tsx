@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api';
 import { DataTable } from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
 import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
-import { Plus, Search, Calendar, Edit, Trash2, CheckCircle } from 'lucide-react';
+import { Plus, Search, Calendar, Edit, Trash2, CheckCircle, Repeat, ListOrdered, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
 import { Button } from '@sms/ui';
 import { Input } from '@sms/ui';
@@ -22,6 +22,16 @@ interface SchoolYear {
   tenantId: string;
   branchId?: string;
   createdAt: string;
+}
+
+interface Term {
+  id: string;
+  schoolYearId: string;
+  name: string;
+  sequence: number;
+  startDate?: string;
+  endDate?: string;
+  gradingDeadline?: string;
 }
 
 interface Tenant {
@@ -102,6 +112,103 @@ export default function SchoolYearsPage() {
     },
   });
 
+  // === Terms (FR-ACA-3): each school year carries its grading periods ===
+  const [termsFor, setTermsFor] = useState<SchoolYear | null>(null);
+  const [termEditing, setTermEditing] = useState<Term | null>(null);
+  const [termForm, setTermForm] = useState({ name: '', sequence: '1', startDate: '', endDate: '', gradingDeadline: '' });
+
+  const { data: termsRes, isLoading: termsLoading } = useQuery({
+    queryKey: ['terms', termsFor?.id],
+    queryFn: () => apiClient.academic.listTerms(termsFor!.id),
+    enabled: !!termsFor,
+  });
+  const terms: Term[] = termsRes?.data ?? [];
+
+  const createTermMutation = useMutation({
+    mutationFn: (data: typeof termForm & { schoolYearId: string }) =>
+      apiClient.academic.createTerm({
+        ...data,
+        sequence: Number(data.sequence) || 1,
+        gradingDeadline: data.gradingDeadline || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['terms'] });
+      setTermForm({ name: '', sequence: String(terms.length + 1), startDate: '', endDate: '', gradingDeadline: '' });
+      toast({ title: 'Term created' });
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  const updateTermMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: typeof termForm }) =>
+      apiClient.academic.updateTerm(id, {
+        ...data,
+        sequence: Number(data.sequence) || 1,
+        gradingDeadline: data.gradingDeadline || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['terms'] });
+      setTermEditing(null);
+      toast({ title: 'Term updated' });
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  const deleteTermMutation = useMutation({
+    mutationFn: (id: string) => apiClient.academic.deleteTerm(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['terms'] });
+      toast({ title: 'Term deleted' });
+    },
+    onError: (error: Error) => toast({ title: 'Cannot delete term', description: error.message, variant: 'destructive' }),
+  });
+
+  const openTerms = (schoolYear: SchoolYear) => {
+    setTermsFor(schoolYear);
+    setTermForm({ name: '', sequence: '1', startDate: '', endDate: '', gradingDeadline: '' });
+    setTermEditing(null);
+  };
+
+  // === FR-CFG-6: Academic-year rollover wizard ===
+  // Preview what would be cloned from the source year, then execute — the
+  // backend clones terms, curricula (+subjects), grading systems (+components)
+  // and honor-roll configs into the new year in ONE transaction.
+  const [rolloverFor, setRolloverFor] = useState<SchoolYear | null>(null);
+  const [rolloverForm, setRolloverForm] = useState({ name: '', startDate: '', endDate: '' });
+
+  const { data: rolloverPreview, isLoading: previewLoading } = useQuery({
+    queryKey: ['rollover-preview', rolloverFor?.id],
+    queryFn: () => apiClient.academic.rolloverPreview(rolloverFor!.id),
+    enabled: !!rolloverFor,
+  });
+
+  const rolloverMutation = useMutation({
+    mutationFn: (vars: { sourceId: string; data: { name: string; startDate: string; endDate: string } }) =>
+      apiClient.academic.rollover(vars.sourceId, vars.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['school-years'] });
+      setRolloverFor(null);
+      toast({
+        title: 'Rollover complete',
+        description: 'Terms, curricula, grading systems and honor-roll configs were cloned into the new school year.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Rollover failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const openRollover = (schoolYear: SchoolYear) => {
+    // Suggest the next year's name and dates from the source year.
+    const startYear = new Date(schoolYear.startDate).getFullYear();
+    setRolloverForm({
+      name: schoolYear.name.replace(/\d{4}/, String(startYear + 1)),
+      startDate: schoolYear.startDate,
+      endDate: schoolYear.endDate,
+    });
+    setRolloverFor(schoolYear);
+  };
+
   const handleEdit = (schoolYear: SchoolYear) => {
     setForm({
       name: schoolYear.name,
@@ -170,6 +277,26 @@ export default function SchoolYearsPage() {
         const schoolYear = row.original;
         return (
           <div className="flex items-center space-x-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openTerms(schoolYear)}
+              className="h-8 w-8 p-0"
+              aria-label="Manage terms"
+              title="Manage terms"
+            >
+              <ListOrdered className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openRollover(schoolYear)}
+              className="h-8 w-8 p-0"
+              aria-label="Roll over to a new school year"
+              title="Roll over to a new school year"
+            >
+              <Repeat className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -355,6 +482,271 @@ export default function SchoolYearsPage() {
                   </Button>
                 </DialogFooter>
               </form>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* FR-CFG-6: Rollover wizard — preview → confirm → execute */}
+        {rolloverFor && (
+          <Dialog open={!!rolloverFor} onOpenChange={(open) => !open && setRolloverFor(null)}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Roll over from {rolloverFor.name}</DialogTitle>
+              </DialogHeader>
+              <div className="mt-2 space-y-4">
+                {previewLoading ? (
+                  <p className="text-sm text-muted-foreground">Counting what would be cloned…</p>
+                ) : rolloverPreview ? (
+                  <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/40 p-3 text-sm">
+                    {(
+                      [
+                        ['Terms', rolloverPreview?.data?.terms],
+                        ['Curricula', rolloverPreview?.data?.curricula],
+                        ['Grading systems', rolloverPreview?.data?.gradingSystems],
+                        ['Honor-roll configs', rolloverPreview?.data?.honorRollConfigs],
+                      ] as [string, number | undefined][]
+                    ).map(([label, value]) => (
+                      <div key={label} className="flex justify-between">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="font-medium">{value ?? 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Preview unavailable — you can still proceed.</p>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    rolloverMutation.mutate({ sourceId: rolloverFor.id, data: rolloverForm });
+                  }}
+                  className="space-y-3"
+                >
+                  <div>
+                    <Label htmlFor="rollover-name">New school year name</Label>
+                    <Input
+                      id="rollover-name"
+                      value={rolloverForm.name}
+                      onChange={(e) => setRolloverForm({ ...rolloverForm, name: e.target.value })}
+                      placeholder="SY 2027-2028"
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="rollover-start">Start date</Label>
+                      <Input
+                        id="rollover-start"
+                        type="date"
+                        value={rolloverForm.startDate}
+                        onChange={(e) => setRolloverForm({ ...rolloverForm, startDate: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="rollover-end">End date</Label>
+                      <Input
+                        id="rollover-end"
+                        type="date"
+                        value={rolloverForm.endDate}
+                        onChange={(e) => setRolloverForm({ ...rolloverForm, endDate: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Clones the counts above into the new year in one transaction. Enrollments, sections and student data are
+                    not copied — configure those after the rollover.
+                  </p>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setRolloverFor(null)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={rolloverMutation.isPending}>
+                      {rolloverMutation.isPending ? 'Rolling over…' : 'Execute rollover'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* FR-ACA-3: Terms manager for one school year */}
+        {termsFor && (
+          <Dialog open={!!termsFor} onOpenChange={(open) => !open && setTermsFor(null)}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Terms — {termsFor.name}</DialogTitle>
+              </DialogHeader>
+              <div className="mt-2 space-y-4">
+                <div className="rounded-md border">
+                  {termsLoading ? (
+                    <p className="p-4 text-sm text-muted-foreground">Loading terms…</p>
+                  ) : terms.length === 0 ? (
+                    <p className="p-4 text-sm text-muted-foreground">
+                      No terms yet. Add grading periods (e.g. 1st Quarter, Semester 1) — the rollover
+                      wizard clones them into the next year.
+                    </p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50 text-left">
+                          <th className="px-3 py-2 font-medium">Seq</th>
+                          <th className="px-3 py-2 font-medium">Name</th>
+                          <th className="px-3 py-2 font-medium">Dates</th>
+                          <th className="px-3 py-2 text-right font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {terms.map((t) => (
+                          <tr key={t.id} className="border-b last:border-0">
+                            <td className="px-3 py-2 font-mono">{t.sequence}</td>
+                            <td className="px-3 py-2 font-medium">{t.name}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              {t.startDate && t.endDate
+                                ? `${new Date(t.startDate).toLocaleDateString()} – ${new Date(t.endDate).toLocaleDateString()}`
+                                : '—'}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                aria-label={`Edit ${t.name}`}
+                                onClick={() => {
+                                  setTermEditing(t);
+                                  setTermForm({
+                                    name: t.name,
+                                    sequence: String(t.sequence),
+                                    startDate: t.startDate?.slice(0, 10) ?? '',
+                                    endDate: t.endDate?.slice(0, 10) ?? '',
+                                    gradingDeadline: t.gradingDeadline?.slice(0, 10) ?? '',
+                                  });
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-[hsl(var(--status-danger-ink))] hover:text-[hsl(var(--status-danger-ink))]"
+                                aria-label={`Delete ${t.name}`}
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: `Delete ${t.name}?`,
+                                    description: 'Terms referenced by curricula or enrollments cannot be deleted.',
+                                    confirmLabel: 'Delete',
+                                    destructive: true,
+                                  });
+                                  if (ok) deleteTermMutation.mutate(t.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (termEditing) {
+                      updateTermMutation.mutate({ id: termEditing.id, data: termForm });
+                    } else {
+                      createTermMutation.mutate({ ...termForm, schoolYearId: termsFor.id });
+                    }
+                  }}
+                  className="space-y-3 rounded-md border bg-muted/30 p-3"
+                >
+                  <p className="text-sm font-medium">
+                    {termEditing ? `Edit ${termEditing.name}` : 'Add term'}
+                    {termEditing && (
+                      <button
+                        type="button"
+                        className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setTermEditing(null);
+                          setTermForm({ name: '', sequence: String(terms.length + 1), startDate: '', endDate: '', gradingDeadline: '' });
+                        }}
+                      >
+                        <X className="inline h-3 w-3" /> cancel edit
+                      </button>
+                    )}
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-[5rem_1fr]">
+                    <div>
+                      <Label htmlFor="term-seq">Seq</Label>
+                      <Input
+                        id="term-seq"
+                        type="number"
+                        min={1}
+                        value={termForm.sequence}
+                        onChange={(e) => setTermForm({ ...termForm, sequence: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="term-name">Name</Label>
+                      <Input
+                        id="term-name"
+                        value={termForm.name}
+                        onChange={(e) => setTermForm({ ...termForm, name: e.target.value })}
+                        placeholder="e.g. 1st Quarter, Semester 1"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <Label htmlFor="term-start">Start date</Label>
+                      <Input
+                        id="term-start"
+                        type="date"
+                        value={termForm.startDate}
+                        onChange={(e) => setTermForm({ ...termForm, startDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="term-end">End date</Label>
+                      <Input
+                        id="term-end"
+                        type="date"
+                        value={termForm.endDate}
+                        onChange={(e) => setTermForm({ ...termForm, endDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="term-deadline">Grading deadline</Label>
+                      <Input
+                        id="term-deadline"
+                        type="date"
+                        value={termForm.gradingDeadline}
+                        onChange={(e) => setTermForm({ ...termForm, gradingDeadline: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    {termEditing && (
+                      <Button type="button" variant="outline" onClick={() => setTermEditing(null)}>
+                        Cancel
+                      </Button>
+                    )}
+                    <Button
+                      type="submit"
+                      disabled={createTermMutation.isPending || updateTermMutation.isPending}
+                    >
+                      {termEditing
+                        ? updateTermMutation.isPending ? 'Saving…' : 'Save changes'
+                        : createTermMutation.isPending ? 'Adding…' : 'Add term'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </div>
             </DialogContent>
           </Dialog>
         )}

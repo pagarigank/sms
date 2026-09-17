@@ -55,7 +55,7 @@ export const configEndpoints = (client: ApiClient) => ({
   listNumberingSchemes: (params?: { entityName?: string; tenantId?: string; branchId?: string }) =>
     client.get<NumberingScheme[]>('/api/v1/config/numbering-schemes', params?.tenantId ? { tenantId: params.tenantId } : undefined),
 
-  createNumberingScheme: (data: { name: string; entityType: string; format: string; tenantId: string; branchId?: string }) =>
+  createNumberingScheme: (data: { name: string; entityType: string; format: string; branchId?: string }) =>
     client.post<NumberingScheme>('/api/v1/config/numbering-schemes', data),
 
   updateNumberingScheme: (id: string, data: Partial<NumberingScheme>) =>
@@ -65,7 +65,7 @@ export const configEndpoints = (client: ApiClient) => ({
   listFeatureFlags: (params?: { tenantId?: string; branchId?: string }) =>
     client.get<FeatureFlag[]>('/api/v1/config/feature-flags', params?.tenantId ? { tenantId: params.tenantId } : undefined),
 
-  createFeatureFlag: (data: { flagKey: string; enabled?: boolean; rolloutPercentage?: number; tenantId: string; branchId?: string }) =>
+  createFeatureFlag: (data: { flagKey: string; enabled?: boolean; rolloutPercentage?: number; branchId?: string }) =>
     client.post<FeatureFlag>('/api/v1/config/feature-flags', data),
 
   updateFeatureFlag: (id: string, data: Partial<FeatureFlag>) =>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ConfigEngineService } from './config-engine.service';
 import { NumberingScheme } from './numbering-scheme.entity';
@@ -23,8 +23,8 @@ export class ConfigEngineController {
   @Post('lookup-lists')
   @ApiOperation({ summary: 'Create a lookup list', description: 'Create a new configurable reference data list (e.g. Room Types, Document Types).' })
   @ApiResponse({ status: 201, description: 'Lookup list created.' })
-  createLookupList(@Body() body: any, @Headers('x-tenant-id') tenantId: string) {
-    return this.configService.createLookupList({ ...body, tenantId });
+  createLookupList(@Body() body: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    return this.configService.createLookupList({ ...body, tenantId }, req);
   }
 
   // NOTE: literal routes must be declared before parameterized ones — NestJS
@@ -45,14 +45,14 @@ export class ConfigEngineController {
 
   @Put('lookup-lists/:id')
   @ApiOperation({ summary: 'Update a lookup list' })
-  updateLookupList(@Param('id') id: string, @Body() body: any) {
-    return this.configService.updateLookupList(id, body);
+  updateLookupList(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.configService.updateLookupList(id, body, req);
   }
 
   @Delete('lookup-lists/:id')
   @ApiOperation({ summary: 'Delete a lookup list', description: 'Fails with 409 if items exist or the list is referenced.' })
-  removeLookupList(@Param('id') id: string) {
-    return this.configService.removeLookupList(id);
+  removeLookupList(@Param('id') id: string, @Req() req: any) {
+    return this.configService.removeLookupList(id, req);
   }
 
   @Get('lookup-lists/:listId/items')
@@ -65,20 +65,20 @@ export class ConfigEngineController {
   @Post('lookup-items')
   @ApiOperation({ summary: 'Create a lookup item', description: 'Add a new value to an existing lookup list.' })
   @ApiResponse({ status: 201, description: 'Lookup item created.' })
-  createLookupItem(@Body() body: any) {
-    return this.configService.createLookupItem(body);
+  createLookupItem(@Body() body: any, @Req() req: any) {
+    return this.configService.createLookupItem(body, req);
   }
 
   @Put('lookup-items/:id')
   @ApiOperation({ summary: 'Update a lookup item' })
-  updateLookupItem(@Param('id') id: string, @Body() body: any) {
-    return this.configService.updateLookupItem(id, body);
+  updateLookupItem(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.configService.updateLookupItem(id, body, req);
   }
 
   @Delete('lookup-items/:id')
   @ApiOperation({ summary: 'Delete a lookup item' })
-  removeLookupItem(@Param('id') id: string) {
-    return this.configService.removeLookupItem(id);
+  removeLookupItem(@Param('id') id: string, @Req() req: any) {
+    return this.configService.removeLookupItem(id, req);
   }
 
   // --- Custom Fields ---
@@ -99,20 +99,20 @@ export class ConfigEngineController {
   @Post('custom-fields')
   @ApiOperation({ summary: 'Create a custom field definition', description: 'Add a custom field to an entity type without schema migration (EAV pattern).' })
   @ApiResponse({ status: 201, description: 'Custom field created.' })
-  createCustomField(@Body() body: any, @Headers('x-tenant-id') tenantId: string) {
-    return this.configService.createCustomField({ ...body, tenantId });
+  createCustomField(@Body() body: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    return this.configService.createCustomField({ ...body, tenantId }, req);
   }
 
   @Put('custom-fields/:id')
   @ApiOperation({ summary: 'Update a custom field definition' })
-  updateCustomField(@Param('id') id: string, @Body() body: any) {
-    return this.configService.updateCustomField(id, body);
+  updateCustomField(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.configService.updateCustomField(id, body, req);
   }
 
   @Delete('custom-fields/:id')
   @ApiOperation({ summary: 'Delete a custom field definition' })
-  removeCustomField(@Param('id') id: string) {
-    return this.configService.removeCustomField(id);
+  removeCustomField(@Param('id') id: string, @Req() req: any) {
+    return this.configService.removeCustomField(id, req);
   }
 
   // --- Numbering Schemes ---
@@ -124,14 +124,14 @@ export class ConfigEngineController {
 
   @Post('numbering-schemes')
   @ApiOperation({ summary: 'Create a numbering scheme' })
-  createNumberingScheme(@Body() body: any, @Headers('x-tenant-id') tenantId: string) {
-    return this.configService.createNumberingScheme({ ...body, tenantId });
+  createNumberingScheme(@Body() body: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    return this.configService.createNumberingScheme({ ...body, tenantId }, req);
   }
 
   @Put('numbering-schemes/:id')
   @ApiOperation({ summary: 'Update a numbering scheme' })
-  updateNumberingScheme(@Param('id') id: string, @Body() body: any) {
-    return this.configService.updateNumberingScheme(id, body);
+  updateNumberingScheme(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.configService.updateNumberingScheme(id, body, req);
   }
 
   // --- Feature Flags ---
@@ -143,20 +143,20 @@ export class ConfigEngineController {
 
   @Post('feature-flags')
   @ApiOperation({ summary: 'Create a feature flag' })
-  createFeatureFlag(@Body() body: any, @Headers('x-tenant-id') tenantId: string) {
-    return this.configService.createFeatureFlag({ ...body, tenantId });
+  createFeatureFlag(@Body() body: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    return this.configService.createFeatureFlag({ ...body, tenantId }, req);
   }
 
   @Put('feature-flags/:id')
   @ApiOperation({ summary: 'Update a feature flag' })
-  updateFeatureFlag(@Param('id') id: string, @Body() body: any) {
-    return this.configService.updateFeatureFlag(id, body);
+  updateFeatureFlag(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.configService.updateFeatureFlag(id, body, req);
   }
 
   @Delete('feature-flags/:id')
   @ApiOperation({ summary: 'Delete a feature flag' })
-  removeFeatureFlag(@Param('id') id: string) {
-    return this.configService.removeFeatureFlag(id);
+  removeFeatureFlag(@Param('id') id: string, @Req() req: any) {
+    return this.configService.removeFeatureFlag(id, req);
   }
 
   // --- Workflows ---
@@ -168,14 +168,14 @@ export class ConfigEngineController {
 
   @Post('workflows')
   @ApiOperation({ summary: 'Create a workflow definition' })
-  createWorkflow(@Body() body: any, @Headers('x-tenant-id') tenantId: string) {
-    return this.configService.createWorkflow({ ...body, tenantId });
+  createWorkflow(@Body() body: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
+    return this.configService.createWorkflow({ ...body, tenantId }, req);
   }
 
   @Put('workflows/:id')
   @ApiOperation({ summary: 'Update a workflow definition' })
-  updateWorkflow(@Param('id') id: string, @Body() body: any) {
-    return this.configService.updateWorkflow(id, body);
+  updateWorkflow(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.configService.updateWorkflow(id, body, req);
   }
 
   @Get('workflow-instances')

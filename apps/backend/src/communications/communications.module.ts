@@ -9,6 +9,7 @@ import { MessageThread } from './message-thread.entity';
 import { Message } from './message.entity';
 import { CommunicationsService } from './communications.service';
 import { CommunicationsController } from './communications.controller';
+import { ConfigEngineModule } from '../config/config.module';
 
 const COMMS_ENTITIES = [
   NotificationTemplate, NotificationRule, ChannelConfig,
@@ -16,7 +17,7 @@ const COMMS_ENTITIES = [
 ];
 
 @Module({
-  imports: [TypeOrmModule.forFeature(COMMS_ENTITIES)],
+  imports: [ConfigEngineModule, TypeOrmModule.forFeature(COMMS_ENTITIES)],
   controllers: [CommunicationsController],
   providers: [CommunicationsService],
   exports: [CommunicationsService],

@@ -16,6 +16,10 @@ import { DenominationSet } from './denomination-set.entity';
 import { Invoice } from '../billing/invoice.entity';
 import { InvoiceService } from '../billing/invoice.service';
 import { Student } from '../sis/student.entity';
+import { WorkflowService } from '../config/workflow.service';
+import { WorkflowInstance } from '../config/workflow-instance.entity';
+import { WorkflowDefinition } from '../config/workflow-definition.entity';
+import { WorkflowApproval } from '../config/workflow-approval.entity';
 
 @Injectable()
 export class CashieringService {
@@ -34,6 +38,7 @@ export class CashieringService {
     @InjectRepository(DenominationSet) private denominationSetsRepo: Repository<DenominationSet>,
     private dataSource: DataSource,
     private invoiceService: InvoiceService,
+    private workflowService: WorkflowService,
   ) {}
 
   // === Cashier Sessions ===
@@ -392,12 +397,137 @@ export class CashieringService {
   async createRefund(data: {
     tenantId: string; branchId: string; originalOrId: string;
     invoiceId: string; amount: number; reason: string; approvedBy?: string;
+    requestedBy?: string;
   }) {
-    const refund = this.refundsRepo.create({
-      ...data,
-      status: data.approvedBy ? 'approved' : 'pending',
+    const refund = await this.dataSource.transaction(async (manager) => {
+      const created = await manager.save(
+        Refund,
+        manager.create(Refund, {
+          ...data,
+          status: data.approvedBy ? 'approved' : 'pending',
+        }),
+      );
+
+      // FR-CFG-4: refunds route through the tenant's approval-chain workflow.
+      // An unapproved refund starts the 'refund' workflow; the row and its
+      // approval instance commit together (transaction-aware startWorkflow).
+      // If no refund workflow is configured the refund stands alone — config
+      // gaps degrade gracefully instead of blocking the cashier.
+      if (!data.approvedBy) {
+        try {
+          await this.workflowService.startWorkflow(
+            data.tenantId,
+            'refund',
+            created.id,
+            data.requestedBy ?? 'system',
+            data.reason,
+            manager,
+          );
+        } catch {
+          // No active 'refund' definition for this tenant → refund stays
+          // pending with no chain; decide() can still be driven manually.
+        }
+      }
+      return created;
     });
-    return this.refundsRepo.save(refund);
+    return refund;
+  }
+
+  /**
+   * FR-CFG-4: decide on a refund's approval chain and apply the money effects
+   * of the final decision in ONE transaction with the instance update.
+   * Approved refunds return money to the ledger (a payment-row-backed
+   * negative payment) and mark the original receipt reversed; rejections and
+   * mid-chain approvals just advance the instance.
+   */
+  async decideRefund(
+    refundId: string,
+    tenantId: string,
+    approverUserId: string,
+    decision: 'approved' | 'rejected',
+    reason?: string,
+  ) {
+    return this.dataSource.transaction(async (manager) => {
+      const refund = await manager.findOne(Refund, { where: { id: refundId, tenantId } });
+      if (!refund) throw new NotFoundException('Refund not found');
+      if (refund.status !== 'pending') {
+        throw new BadRequestException('Refund is not pending');
+      }
+
+      const instance = await manager.findOne(WorkflowInstance, {
+        where: { tenantId, entityType: 'refund', entityId: refundId, status: 'pending' },
+      });
+
+      // Advance (or finalize) the chain first — a missing instance is
+      // tolerated (legacy/manual refunds) but an explicit rejection must not
+      // silently apply money effects. decide() joins THIS transaction, and the
+      // returned instance reflects the decision, so the final approval applies
+      // the money effects on this very call.
+      let postDecision: WorkflowInstance | null = null;
+      if (instance) {
+        postDecision = await this.workflowService.decide(
+          instance.id,
+          approverUserId,
+          decision,
+          reason,
+          manager,
+        );
+      }
+
+      if (decision === 'rejected') {
+        refund.status = 'rejected';
+        return manager.save(Refund, refund);
+      }
+
+      const definition = postDecision
+        ? await manager.findOne(WorkflowDefinition, {
+            where: { id: postDecision.workflowDefinitionId },
+          })
+        : null;
+      const chainComplete =
+        !postDecision ||
+        (definition
+          ? postDecision.currentStep >= definition.steps.length
+          : true);
+
+      if (!chainComplete) return manager.save(Refund, refund);
+
+      // Chain complete — apply money effects atomically with the decision.
+      const originalOr = await manager.findOne(OfficialReceipt, {
+        where: { id: refund.originalOrId, tenantId },
+      });
+      if (!originalOr) throw new NotFoundException('Original official receipt not found');
+
+      refund.status = 'approved';
+      refund.approvedBy = approverUserId;
+      const saved = await manager.save(Refund, refund);
+
+      // Ledger leg: a negative payment row reduces the invoice's paid amount
+      // via the same row-locked applyPaymentTx used by collections.
+      await this.invoiceService.applyPaymentTx(
+        manager,
+        refund.invoiceId,
+        tenantId,
+        -Number(refund.amount),
+      );
+      const payment = manager.create(Payment, {
+        tenantId,
+        branchId: refund.branchId,
+        invoiceId: refund.invoiceId,
+        amount: -Number(refund.amount),
+        method: 'refund',
+        status: 'completed',
+        idempotencyKey: `refund-${refund.id}`,
+        denominationBreakdown: {},
+      });
+      await manager.save(Payment, payment);
+
+      // BIR leg: mark the original receipt reversed.
+      originalOr.reversedBy = saved.id;
+      await manager.save(OfficialReceipt, originalOr);
+
+      return saved;
+    });
   }
 
   // === Ad-Hoc Sales ===

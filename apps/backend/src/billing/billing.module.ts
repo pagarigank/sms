@@ -15,6 +15,7 @@ import { Enrollment } from '../sis/enrollment.entity';
 import { Student } from '../sis/student.entity';
 import { SchoolYear } from '../academic/school-year.entity';
 import { Curriculum } from '../academic/curriculum.entity';
+import { ConfigEngineModule } from '../config/config.module';
 import { BillingService } from './billing.service';
 import { InvoiceService } from './invoice.service';
 import { BillingController } from './billing.controller';
@@ -22,6 +23,7 @@ import { InvoiceController } from './invoice.controller';
 
 @Module({
   imports: [
+    ConfigEngineModule,
     TypeOrmModule.forFeature([
       FeeType,
       FeeStructure,

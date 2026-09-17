@@ -85,6 +85,14 @@ export class AcademicController {
   @ApiOperation({ summary: 'Create term', description: 'e.g. First Quarter, Semester 1' })
   createTerm(@Body() body: any, @Headers('x-tenant-id') tenantId: string) { return this.academicService.createTerm({ ...body, tenantId }); }
 
+  @Patch('terms/:id')
+  @ApiOperation({ summary: 'Update term' })
+  updateTerm(@Param('id') id: string, @Body() body: any) { return this.academicService.updateTerm(id, body); }
+
+  @Delete('terms/:id')
+  @ApiOperation({ summary: 'Delete term', description: 'Fails with 409 if referenced by curricula subjects or enrollments.' })
+  removeTerm(@Param('id') id: string) { return this.academicService.removeTerm(id); }
+
   // === Tracks (SHS) ===
   @Get('tracks')
   @ApiOperation({ summary: 'List tracks (SHS)', description: 'e.g. Academic, TVL, Sports, Arts & Design' })
@@ -213,6 +221,10 @@ export class AcademicController {
   @Post('curriculum-subjects')
   @ApiOperation({ summary: 'Add subject to curriculum', description: 'Assign a subject to a term within a curriculum, with prerequisite linking.' })
   createCurriculumSubject(@Body() body: any, @Headers('x-tenant-id') tenantId: string) { return this.academicService.createCurriculumSubject({ ...body, tenantId }); }
+
+  @Delete('curriculum-subjects/:id')
+  @ApiOperation({ summary: 'Remove a subject from a curriculum' })
+  removeCurriculumSubject(@Param('id') id: string) { return this.academicService.removeCurriculumSubject(id); }
 
   @Post('curricula/:id/publish')
   @ApiOperation({ summary: 'Publish curriculum', description: 'Transition from draft → active. Validates effectiveGradingSystemId is set on all subjects.' })

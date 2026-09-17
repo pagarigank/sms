@@ -6,6 +6,7 @@ import { InvoiceItem } from './invoice-item.entity';
 import { StudentDiscountGrant } from './student-discount-grant.entity';
 import { Student } from '../sis/student.entity';
 import { BillingService } from './billing.service';
+import { NumberingService } from '../config/numbering.service';
 
 @Injectable()
 export class InvoiceService {
@@ -16,6 +17,7 @@ export class InvoiceService {
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
     private billingService: BillingService,
     private dataSource: DataSource,
+    private numberingService: NumberingService,
   ) {}
 
   // === Invoices ===
@@ -105,7 +107,7 @@ export class InvoiceService {
     // Invoice + items are written in ONE transaction: a mid-way failure must
     // not leave an invoice with no (or partial) line items in AR.
     return this.dataSource.transaction(async (manager) => {
-      const invoiceNumber = await this.generateInvoiceNumber(data.tenantId);
+      const invoiceNumber = await this.generateInvoiceNumber(data.tenantId, manager, data.branchId);
       const savedInvoice = await manager.save(
         manager.create(Invoice, {
           tenantId: data.tenantId,
@@ -336,8 +338,18 @@ export class InvoiceService {
     };
   }
 
-  private async generateInvoiceNumber(tenantId: string): Promise<string> {
-    const count = await this.invoicesRepo.count({ where: { tenantId } });
-    return `INV-${(count + 1).toString().padStart(6, '0')}`;
+  /**
+   * FR-CFG-3: invoice numbers come from the tenant's numbering scheme
+   * (numbering_schemes, entityType='invoice'), auto-provisioned as
+   * INV-{YYYY}-{SEQ}. The counter increments inside the invoice transaction —
+   * a rollback never burns a number. Kept UNIQUE via migration 025 (the old
+   * count-based scheme collided under concurrency).
+   */
+  private async generateInvoiceNumber(
+    tenantId: string,
+    tx: EntityManager,
+    branchId?: string,
+  ): Promise<string> {
+    return this.numberingService.allocateNumber(tenantId, 'invoice', { branchId, tx });
   }
 }

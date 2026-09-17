@@ -146,6 +146,12 @@ export default function TracksPage() {
     setEditingStrand(strand);
   };
 
+  // Jump from a track row to its strands (the old button was decorative).
+  const manageStrands = (track: Track) => {
+    setSearchQuery(track.name);
+    setActiveTab('strands');
+  };
+
   const handleTrackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingTrack) {
@@ -227,6 +233,8 @@ export default function TracksPage() {
               size="sm"
               className="h-8 w-8 p-0"
               aria-label="Manage strands"
+              title="Manage strands under this track"
+              onClick={() => manageStrands(track)}
             >
               <BookOpen className="h-4 w-4" />
             </Button>
@@ -613,7 +621,7 @@ export default function TracksPage() {
             />
           </>
         )}
-
+
       </div>
     </>
   );

@@ -83,6 +83,8 @@ export class AcademicService {
   // === Terms ===
   findTerms(schoolYearId: string) { return this.termsRepo.find({ where: { schoolYearId }, order: { sequence: 'ASC' } }); }
   async createTerm(data: Partial<Term>) { return this.termsRepo.save(this.termsRepo.create(data)); }
+  updateTerm(id: string, data: Partial<Term>) { return this.updateGuarded(this.termsRepo, id, data, 'Term'); }
+  removeTerm(id: string) { return this.deleteGuarded(this.termsRepo, id, 'Term'); }
 
   // === Tracks (SHS) ===
   findTracks(tenantId: string) { return this.tracksRepo.find({ where: { tenantId } }); }

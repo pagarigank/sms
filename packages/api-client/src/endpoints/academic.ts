@@ -72,6 +72,12 @@ export const academicEndpoints = (client: ApiClient) => ({
   createTerm: (data: { schoolYearId: string; name: string; sequence: number; startDate: string; endDate: string; gradingDeadline?: string }) =>
     client.post<Term>('/api/v1/academic/terms', data),
 
+  updateTerm: (id: string, data: Partial<Term>) =>
+    client.patch<Term>(`/api/v1/academic/terms/${id}`, data),
+
+  deleteTerm: (id: string) =>
+    client.delete<Term>(`/api/v1/academic/terms/${id}`),
+
   // Tracks
   listTracks: (params?: { limit?: number; search?: string }) =>
     client.get<Track[]>('/api/v1/academic/tracks', params as Record<string, string>),
@@ -153,4 +159,7 @@ export const academicEndpoints = (client: ApiClient) => ({
 
   createCurriculumSubject: (data: { curriculumId: string; subjectId: string; termId?: string; prerequisiteSubjectId?: string }) =>
     client.post<CurriculumSubject>('/api/v1/academic/curriculum-subjects', data),
+
+  deleteCurriculumSubject: (id: string) =>
+    client.delete<void>(`/api/v1/academic/curriculum-subjects/${id}`),
 });

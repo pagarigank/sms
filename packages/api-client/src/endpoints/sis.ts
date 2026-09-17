@@ -1,5 +1,37 @@
 import type { ApiClient } from '../client';
 
+/** Section row as returned by the list endpoint, plus the roster seat count. */
+export interface SectionWithSeatCount {
+  id: string;
+  tenantId: string;
+  branchId?: string;
+  schoolYearId?: string;
+  name: string;
+  gradeLevelId?: string;
+  homeroom?: string;
+  capacity: number;
+  isActive: boolean;
+  seatCount: number;
+}
+
+/** Active section-assignment row joined with the student profile. */
+export interface SectionAssignment {
+  id: string;
+  tenantId: string;
+  enrollmentId: string;
+  sectionId: string;
+  studentId: string;
+  isActive: boolean;
+  assignedAt: string;
+  assignedBy?: string;
+  student?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    studentNumber?: string;
+  };
+}
+
 export function sisEndpoints(client: ApiClient) {
   return {
     // Students
@@ -62,15 +94,28 @@ export function sisEndpoints(client: ApiClient) {
     updateEnrollment: (id: string, data: any) =>
       client.put(`/api/v1/sis/enrollments/${id}`, data),
 
-    // Sections
+    // Sections — rows carry seatCount (active assignments) for inline meters
     listSections: (params: { tenantId: string; branchId?: string; schoolYearId?: string }) =>
-      client.get('/api/v1/sis/sections', params as any),
+      client.get<SectionWithSeatCount[]>('/api/v1/sis/sections', params as any),
 
     createSection: (data: any) =>
       client.post('/api/v1/sis/sections', data),
 
     updateSection: (id: string, data: any) =>
       client.put(`/api/v1/sis/sections/${id}`, data),
+
+    deleteSection: (id: string) =>
+      client.delete(`/api/v1/sis/sections/${id}`),
+
+    // Section roster: active assignments joined with student profiles.
+    listSectionStudents: (sectionId: string) =>
+      client.get<SectionAssignment[]>(`/api/v1/sis/sections/${sectionId}/students`),
+
+    assignStudentToSectionByStudent: (studentId: string, sectionId: string) =>
+      client.post(`/api/v1/sis/sections/${sectionId}/students/${studentId}`),
+
+    unassignSectionStudent: (sectionId: string, studentId: string) =>
+      client.delete(`/api/v1/sis/sections/${sectionId}/students/${studentId}`),
 
     assignToSection: (enrollmentId: string, sectionId: string) =>
       client.post(`/api/v1/sis/enrollments/${enrollmentId}/assign-section/${sectionId}`),

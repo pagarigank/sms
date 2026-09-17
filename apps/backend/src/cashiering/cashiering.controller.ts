@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CashieringService } from './cashiering.service';
 import { OptionalIdempotencyGuard } from '../common/idempotency.guard';
@@ -93,8 +93,25 @@ export class CashieringController {
   @Post('refunds')
   @UseGuards(OptionalIdempotencyGuard)
   @ApiOperation({ summary: 'Create a refund request' })
-  async createRefund(@Headers('x-tenant-id') tenantId: string, @Body() body: any) {
-    return this.cashieringService.createRefund({ ...body, tenantId });
+  async createRefund(@Headers('x-tenant-id') tenantId: string, @Body() body: any, @Req() req: any) {
+    return this.cashieringService.createRefund({ ...body, tenantId, requestedBy: req.user?.sub ?? req.user?.id });
+  }
+
+  @Post('refunds/:id/decide')
+  @ApiOperation({ summary: 'Approve or reject a refund', description: 'Advances the refund approval chain (FR-CFG-4); the final approval applies the ledger and BIR effects atomically.' })
+  async decideRefund(
+    @Param('id') id: string,
+    @Headers('x-tenant-id') tenantId: string,
+    @Req() req: any,
+    @Body() body: { decision: 'approved' | 'rejected'; reason?: string },
+  ) {
+    return this.cashieringService.decideRefund(
+      id,
+      tenantId,
+      req.user?.sub ?? req.user?.id,
+      body.decision,
+      body.reason,
+    );
   }
 
   // === Ad-Hoc Sales ===

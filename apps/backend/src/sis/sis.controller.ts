@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { SisService } from './sis.service';
@@ -172,6 +172,44 @@ export class SisController {
   @ApiOperation({ summary: 'Update a section' })
   async updateSection(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string, @Body() data: any) {
     return this.sisService.updateSection(id, tenantId, data);
+  }
+
+  @Delete('sections/:id')
+  @ApiOperation({ summary: 'Delete a section', description: 'Fails with 409 if students are still assigned.' })
+  async deleteSection(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteSection(id, tenantId);
+  }
+
+  @Get('sections/:id/students')
+  @ApiOperation({ summary: 'Section roster', description: 'Active student assignments for a section, joined with student profiles.' })
+  async findSectionStudents(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.findSectionStudents(id, tenantId);
+  }
+
+  @Post('sections/:id/students/:studentId')
+  @ApiOperation({ summary: 'Assign a student to a section by studentId', description: 'Resolves the student\'s active enrollment, then runs the capacity-checked assignment transaction.' })
+  async assignSectionStudent(
+    @Param('id') id: string,
+    @Param('studentId') studentId: string,
+    @Headers('x-tenant-id') tenantId: string,
+    @Req() req: any,
+  ) {
+    return this.sisService.assignStudentToSectionByStudent(
+      id,
+      studentId,
+      tenantId,
+      req.user?.sub ?? req.user?.id,
+    );
+  }
+
+  @Delete('sections/:id/students/:studentId')
+  @ApiOperation({ summary: 'Unassign a student from a section', description: 'Soft-deactivates the assignment and clears the enrollment pointer in one transaction.' })
+  async removeSectionStudent(
+    @Param('id') id: string,
+    @Param('studentId') studentId: string,
+    @Headers('x-tenant-id') tenantId: string,
+  ) {
+    return this.sisService.removeSectionAssignment(id, studentId, tenantId);
   }
 
   @Post('enrollments/:enrollmentId/assign-section/:sectionId')

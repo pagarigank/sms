@@ -1,4 +1,10 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+
+/** The authenticated-request pieces logMutation reads (JWT payload + tenant header). */
+interface ActorRequest {
+  headers: Record<string, string | string[] | undefined>;
+  user?: { sub?: string; id?: string };
+}
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { LookupList } from './lookup-list.entity';
@@ -48,9 +54,10 @@ export class ConfigEngineService {
     return this.lookupListsRepo.find({ where: { tenantId } });
   }
 
-  async createLookupList(data: Partial<LookupList>): Promise<LookupList> {
-    const list = this.lookupListsRepo.create(data);
-    return this.lookupListsRepo.save(list);
+  async createLookupList(data: Partial<LookupList>, actor?: ActorRequest): Promise<LookupList> {
+    const list = await this.lookupListsRepo.save(this.lookupListsRepo.create(data));
+    await this.logMutation(actor, 'LookupList', list.id, 'create', null, list);
+    return list;
   }
 
   async findOneLookupList(id: string): Promise<LookupList> {
@@ -59,14 +66,19 @@ export class ConfigEngineService {
     return list;
   }
 
-  async updateLookupList(id: string, data: Partial<LookupList>) {
-    return this.updateGuarded(this.lookupListsRepo, id, data, 'Lookup list');
+  async updateLookupList(id: string, data: Partial<LookupList>, actor?: ActorRequest) {
+    const before = await this.lookupListsRepo.findOneBy({ id });
+    const updated = await this.updateGuarded(this.lookupListsRepo, id, data, 'Lookup list');
+    await this.logMutation(actor, 'LookupList', id, 'update', before, updated);
+    return updated;
   }
 
-  async removeLookupList(id: string) {
+  async removeLookupList(id: string, actor?: ActorRequest) {
     const items = await this.lookupItemsRepo.count({ where: { lookupListId: id } });
     if (items > 0) throw new ConflictException(`Lookup list ${id} still has ${items} items — delete them first`);
+    const before = await this.lookupListsRepo.findOneBy({ id });
     await this.deleteGuarded(this.lookupListsRepo, id, 'Lookup list');
+    await this.logMutation(actor, 'LookupList', id, 'delete', before, null);
   }
 
   async findLookupItemsFlat(tenantId: string, lookupListId?: string): Promise<LookupItem[]> {
@@ -79,17 +91,23 @@ export class ConfigEngineService {
     return this.lookupItemsRepo.find({ where: { lookupListId: listId }, order: { sortOrder: 'ASC' } });
   }
 
-  async createLookupItem(data: Partial<LookupItem>): Promise<LookupItem> {
-    const item = this.lookupItemsRepo.create(data);
-    return this.lookupItemsRepo.save(item);
+  async createLookupItem(data: Partial<LookupItem>, actor?: ActorRequest): Promise<LookupItem> {
+    const item = await this.lookupItemsRepo.save(this.lookupItemsRepo.create(data));
+    await this.logMutation(actor, 'LookupItem', item.id, 'create', null, item);
+    return item;
   }
 
-  updateLookupItem(id: string, data: Partial<LookupItem>) {
-    return this.updateGuarded(this.lookupItemsRepo, id, data, 'Lookup item');
+  async updateLookupItem(id: string, data: Partial<LookupItem>, actor?: ActorRequest) {
+    const before = await this.lookupItemsRepo.findOneBy({ id });
+    const updated = await this.updateGuarded(this.lookupItemsRepo, id, data, 'Lookup item');
+    await this.logMutation(actor, 'LookupItem', id, 'update', before, updated);
+    return updated;
   }
 
-  removeLookupItem(id: string) {
-    return this.deleteGuarded(this.lookupItemsRepo, id, 'Lookup item');
+  async removeLookupItem(id: string, actor?: ActorRequest) {
+    const before = await this.lookupItemsRepo.findOneBy({ id });
+    await this.deleteGuarded(this.lookupItemsRepo, id, 'Lookup item');
+    await this.logMutation(actor, 'LookupItem', id, 'delete', before, null);
   }
 
   // --- Custom Fields ---
@@ -105,17 +123,23 @@ export class ConfigEngineService {
     return f;
   }
 
-  async createCustomField(data: Partial<CustomFieldDefinition>): Promise<CustomFieldDefinition> {
-    const field = this.customFieldsRepo.create(data);
-    return this.customFieldsRepo.save(field);
+  async createCustomField(data: Partial<CustomFieldDefinition>, actor?: ActorRequest): Promise<CustomFieldDefinition> {
+    const field = await this.customFieldsRepo.save(this.customFieldsRepo.create(data));
+    await this.logMutation(actor, 'CustomFieldDefinition', field.id, 'create', null, field);
+    return field;
   }
 
-  updateCustomField(id: string, data: Partial<CustomFieldDefinition>) {
-    return this.updateGuarded(this.customFieldsRepo, id, data, 'Custom field');
+  async updateCustomField(id: string, data: Partial<CustomFieldDefinition>, actor?: ActorRequest) {
+    const before = await this.customFieldsRepo.findOneBy({ id });
+    const updated = await this.updateGuarded(this.customFieldsRepo, id, data, 'Custom field');
+    await this.logMutation(actor, 'CustomFieldDefinition', id, 'update', before, updated);
+    return updated;
   }
 
-  removeCustomField(id: string) {
-    return this.deleteGuarded(this.customFieldsRepo, id, 'Custom field');
+  async removeCustomField(id: string, actor?: ActorRequest) {
+    const before = await this.customFieldsRepo.findOneBy({ id });
+    await this.deleteGuarded(this.customFieldsRepo, id, 'Custom field');
+    await this.logMutation(actor, 'CustomFieldDefinition', id, 'delete', before, null);
   }
 
   // --- Numbering Schemes ---
@@ -123,12 +147,17 @@ export class ConfigEngineService {
     return this.numberingRepo.find({ where: { tenantId } });
   }
 
-  createNumberingScheme(data: Partial<NumberingScheme>): Promise<NumberingScheme> {
-    return this.numberingRepo.save(this.numberingRepo.create(data));
+  async createNumberingScheme(data: Partial<NumberingScheme>, actor?: ActorRequest): Promise<NumberingScheme> {
+    const scheme = await this.numberingRepo.save(this.numberingRepo.create(data));
+    await this.logMutation(actor, 'NumberingScheme', scheme.id, 'create', null, scheme);
+    return scheme;
   }
 
-  updateNumberingScheme(id: string, data: Partial<NumberingScheme>) {
-    return this.updateGuarded(this.numberingRepo, id, data, 'Numbering scheme');
+  async updateNumberingScheme(id: string, data: Partial<NumberingScheme>, actor?: ActorRequest) {
+    const before = await this.numberingRepo.findOneBy({ id });
+    const updated = await this.updateGuarded(this.numberingRepo, id, data, 'Numbering scheme');
+    await this.logMutation(actor, 'NumberingScheme', id, 'update', before, updated);
+    return updated;
   }
 
   // --- Feature Flags ---
@@ -136,16 +165,22 @@ export class ConfigEngineService {
     return this.featureFlagsRepo.find({ where: { tenantId } });
   }
 
-  createFeatureFlag(data: Partial<FeatureFlag>): Promise<FeatureFlag> {
-    return this.featureFlagsRepo.save(this.featureFlagsRepo.create(data));
+  async createFeatureFlag(data: Partial<FeatureFlag>, actor?: ActorRequest): Promise<FeatureFlag> {
+    const flag = await this.featureFlagsRepo.save(this.featureFlagsRepo.create(data));
+    await this.logMutation(actor, 'FeatureFlag', flag.id, 'create', null, flag);
+    return flag;
   }
 
-  updateFeatureFlag(id: string, data: Partial<FeatureFlag>) {
-    return this.updateGuarded(this.featureFlagsRepo, id, data, 'Feature flag');
+  async updateFeatureFlag(id: string, data: Partial<FeatureFlag>, actor?: ActorRequest) {
+    const before = await this.featureFlagsRepo.findOneBy({ id });
+    const updated = await this.updateGuarded(this.featureFlagsRepo, id, data, 'Feature flag');
+    await this.logMutation(actor, 'FeatureFlag', id, 'update', before, updated);
+    return updated;
   }
-
-  removeFeatureFlag(id: string) {
-    return this.deleteGuarded(this.featureFlagsRepo, id, 'Feature flag');
+  async removeFeatureFlag(id: string, actor?: ActorRequest) {
+    const before = await this.featureFlagsRepo.findOneBy({ id });
+    await this.deleteGuarded(this.featureFlagsRepo, id, 'Feature flag');
+    await this.logMutation(actor, 'FeatureFlag', id, 'delete', before, null);
   }
 
   // --- Workflows ---
@@ -153,12 +188,17 @@ export class ConfigEngineService {
     return this.workflowsRepo.find({ where: { tenantId } });
   }
 
-  createWorkflow(data: Partial<WorkflowDefinition>): Promise<WorkflowDefinition> {
-    return this.workflowsRepo.save(this.workflowsRepo.create(data));
+  async createWorkflow(data: Partial<WorkflowDefinition>, actor?: ActorRequest): Promise<WorkflowDefinition> {
+    const wf = await this.workflowsRepo.save(this.workflowsRepo.create(data));
+    await this.logMutation(actor, 'WorkflowDefinition', wf.id, 'create', null, wf);
+    return wf;
   }
 
-  updateWorkflow(id: string, data: Partial<WorkflowDefinition>) {
-    return this.updateGuarded(this.workflowsRepo, id, data, 'Workflow definition');
+  async updateWorkflow(id: string, data: Partial<WorkflowDefinition>, actor?: ActorRequest) {
+    const before = await this.workflowsRepo.findOneBy({ id });
+    const updated = await this.updateGuarded(this.workflowsRepo, id, data, 'Workflow definition');
+    await this.logMutation(actor, 'WorkflowDefinition', id, 'update', before, updated);
+    return updated;
   }
 
   findWorkflowInstances(tenantId: string): Promise<WorkflowInstance[]> {
@@ -171,12 +211,79 @@ export class ConfigEngineService {
     return this.auditEventsRepo.save(event);
   }
 
+  /**
+   * FR-CFG-7: audit-log writes for configuration mutations (who changed what,
+   * when, before/after). Non-fatal by design — a broken audit write must never
+   * block the business mutation it describes.
+   */
+  private async logMutation(
+    actor: ActorRequest | undefined,
+    entityType: string,
+    entityId: string,
+    action: 'create' | 'update' | 'delete',
+    beforeState: Record<string, any> | null,
+    afterState: Record<string, any> | null,
+  ): Promise<void> {
+    try {
+      await this.auditEventsRepo.save(
+        this.auditEventsRepo.create({
+          tenantId: actor?.headers?.['x-tenant-id'] as string,
+          actorUserId: actor?.user?.sub ?? actor?.user?.id ?? null,
+          entityType,
+          entityId,
+          action,
+          beforeState,
+          afterState,
+          requestId: actor?.headers?.['x-request-id'] as string | undefined,
+        }),
+      );
+    } catch {
+      // Audit writes are best-effort: never fail the mutation they describe.
+    }
+  }
+
   async findAuditEvents(tenantId: string, filters?: { entityType?: string; entityId?: string; actorUserId?: string }): Promise<AuditEvent[]> {
     const where: any = { tenantId };
     if (filters?.entityType) where.entityType = filters.entityType;
     if (filters?.entityId) where.entityId = filters.entityId;
     if (filters?.actorUserId) where.actorUserId = filters.actorUserId;
     return this.auditEventsRepo.find({ where, order: { occurredAt: 'DESC' }, take: 100 });
+  }
+
+  /**
+   * FR-CFG-8: feature-flag evaluation. Branch-specific flags override
+   * tenant-level ones; percentage rollout is decided deterministically from
+   * the subject id (the same subject always gets the same answer, and a
+   * missing subject falls back to the enabled bit alone).
+   */
+  async isFlagEnabled(
+    tenantId: string,
+    flagKey: string,
+    opts?: { branchId?: string | null; subjectId?: string },
+  ): Promise<boolean> {
+    const flags = await this.featureFlagsRepo.find({ where: { tenantId, flagKey } });
+    if (flags.length === 0) return false;
+
+    const branchSpecific = opts?.branchId
+      ? flags.find((f) => f.branchId === opts.branchId)
+      : undefined;
+    const flag = branchSpecific ?? flags.find((f) => !f.branchId) ?? flags[0];
+    if (!flag.enabled) return false;
+    if (flag.rolloutPercentage >= 100) return true;
+
+    if (!opts?.subjectId) return flag.rolloutPercentage > 0;
+    // Deterministic bucket: hash the subject into 0..99.
+    const bucket = this.hashSubject(flag.id, opts.subjectId) % 100;
+    return bucket < flag.rolloutPercentage;
+  }
+
+  private hashSubject(flagId: string, subjectId: string): number {
+    let h = 5381;
+    const key = `${flagId}:${subjectId}`;
+    for (let i = 0; i < key.length; i++) {
+      h = ((h << 5) + h + key.charCodeAt(i)) >>> 0;
+    }
+    return h;
   }
 
   async findOneAuditEvent(id: string): Promise<AuditEvent> {

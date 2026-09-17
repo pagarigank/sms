@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { DataTable } from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
 import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
-import { Plus, Search, Building, Edit, Trash2, BookOpen, GraduationCap } from 'lucide-react';
+import { Plus, Search, Building, Edit, Trash2, BookOpen } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
 import { Button } from '@sms/ui';
 import { Input } from '@sms/ui';
@@ -26,6 +27,7 @@ interface Program {
 
 export default function ProgramsPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { toast } = useToast();
   const confirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,17 +192,11 @@ export default function ProgramsPage() {
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"
-              aria-label="View curriculum"
+              aria-label="View curricula"
+              title="See curricula for this program"
+              onClick={() => router.push('/academic/curricula')}
             >
               <BookOpen className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              aria-label="Manage subjects"
-            >
-              <GraduationCap className="h-4 w-4" />
             </Button>
           </div>
         );
@@ -394,7 +390,7 @@ export default function ProgramsPage() {
           isLoading={isLoading}
           emptyMessage="No programs found. Click 'Add Program' to create your first program."
         />
-
+
       </div>
     </>
   );

@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api';
 import { DataTable } from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
 import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
-import { Plus, Building, GraduationCap, Check, Trash2, Edit, PauseCircle, PlayCircle, Search } from 'lucide-react';
+import { Plus, Building, Check, Trash2, Edit, PauseCircle, PlayCircle, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
 import { Button } from '@sms/ui';
 import { Input } from '@sms/ui';
@@ -137,6 +137,17 @@ export default function DepartmentsPage() {
     },
   });
 
+  const setDefaultMutation = useMutation({
+    mutationFn: (id: string) => apiClient.departments.setDefault(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      toast({ title: 'Default department set', description: 'New enrollments in this branch default to it.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const handleEdit = (dept: Department) => {
     setForm({
       name: dept.name,
@@ -260,23 +271,15 @@ export default function DepartmentsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  toast({ title: 'Not implemented', description: 'Set as default functionality coming soon.' });
-                }}
+                disabled={setDefaultMutation.isPending}
+                onClick={() => setDefaultMutation.mutate(dept.id)}
                 className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
                 aria-label="Set as default"
+                title="Set as default department for this branch"
               >
                 <Check className="h-4 w-4" />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              aria-label="Manage education levels"
-            >
-              <GraduationCap className="h-4 w-4" />
-            </Button>
           </div>
         );
       },
@@ -590,7 +593,7 @@ export default function DepartmentsPage() {
           isLoading={isLoading}
           emptyMessage="No departments found. Click 'Add Department' to create your first department."
         />
-
+
       </div>
     </>
   );

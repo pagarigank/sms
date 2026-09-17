@@ -13,6 +13,7 @@ import { ConfigEngineService } from './config-engine.service';
 import { ConfigEngineController } from './config-engine.controller';
 import { WorkflowService } from './workflow.service';
 import { WorkflowController } from './workflow.controller';
+import { NumberingService } from './numbering.service';
 
 const CONFIG_ENTITIES = [
   LookupList, LookupItem, CustomFieldDefinition, NumberingScheme, FeatureFlag, AuditEvent,
@@ -22,7 +23,7 @@ const CONFIG_ENTITIES = [
 @Module({
   imports: [TypeOrmModule.forFeature(CONFIG_ENTITIES)],
   controllers: [ConfigEngineController, WorkflowController],
-  providers: [ConfigEngineService, WorkflowService],
-  exports: [TypeOrmModule, ConfigEngineService, WorkflowService],
+  providers: [ConfigEngineService, WorkflowService, NumberingService],
+  exports: [TypeOrmModule, ConfigEngineService, WorkflowService, NumberingService],
 })
 export class ConfigEngineModule {}

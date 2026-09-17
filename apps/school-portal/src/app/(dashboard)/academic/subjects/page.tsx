@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { DataTable } from '@sms/ui';
@@ -30,6 +31,7 @@ interface Subject {
 
 export default function SubjectsPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { toast } = useToast();
   const confirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState('');
@@ -210,6 +212,8 @@ export default function SubjectsPage() {
               size="sm"
               className="h-8 w-8 p-0"
               aria-label="View in curriculum"
+              title="See which curricula include this subject"
+              onClick={() => router.push('/academic/curricula')}
             >
               <BookOpen className="h-4 w-4" />
             </Button>
@@ -453,7 +457,7 @@ export default function SubjectsPage() {
           isLoading={isLoading}
           emptyMessage="No subjects found. Click 'Add Subject' to create your first subject."
         />
-
+
       </div>
     </>
   );

@@ -23,11 +23,13 @@ import { AdmissionsService } from './admissions.service';
 import { AdmissionsController } from './admissions.controller';
 import { BillingModule } from '../billing/billing.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
+import { ConfigEngineModule } from '../config/config.module';
 
 @Module({
   imports: [
     BillingModule,
     SchedulingModule,
+    ConfigEngineModule,
     TypeOrmModule.forFeature([
       Student,
       Guardian,

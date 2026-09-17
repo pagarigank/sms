@@ -145,7 +145,7 @@ export default function ConfigPage() {
 
   const createNumberingScheme = useMutation({
     mutationFn: (data: { name: string; entityType: string; format: string }) =>
-      apiClient.config.createNumberingScheme({ ...data, tenantId: selectedTenantId! }),
+      apiClient.config.createNumberingScheme(data),
     onSuccess: () => {
       invalidate('config-numbering-schemes');
       toast({ title: 'Numbering scheme created' });
@@ -156,7 +156,7 @@ export default function ConfigPage() {
 
   const createFeatureFlag = useMutation({
     mutationFn: (data: { flagKey: string; enabled: boolean }) =>
-      apiClient.config.createFeatureFlag({ ...data, tenantId: selectedTenantId! }),
+      apiClient.config.createFeatureFlag(data),
     onSuccess: () => {
       invalidate('config-feature-flags');
       toast({ title: 'Feature flag created' });

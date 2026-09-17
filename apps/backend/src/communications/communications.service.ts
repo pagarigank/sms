@@ -8,6 +8,7 @@ import { NotificationLog } from './notification-log.entity';
 import { Announcement } from './announcement.entity';
 import { MessageThread } from './message-thread.entity';
 import { Message } from './message.entity';
+import { ConfigEngineService } from '../config/config-engine.service';
 
 @Injectable()
 export class CommunicationsService {
@@ -19,6 +20,7 @@ export class CommunicationsService {
     @InjectRepository(Announcement) private announcementsRepo: Repository<Announcement>,
     @InjectRepository(MessageThread) private threadsRepo: Repository<MessageThread>,
     @InjectRepository(Message) private messagesRepo: Repository<Message>,
+    private readonly configEngine: ConfigEngineService,
   ) {}
 
   // === Templates ===
@@ -66,6 +68,9 @@ export class CommunicationsService {
   async dispatch(data: {
     tenantId: string; branchId: string; eventType: string;
     recipientUserId: string | null;
+    /** FR-CFG-8: gate dispatch on a tenant/branch feature flag when callers
+     * name one (e.g. 'notifications.sms'). Unnamed → behavior unchanged. */
+    featureFlag?: string;
     /** Legacy single-contact form, used as fallback for every channel. */
     recipientContact?: string;
     /** Channel-specific contacts: an sms template uses the phone, an email
@@ -99,6 +104,30 @@ export class CommunicationsService {
       let body = template.bodyTemplate;
       for (const [key, value] of Object.entries(data.variables)) {
         body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value));
+      }
+
+      // FR-CFG-8: feature-flag gate. A disabled flag suppresses the send and
+      // records the suppression so the audit trail shows why nothing went out.
+      if (data.featureFlag) {
+        const enabled = await this.configEngine.isFlagEnabled(data.tenantId, data.featureFlag, {
+          branchId: data.branchId,
+          subjectId: data.recipientUserId ?? undefined,
+        });
+        if (!enabled) {
+          await this.logsRepo.save(
+            this.logsRepo.create({
+              tenantId: data.tenantId,
+              branchId: data.branchId,
+              templateId: template.id,
+              channel: template.channel,
+              recipientUserId: data.recipientUserId,
+              recipientContact: contact,
+              payload: { ...data.variables, suppressedBy: `feature-flags:${data.featureFlag}` },
+              status: 'suppressed',
+            }),
+          );
+          return []; // suppression is recorded in the log row above
+        }
       }
 
       // Log the dispatch (recipientContact records the channel-appropriate contact)

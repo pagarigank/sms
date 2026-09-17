@@ -16,6 +16,7 @@ import { CashieringService } from './cashiering.service';
 import { CashieringController } from './cashiering.controller';
 import { XenditAdapter } from './xendit.adapter';
 import { BillingModule } from '../billing/billing.module';
+import { ConfigEngineModule } from '../config/config.module';
 
 const CASHIERING_ENTITIES = [
   CashierStation, PaymentMethod, DenominationSet, CashierSession,
@@ -24,7 +25,7 @@ const CASHIERING_ENTITIES = [
 ];
 
 @Module({
-  imports: [BillingModule, TypeOrmModule.forFeature(CASHIERING_ENTITIES)],
+  imports: [BillingModule, ConfigEngineModule, TypeOrmModule.forFeature(CASHIERING_ENTITIES)],
   controllers: [CashieringController],
   providers: [CashieringService, XenditAdapter],
   exports: [CashieringService, XenditAdapter],

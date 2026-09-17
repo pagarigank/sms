@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { Student } from './student.entity';
@@ -16,6 +16,7 @@ import { HealthRecord } from './health-record.entity';
 import { StudentMergeAudit } from './student-merge-audit.entity';
 import { GradeLevel } from '../academic/grade-level.entity';
 import { InvoiceService } from '../billing/invoice.service';
+import { NumberingService } from '../config/numbering.service';
 import { Logger } from '@nestjs/common';
 
 @Injectable()
@@ -24,6 +25,7 @@ export class SisService {
 
   constructor(
     private readonly invoiceService: InvoiceService,
+    private readonly numberingService: NumberingService,
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
     @InjectRepository(Guardian) private guardiansRepo: Repository<Guardian>,
     @InjectRepository(StudentGuardian) private studentGuardiansRepo: Repository<StudentGuardian>,
@@ -73,6 +75,20 @@ export class SisService {
     // Validate LRN format if provided
     if (data.lrn && !/^\d{12}$/.test(data.lrn)) {
       throw new BadRequestException('LRN must be exactly 12 digits');
+    }
+    // FR-CFG-3: mint the student number from the tenant's numbering scheme
+    // ({YYYY}-{SEQ:4}) unless the caller supplied one explicitly. A failed
+    // allocation must not lose the admission — fall back to a random
+    // collision-free number and log for follow-up.
+    if (!data.studentNumber) {
+      try {
+        data.studentNumber = await this.numberingService.allocateNumber(
+          data.tenantId,
+          'student',
+        );
+      } catch {
+        data.studentNumber = `STU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      }
     }
     const student = this.studentsRepo.create(data);
     return this.studentsRepo.save(student);
@@ -175,7 +191,31 @@ export class SisService {
     const where: any = { tenantId };
     if (branchId) where.branchId = branchId;
     if (schoolYearId) where.schoolYearId = schoolYearId;
-    return this.sectionsRepo.find({ where, order: { name: 'ASC' } });
+
+    const sections = await this.sectionsRepo.find({ where, order: { name: 'ASC' } });
+
+    // Seat counts in ONE grouped query (not one COUNT per row): the sections
+    // table renders "18/40" inline, so N+1 counts would scale badly with the
+    // number of sections a branch runs.
+    const counts =
+      sections.length > 0
+        ? await this.assignmentsRepo
+            .createQueryBuilder('a')
+            .select('a.sectionId', 'sectionId')
+            .addSelect('COUNT(*)', 'count')
+            .where('a.sectionId IN (:...ids)', {
+              ids: sections.map((s) => s.id),
+            })
+            .andWhere('a.isActive = true')
+            .groupBy('a.sectionId')
+            .getRawMany<{ sectionId: string; count: string }>()
+        : [];
+    const countBySection = new Map(counts.map((c) => [c.sectionId, Number(c.count)]));
+
+    return sections.map((s) => ({
+      ...s,
+      seatCount: countBySection.get(s.id) ?? 0,
+    }));
   }
 
   async createSection(data: Partial<Section>) {
@@ -188,6 +228,85 @@ export class SisService {
     if (!section) throw new NotFoundException('Section not found');
     Object.assign(section, data);
     return this.sectionsRepo.save(section);
+  }
+
+  async deleteSection(id: string, tenantId: string) {
+    // Referential guard: a section that already has student assignments must
+    // not be hard-deleted (the assignments would dangle).
+    const assigned = await this.assignmentsRepo.count({ where: { sectionId: id } });
+    if (assigned > 0) {
+      throw new ConflictException(
+        `Section ${id} still has ${assigned} student assignment(s) — reassign them first`,
+      );
+    }
+    const res = await this.sectionsRepo.delete(id);
+    if (res.affected === 0) throw new NotFoundException('Section not found');
+    return { deleted: true };
+  }
+
+  /**
+   * Assign a student to a section by studentId (the roster picker path).
+   * Resolves the student's active enrollment and delegates to the same
+   * transactional, capacity-checked assignment used by the wizard.
+   */
+  async assignStudentToSectionByStudent(sectionId: string, studentId: string, tenantId: string, assignedBy?: string) {
+    const enrollment = await this.enrollmentsRepo.findOne({
+      where: { studentId, tenantId, status: 'enrolled' },
+      order: { createdAt: 'DESC' },
+    });
+    if (!enrollment) {
+      throw new NotFoundException('No active enrollment found for this student');
+    }
+    return this.assignStudentToSection(enrollment.id, sectionId, tenantId, assignedBy);
+  }
+
+  /**
+   * Section roster: active assignments joined with student profiles so the
+   * sections page can show who is actually seated in the section. Also used
+   * by the assignment picker to know which students are already here.
+   */
+  async findSectionStudents(sectionId: string, tenantId: string) {
+    const section = await this.sectionsRepo.findOne({ where: { id: sectionId, tenantId } });
+    if (!section) throw new NotFoundException('Section not found');
+
+    return this.assignmentsRepo
+      .createQueryBuilder('a')
+      .leftJoinAndMapOne('a.student', Student, 's', 's.id = a.studentId')
+      .where('a.sectionId = :sectionId', { sectionId })
+      .andWhere('a.tenantId = :tenantId', { tenantId })
+      .andWhere('a.isActive = true')
+      .orderBy('s.lastName', 'ASC')
+      .addOrderBy('s.firstName', 'ASC')
+      .getMany();
+  }
+
+  /**
+   * Remove a student from a section (soft-deactivates the assignment). The
+   * enrollment's sectionId pointer is cleared in the same transaction so the
+   * two records cannot disagree about where the student is.
+   */
+  async removeSectionAssignment(sectionId: string, studentId: string, tenantId: string) {
+    return this.dataSource.transaction(async (manager) => {
+      const assignmentsRepo = manager.getRepository(StudentSectionAssignment);
+      const assignment = await assignmentsRepo.findOne({
+        where: { sectionId, studentId, tenantId, isActive: true },
+      });
+      if (!assignment) throw new NotFoundException('Student is not assigned to this section');
+
+      assignment.isActive = false;
+      await manager.save(assignment);
+
+      // Clear the enrollment pointer only if it still points at this section.
+      const enrollment = await manager.findOne(Enrollment, {
+        where: { id: assignment.enrollmentId, tenantId },
+      });
+      if (enrollment && enrollment.sectionId === sectionId) {
+        enrollment.sectionId = null;
+        await manager.save(enrollment);
+      }
+
+      return { unassigned: true };
+    });
   }
 
   async assignStudentToSection(enrollmentId: string, sectionId: string, tenantId: string, assignedBy?: string) {

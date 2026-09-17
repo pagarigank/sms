@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { WorkflowDefinition } from './workflow-definition.entity';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowApproval } from './workflow-approval.entity';
@@ -11,6 +11,7 @@ export class WorkflowService {
     @InjectRepository(WorkflowDefinition) private definitionsRepo: Repository<WorkflowDefinition>,
     @InjectRepository(WorkflowInstance) private instancesRepo: Repository<WorkflowInstance>,
     @InjectRepository(WorkflowApproval) private approvalsRepo: Repository<WorkflowApproval>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -39,6 +40,10 @@ export class WorkflowService {
 
   /**
    * Start a workflow instance.
+   *
+   * Transaction-aware: pass `tx` to join the caller's transaction (e.g. a
+   * refund and its approval chain must commit or roll back together). Called
+   * without `tx` it opens its own.
    */
   async startWorkflow(
     tenantId: string,
@@ -46,88 +51,102 @@ export class WorkflowService {
     entityId: string,
     requestedBy: string,
     reason?: string,
+    tx?: EntityManager,
   ): Promise<WorkflowInstance> {
-    // Find the matching workflow definition
-    const definition = await this.definitionsRepo.findOne({
-      where: { tenantId, entityType, isActive: true },
-    });
+    const run = async (manager: EntityManager): Promise<WorkflowInstance> => {
+      // Find the matching workflow definition
+      const definition = await manager.findOne(WorkflowDefinition, {
+        where: { tenantId, entityType, isActive: true },
+      });
 
-    if (!definition) {
-      throw new BadRequestException(`No active workflow for ${entityType}`);
-    }
+      if (!definition) {
+        throw new BadRequestException(`No active workflow for ${entityType}`);
+      }
 
-    // Check if there's already an active instance for this entity
-    const existing = await this.instancesRepo.findOne({
-      where: { tenantId, entityType, entityId, status: 'pending' },
-    });
+      // Check if there's already an active instance for this entity
+      const existing = await manager.findOne(WorkflowInstance, {
+        where: { tenantId, entityType, entityId, status: 'pending' },
+      });
 
-    if (existing) {
-      throw new BadRequestException('A workflow is already in progress for this entity');
-    }
+      if (existing) {
+        throw new BadRequestException('A workflow is already in progress for this entity');
+      }
 
-    const instance = this.instancesRepo.create({
-      tenantId,
-      workflowDefinitionId: definition.id,
-      entityType,
-      entityId,
-      currentStep: 0,
-      status: 'pending',
-      requestedBy,
-      requestedAt: new Date(),
-      reason,
-    });
+      const instance = manager.create(WorkflowInstance, {
+        tenantId,
+        workflowDefinitionId: definition.id,
+        entityType,
+        entityId,
+        currentStep: 0,
+        status: 'pending',
+        requestedBy,
+        requestedAt: new Date(),
+        reason,
+      });
 
-    return this.instancesRepo.save(instance);
+      return manager.save(instance);
+    };
+    return tx ? run(tx) : this.dataSource.transaction(run);
   }
 
   /**
    * Approve or reject a workflow instance.
+   *
+   * Transaction-aware: pass `tx` to join the caller's transaction (e.g. a
+   * refund decision and its money effects must commit or roll back together).
+   * Called without `tx` it opens its own, so the approval row and the instance
+   * status change can never land half-applied.
    */
   async decide(
     instanceId: string,
     approverUserId: string,
     decision: 'approved' | 'rejected',
     reason?: string,
+    tx?: EntityManager,
   ): Promise<WorkflowInstance> {
-    const instance = await this.instancesRepo.findOne({ where: { id: instanceId } });
-    if (!instance) throw new NotFoundException('Workflow instance not found');
+    const run = async (manager: EntityManager): Promise<WorkflowInstance> => {
+      const instance = await manager.findOne(WorkflowInstance, { where: { id: instanceId } });
+      if (!instance) throw new NotFoundException('Workflow instance not found');
 
-    if (instance.status !== 'pending') {
-      throw new BadRequestException('Workflow is not in pending status');
-    }
+      if (instance.status !== 'pending') {
+        throw new BadRequestException('Workflow is not in pending status');
+      }
 
-    const definition = await this.getDefinition(instance.workflowDefinitionId);
-    const totalSteps = definition.steps.length;
+      const definition = await manager.findOne(WorkflowDefinition, {
+        where: { id: instance.workflowDefinitionId },
+      });
+      if (!definition) throw new NotFoundException('Workflow definition not found');
+      const totalSteps = definition.steps.length;
 
-    // Record the approval
-    const approval = this.approvalsRepo.create({
-      tenantId: instance.tenantId,
-      instanceId: instance.id,
-      approverUserId,
-      stepIndex: instance.currentStep,
-      decision,
-      reason,
-      decidedAt: new Date(),
-    });
-    await this.approvalsRepo.save(approval);
+      // Record the approval
+      const approval = manager.create(WorkflowApproval, {
+        tenantId: instance.tenantId,
+        instanceId: instance.id,
+        approverUserId,
+        stepIndex: instance.currentStep,
+        decision,
+        reason,
+        decidedAt: new Date(),
+      });
+      await manager.save(approval);
 
-    // Update instance based on decision
-    if (decision === 'rejected') {
-      instance.status = 'rejected';
-      await this.instancesRepo.save(instance);
-      return instance;
-    }
+      // Update instance based on decision
+      if (decision === 'rejected') {
+        instance.status = 'rejected';
+        return manager.save(instance);
+      }
 
-    // Move to next step
-    instance.currentStep += 1;
+      // Move to next step
+      instance.currentStep += 1;
 
-    // Check if all steps are completed
-    if (instance.currentStep >= totalSteps) {
-      instance.status = 'approved';
-    }
+      // Check if all steps are completed
+      if (instance.currentStep >= totalSteps) {
+        instance.status = 'approved';
+      }
 
-    await this.instancesRepo.save(instance);
-    return instance;
+      return manager.save(instance);
+    };
+    return tx ? run(tx) : this.dataSource.transaction(run);
   }
 
   /**

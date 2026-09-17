@@ -8,6 +8,7 @@ import { Plus, Tag, CheckCircle, Clock, XCircle, Loader2, AlertTriangle } from '
 import { Button } from '@sms/ui';
 import { Input } from '@sms/ui';
 import { Label } from '@sms/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
 import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 
@@ -297,15 +298,15 @@ export default function DiscountsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="dt-mode">Mode</Label>
-                  <select
-                    id="dt-mode"
-                    value={typeForm.discountMode}
-                    onChange={(e) => setTypeForm({ ...typeForm, discountMode: e.target.value })}
-                    className="flex h-9 w-full rounded-md border px-2 py-1 text-sm"
-                  >
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed amount</option>
-                  </select>
+                  <Select value={typeForm.discountMode} onValueChange={(v) => setTypeForm({ ...typeForm, discountMode: v })}>
+                    <SelectTrigger id="dt-mode">
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="fixed">Fixed amount</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="dt-value">{typeForm.discountMode === 'percentage' ? 'Default %' : 'Default amount (₱)'}</Label>
@@ -372,37 +373,39 @@ export default function DiscountsPage() {
             >
               <div>
                 <Label htmlFor="dg-student">Student</Label>
-                <select
-                  id="dg-student"
+                <Select
                   value={grantForm.studentId}
-                  onChange={(e) => setGrantForm({ ...grantForm, studentId: e.target.value })}
-                  className="flex h-9 w-full rounded-md border px-2 py-1 text-sm"
-                  required
+                  onValueChange={(v) => setGrantForm({ ...grantForm, studentId: v })}
                 >
-                  <option value="">Select student…</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.lastName}, {s.firstName}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="dg-student">
+                    <SelectValue placeholder="Select student…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.lastName}, {s.firstName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="dg-type">Discount type</Label>
-                <select
-                  id="dg-type"
+                <Select
                   value={grantForm.discountTypeId}
-                  onChange={(e) => setGrantForm({ ...grantForm, discountTypeId: e.target.value })}
-                  className="flex h-9 w-full rounded-md border px-2 py-1 text-sm"
-                  required
+                  onValueChange={(v) => setGrantForm({ ...grantForm, discountTypeId: v })}
                 >
-                  <option value="">Select discount type…</option>
-                  {types.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.discountMode === 'percentage' ? `${Number(t.defaultPercentage)}%` : `₱${Number(t.defaultAmount)}`})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="dg-type">
+                    <SelectValue placeholder="Select discount type…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {types.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} ({t.discountMode === 'percentage' ? `${Number(t.defaultPercentage)}%` : `₱${Number(t.defaultAmount)}`})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -434,13 +437,16 @@ export default function DiscountsPage() {
                 <Button type="button" variant="outline" onClick={() => setShowCreateGrant(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createGrantMutation.isPending}>
+                <Button
+                  type="submit"
+                  disabled={!grantForm.studentId || !grantForm.discountTypeId || createGrantMutation.isPending}
+                >
                   {createGrantMutation.isPending ? 'Creating…' : 'Create Grant'}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>
       </div>
     </>
   );

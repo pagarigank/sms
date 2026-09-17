@@ -6,8 +6,8 @@ import { apiClient } from '@/lib/api';
 import { DataTable } from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
 import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
-import { Plus, Search, BookOpen, Edit, Trash2, Copy, CheckCircle, Settings } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
+import { Plus, Search, BookOpen, Edit, Trash2, Copy, CheckCircle, Settings, X, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from '@sms/ui';
 import { Button } from '@sms/ui';
 import { Input } from '@sms/ui';
 import { Label } from '@sms/ui';
@@ -65,6 +65,25 @@ interface Program {
   code: string;
 }
 
+interface Subject {
+  id: string;
+  code: string;
+  title: string;
+}
+
+interface Term {
+  id: string;
+  name: string;
+  sequence: number;
+}
+
+interface CurriculumSubject {
+  id: string;
+  curriculumId: string;
+  subjectId: string;
+  termId?: string;
+}
+
 export default function CurriculaPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -108,6 +127,17 @@ export default function CurriculaPage() {
     enabled: educationLevelFilter !== 'all',
   });
 
+  // Grade levels for the create/edit dialogs follow the level chosen IN the
+  // form (not the table filter) — otherwise the dropdown can be empty or
+  // wrong whenever the table is filtered differently from what's being edited.
+  const formLevelId = editingCurriculum?.educationLevelId || form.educationLevelId;
+  const { data: formGradeLevelsRes } = useQuery({
+    queryKey: ['grade-levels', 'for-form', formLevelId],
+    queryFn: () => apiClient.academic.listGradeLevels({ educationLevelId: formLevelId!, limit: 100 }),
+    enabled: !!formLevelId,
+  });
+  const dialogGradeLevels: GradeLevel[] = (formGradeLevelsRes?.data ?? []) as GradeLevel[];
+
   const { data: schoolYearsRes } = useQuery({
     queryKey: ['school-years'],
     queryFn: () => apiClient.academic.listSchoolYears({ limit: 100 }),
@@ -124,7 +154,6 @@ export default function CurriculaPage() {
   });
 
   const educationLevels: EducationLevel[] = educationLevelsRes?.data ?? [];
-  const gradeLevels: GradeLevel[] = gradeLevelsRes?.data ?? [];
   const schoolYears: SchoolYear[] = schoolYearsRes?.data ?? [];
   const strands: Strand[] = strandsRes?.data ?? [];
   const programs: Program[] = programsRes?.data ?? [];
@@ -186,6 +215,68 @@ export default function CurriculaPage() {
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
+  });
+
+  // === Curriculum subjects manager (FR-ACA-5) ===
+  // Opens from the row actions "Manage subjects" button: lists the subjects
+  // mapped to the curriculum, lets the registrar add more (with term +
+  // prerequisite) and remove mistakes — the publish check requires every
+  // subject to carry an effective grading system, so this editor is where
+  // that data gets entered.
+  const [subjectsFor, setSubjectsFor] = useState<Curriculum | null>(null);
+  const [newSubjectId, setNewSubjectId] = useState('');
+  const [newSubjectTermId, setNewSubjectTermId] = useState('');
+
+  const { data: currSubjectsRes, isLoading: currSubjectsLoading } = useQuery({
+    queryKey: ['curriculum-subjects', subjectsFor?.id],
+    queryFn: () => apiClient.academic.listCurriculumSubjects(subjectsFor!.id),
+    enabled: !!subjectsFor,
+  });
+  const curriculumSubjects: CurriculumSubject[] = currSubjectsRes?.data ?? [];
+
+  const { data: allSubjectsRes } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => apiClient.academic.listSubjects({ limit: 200 }),
+  });
+  const allSubjects: Subject[] = allSubjectsRes?.data ?? [];
+
+  const { data: curriculumTermsRes } = useQuery({
+    queryKey: ['terms', subjectsFor?.schoolYearId],
+    queryFn: () => apiClient.academic.listTerms(subjectsFor!.schoolYearId),
+    enabled: !!subjectsFor,
+  });
+  const curriculumTerms: Term[] = curriculumTermsRes?.data ?? [];
+
+  const subjectName = (id: string) => {
+    const s = allSubjects.find((x) => x.id === id);
+    return s ? `${s.code} — ${s.title}` : id.slice(0, 8);
+  };
+  const termName = (id?: string) => curriculumTerms.find((t) => t.id === id)?.name ?? '—';
+
+  const addSubjectMutation = useMutation({
+    mutationFn: (data: { curriculumId: string; subjectId: string; termId?: string }) =>
+      apiClient.academic.createCurriculumSubject({
+        ...data,
+        termId: data.termId || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['curriculum-subjects'] });
+      setNewSubjectId('');
+      setNewSubjectTermId('');
+      toast({ title: 'Subject added to curriculum' });
+    },
+    onError: (error: Error) =>
+      toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  const removeSubjectMutation = useMutation({
+    mutationFn: (id: string) => apiClient.academic.deleteCurriculumSubject(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['curriculum-subjects'] });
+      toast({ title: 'Subject removed' });
+    },
+    onError: (error: Error) =>
+      toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
   const handleEdit = (curriculum: Curriculum) => {
@@ -324,6 +415,12 @@ export default function CurriculaPage() {
               size="sm"
               className="h-8 w-8 p-0"
               aria-label="Manage subjects"
+              title="Manage subjects in this curriculum"
+              onClick={() => {
+                setNewSubjectId('');
+                setNewSubjectTermId('');
+                setSubjectsFor(curriculum);
+              }}
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -406,7 +503,7 @@ export default function CurriculaPage() {
                         <SelectValue placeholder={form.educationLevelId ? "Select grade level" : "Select education level first"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {gradeLevels.map((gl) => (
+                        {dialogGradeLevels.map((gl) => (
                           <SelectItem key={gl.id} value={gl.id}>
                             {gl.name} ({gl.code})
                           </SelectItem>
@@ -547,7 +644,7 @@ export default function CurriculaPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">None</SelectItem>
-                        {gradeLevels.map((gl) => (
+                        {dialogGradeLevels.map((gl) => (
                           <SelectItem key={gl.id} value={gl.id}>
                             {gl.name} ({gl.code})
                           </SelectItem>
@@ -683,7 +780,110 @@ export default function CurriculaPage() {
           isLoading={isLoading}
           emptyMessage="No curricula found. Click 'Create Curriculum' to create your first curriculum."
         />
-
+
+        {/* FR-ACA-5: curriculum-subjects manager */}
+        <Dialog open={!!subjectsFor} onOpenChange={(open) => !open && setSubjectsFor(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                Subjects — {subjectsFor?.versionLabel || subjectsFor?.gradeLevelName || 'Curriculum'}
+              </DialogTitle>
+              <DialogDescription>
+                Subjects mapped to this curriculum, with the term they are taken in. Publishing
+                requires each subject to have an effective grading system configured.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
+              {currSubjectsLoading ? (
+                <p className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading subjects…
+                </p>
+              ) : curriculumSubjects.length === 0 ? (
+                <p className="p-2 text-sm text-muted-foreground">
+                  No subjects mapped yet — add them below.
+                </p>
+              ) : (
+                curriculumSubjects.map((cs) => (
+                  <div
+                    key={cs.id}
+                    className="flex items-center justify-between rounded border px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">{subjectName(cs.subjectId)}</p>
+                      <p className="text-xs text-muted-foreground">Term: {termName(cs.termId)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-[hsl(var(--status-danger-ink))] hover:text-[hsl(var(--status-danger-ink))]"
+                      aria-label={`Remove ${subjectName(cs.subjectId)}`}
+                      onClick={() => removeSubjectMutation.mutate(cs.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!subjectsFor || !newSubjectId) return;
+                addSubjectMutation.mutate({
+                  curriculumId: subjectsFor.id,
+                  subjectId: newSubjectId,
+                  termId: newSubjectTermId || undefined,
+                });
+              }}
+              className="space-y-3 rounded-md border bg-muted/30 p-3"
+            >
+              <div>
+                <Label htmlFor="cs-subject">Subject</Label>
+                <Select value={newSubjectId} onValueChange={setNewSubjectId}>
+                  <SelectTrigger id="cs-subject">
+                    <SelectValue placeholder="Select subject…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allSubjects
+                      .filter((s) => !curriculumSubjects.some((cs) => cs.subjectId === s.id))
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.code} — {s.title}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="cs-term">Term (optional)</Label>
+                <Select value={newSubjectTermId} onValueChange={setNewSubjectTermId}>
+                  <SelectTrigger id="cs-term">
+                    <SelectValue placeholder="No specific term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No specific term</SelectItem>
+                    {curriculumTerms.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setSubjectsFor(null)}>
+                  Done
+                </Button>
+                <Button type="submit" disabled={!newSubjectId || addSubjectMutation.isPending}>
+                  {addSubjectMutation.isPending ? 'Adding…' : 'Add subject'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </>
   );

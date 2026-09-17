@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Student } from './student.entity';
 
 @Entity({ name: 'student_section_assignments' })
 export class StudentSectionAssignment {
@@ -16,6 +17,15 @@ export class StudentSectionAssignment {
 
   @Column('uuid')
   studentId: string;
+
+  /**
+   * Not a FK column — studentId above is the link. This relation exists so
+   * roster queries can `leftJoinAndMapOne('a.student', …)` the profile in
+   * without a second round-trip. `create`/`save` ignore it.
+   */
+  @ManyToOne(() => Student, { createForeignKeyConstraints: false })
+  @JoinColumn({ name: 'studentId' })
+  student?: Student;
 
   @Column({ default: true })
   isActive: boolean;

@@ -11,4 +11,5 @@ export * from './endpoints/facility';
 export * from './endpoints/academic';
 export * from './endpoints/grading';
 export * from './endpoints/config';
+export * from './endpoints/sis';
 export * from './endpoints/reports';
