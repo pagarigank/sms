@@ -129,44 +129,51 @@ export default function DashboardPage() {
         range: timeRange,
       }),
     enabled: !!currentTenantId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const branchesQuery = useQuery({
-    queryKey: ['branches', 'all', currentTenantId],
+    queryKey: ['branches', currentTenantId],
     queryFn: () => apiClient.branches.list({ limit: 100 }),
     enabled: !!currentTenantId && permissions.includes('tenancy.branch:view'),
+    staleTime: 5 * 60 * 1000,
   });
 
   const schoolYearsQuery = useQuery({
-    queryKey: ['school-years', 'dashboard', currentTenantId],
+    queryKey: ['school-years', currentTenantId],
     queryFn: () => apiClient.academic.listSchoolYears({ limit: 10 }),
     enabled: !!currentTenantId && permissions.includes('academic.school_year:view'),
+    staleTime: 5 * 60 * 1000,
   });
 
   const curriculaQuery = useQuery({
-    queryKey: ['curricula', 'dashboard', currentTenantId],
+    queryKey: ['curricula', currentTenantId],
     queryFn: () => apiClient.academic.listCurricula({ limit: 10 }),
     enabled: !!currentTenantId && permissions.includes('academic.curriculum:view'),
+    staleTime: 5 * 60 * 1000,
   });
 
   // Upcoming events: resolve the first calendar, then its events.
   const calendarsQuery = useQuery({
-    queryKey: ['calendars', 'dashboard', currentTenantId],
+    queryKey: ['calendars', currentTenantId],
     queryFn: () => apiClient.scheduling.listCalendars({ tenantId: currentTenantId ?? '' }),
     enabled: !!currentTenantId && permissions.includes('scheduling.timetable:view'),
+    staleTime: 5 * 60 * 1000,
   });
   const firstCalendarId = (calendarsQuery.data?.data as unknown as { id: string }[] | undefined)?.[0]?.id;
   const eventsQuery = useQuery({
     queryKey: ['calendar-events', firstCalendarId],
     queryFn: () => apiClient.scheduling.getCalendarEvents(firstCalendarId!),
     enabled: !!firstCalendarId,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Recent activity from the audit trail (real events, not mock data).
   const auditQuery = useQuery({
-    queryKey: ['audit-events', 'dashboard', currentTenantId],
+    queryKey: ['audit-events', currentTenantId],
     queryFn: () => apiClient.config.listAuditEvents({ tenantId: currentTenantId ?? undefined }),
     enabled: !!currentTenantId && permissions.includes('config.audit_log:view'),
+    staleTime: 5 * 60 * 1000,
   });
 
   const isLoading = statsQuery.isLoading;
