@@ -54,8 +54,7 @@ export default function AttendancePage() {
       next[record.studentId] = record.status;
     }
     setAttendance(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClass, selectedDate, existingRecords]);
+  }, [existingData]);
 
   const saveAttendance = useMutation({
     mutationFn: () => {

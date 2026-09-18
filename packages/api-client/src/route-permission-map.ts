@@ -142,10 +142,11 @@ export function filterNavigationByPermissions(
   navigation: any[],
   userPermissions: string[],
 ): any[] {
+  const allowed = new Set(userPermissions);
   const isAllowed = (href: string): boolean => {
     const required = getRoutePermission(href);
     if (!required) return true; // No permission required
-    return userPermissions.includes(required);
+    return allowed.has(required);
   };
 
   return navigation
