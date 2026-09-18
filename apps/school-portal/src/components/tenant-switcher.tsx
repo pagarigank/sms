@@ -53,14 +53,14 @@ export function TenantSwitcher() {
     } else if (tenants.length > 0) {
       setCurrentTenant(tenants[0].id);
     }
-  }, [currentTenantId, user?.tenantId, tenants, setCurrentTenant]);
+  }, [currentTenantId, user?.tenantId, tenants.length, setCurrentTenant]);
 
   // Auto-select first branch if none selected
   useEffect(() => {
     if (!currentBranchId && branches.length > 0) {
       setCurrentBranch(branches[0].id);
     }
-  }, [currentBranchId, branches, setCurrentBranch]);
+  }, [currentBranchId, branches.length, setCurrentBranch]);
 
   return (
     <div className="flex items-center gap-2">
