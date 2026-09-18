@@ -161,7 +161,15 @@ export default function CurriculaPage() {
   const curricula: Curriculum[] = curriculaRes?.data ?? [];
 
   const createMutation = useMutation({
-    mutationFn: (data: typeof form) => apiClient.academic.createCurriculum(data),
+    mutationFn: (data: {
+      educationLevelId: string;
+      schoolYearId: string;
+      gradeLevelId?: string;
+      strandId?: string;
+      programId?: string;
+      versionLabel?: string;
+      status?: string;
+    }) => apiClient.academic.createCurriculum(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['curricula'] });
       setShowCreate(false);

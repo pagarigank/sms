@@ -15,7 +15,7 @@ export const facilityEndpoints = (client: ApiClient) => ({
   getBuilding: (id: string) =>
     client.get<Building>(`/api/v1/facility/buildings/${id}`),
 
-  createBuilding: (data: { name: string; branchId: string; code?: string; address?: string }) =>
+  createBuilding: (data: { name: string; branchId: string; tenantId?: string; code?: string; address?: string }) =>
     client.post<Building>('/api/v1/facility/buildings', data),
 
   updateBuilding: (id: string, data: Partial<Building>) =>
