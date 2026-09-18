@@ -1,9 +1,8 @@
 'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-export const dynamic = 'force-dynamic';
 import { useAuthStore } from '@/lib/store';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
@@ -21,21 +20,18 @@ function DashboardProviders({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
-
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
+  // Defer auth redirect to client side only, once, after first paint.
+  // Avoids a useEffect→setTimeout→router.replace cascade on every navigation.
   useEffect(() => {
-    if (mounted && !isAuthenticated) {
-      const timer = setTimeout(() => {
-        router.replace('/login');
-      }, 0);
-      return () => clearTimeout(timer);
+    setMounted(true);
+    if (!isAuthenticated) {
+      router.replace('/login');
     }
-  }, [mounted, isAuthenticated, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // To prevent hydration errors, we always render the shell with providers.
-  // We only conditionally hide the content when unmounted or unauthenticated.
   return (
     <DashboardProviders>
       <ToastProvider>

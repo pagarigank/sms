@@ -125,23 +125,16 @@ function InlineField({
 /* ------------------------------------------------------------------ */
 
 function StepTransition({ stepKey, children }: { stepKey: string; children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  const [seenKey, setSeenKey] = useState(stepKey);
-
-  if (seenKey !== stepKey) {
-    setSeenKey(stepKey);
-    setMounted(false);
-  }
+  const [visible, setVisible] = useState(stepKey);
 
   useEffect(() => {
-    if (!mounted) {
-      const frame = requestAnimationFrame(() => setMounted(true));
-      return () => cancelAnimationFrame(frame);
-    }
-  }, [mounted]);
+    // Animate in on step change; animate out (hide) immediately on the
+    // outgoing step so the new step's mount-in animation is not layered.
+    setVisible(stepKey);
+  }, [stepKey]);
 
   return (
-    <div className={cn('transition-opacity duration-200 ease-out', mounted ? 'opacity-100' : 'opacity-0')}>
+    <div className={cn('transition-opacity duration-200 ease-out', visible === stepKey ? 'opacity-100' : 'opacity-0')}>
       {children}
     </div>
   );
