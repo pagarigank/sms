@@ -587,6 +587,28 @@ export default function IAMPage() {
               </div>
             </div>
 
+            {/* ── Section 1.5: Tenant Selection (Super Admin Only) ── */}
+            {isSuperAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="u-tenant">Tenant Assignment <span className="text-red-500">*</span></Label>
+                <Select
+                  value={userForm.tenantId || 'platform'}
+                  onValueChange={(v) => setUserForm(f => ({ ...f, tenantId: v }))}
+                >
+                  <SelectTrigger id="u-tenant">
+                    <SelectValue placeholder="Select a tenant..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="platform">— Platform Admin (No Tenant) —</SelectItem>
+                    {tenants.map((t: any) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">SuperAdmins can assign users to a specific tenant, or leave them as Platform users.</p>
+              </div>
+            )}
+
             {/* ── Section 2: Link to Employee (optional) ── */}
             <div className="rounded-lg border p-3 space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Link to Employee Record <span className="font-normal">(optional)</span></p>

@@ -114,6 +114,11 @@ export default function TenantsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.planId) {
+      toast({ title: 'Validation Error', description: 'Please select a plan.', variant: 'destructive' });
+      return;
+    }
+    
     if (editingTenant) {
       updateMutation.mutate({ ...editingTenant, ...form, id: editingTenant.id });
     } else {

@@ -102,11 +102,11 @@ export default function PipelineStagesPage() {
     }
   };
 
-  const columns: ColumnDef<Stage>[] = [
+  const columns: ColumnDef<any, any>[] = [
     {
       accessorKey: 'stageName',
       header: 'Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.stageName}</span>,
+      cell: ({ row }: { row: any }) => <span className="font-medium">{row.original.stageName}</span>,
     },
     {
       accessorKey: 'stageCode',
@@ -119,25 +119,25 @@ export default function PipelineStagesPage() {
     {
       accessorKey: 'isDefault',
       header: 'Default',
-      cell: ({ row }) => (
+      cell: ({ row }: { row: any }) => (
         row.original.isDefault ? <Badge variant="secondary">Yes</Badge> : <span className="text-muted-foreground">-</span>
       ),
     },
     {
       accessorKey: 'isActive',
       header: 'Status',
-      cell: ({ row }) => (
+      cell: ({ row }: { row: any }) => (
         row.original.isActive ? (
-          <div className="flex items-center gap-2"><StatusDot variant="success" /> Active</div>
+          <div className="flex items-center gap-2"><StatusDot className="bg-green-500" /> Active</div>
         ) : (
-          <div className="flex items-center gap-2"><StatusDot variant="danger" /> Inactive</div>
+          <div className="flex items-center gap-2"><StatusDot className="bg-red-500" /> Inactive</div>
         )
       ),
     },
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) => (
+      cell: ({ row }: { row: any }) => (
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="icon" onClick={() => handleEdit(row.original)}>
             <Edit className="h-4 w-4" />
@@ -179,7 +179,7 @@ export default function PipelineStagesPage() {
 
       <div className="rounded-md border bg-card">
         <DataTable
-          columns={columns}
+          columns={columns as any}
           data={stages}
           emptyMessage={isLoading ? 'Loading stages...' : 'No stages configured.'}
         />

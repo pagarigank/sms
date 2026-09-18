@@ -20,7 +20,7 @@ async function bootstrap() {
   // to silently drop the guardian portal (port 3002), breaking its login
   // with a browser-side "Failed to fetch". `*` with credentials is still
   // rejected by browsers (OWASP ASVS 14.4), so explicit origins remain.
-  const devOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
+  const devOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003'];
   const extraOrigins = (process.env.CORS_ORIGIN || '')
     .split(',')
     .map((o) => o.trim())
