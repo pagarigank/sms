@@ -263,6 +263,20 @@ export class SisService {
   }
 
   async createSection(data: Partial<Section>) {
+    if (!data.branchId && data.tenantId) {
+      const branches = await this.dataSource.query(
+        `SELECT id FROM branches WHERE "tenantId" = $1 ORDER BY "createdAt" ASC LIMIT 1`,
+        [data.tenantId],
+      );
+      if (branches.length > 0) data.branchId = branches[0].id;
+    }
+    if (!data.schoolYearId && data.tenantId) {
+      const sys = await this.dataSource.query(
+        `SELECT id FROM school_years WHERE "tenantId" = $1 ORDER BY "startDate" DESC LIMIT 1`,
+        [data.tenantId],
+      );
+      if (sys.length > 0) data.schoolYearId = sys[0].id;
+    }
     const section = this.sectionsRepo.create(data);
     return this.sectionsRepo.save(section);
   }

@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store';
 import { useStudentStore } from '@/lib/student-store';
 import { apiClient } from '@/lib/api';
 import { Sidebar } from '@/components/sidebar';
+
+// Dashboard pages (dashboard, messages, etc.) call useQuery — the provider
+// must live above them or Next.js throws "No QueryClient set".
+const queryClient = new QueryClient();
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -37,6 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           lastName: s.lastName,
           studentNumber: s.studentNumber,
           lrn: s.lrn,
+          branchId: s.branchId,
         })));
       } catch {
         // 403 = not a guardian profile; leave students empty — the pages
@@ -55,13 +61,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!token) return null;
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-6">
-          {children}
-        </div>
-      </main>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <div className="flex h-screen bg-background">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-6">
+            {children}
+          </div>
+        </main>
+      </div>
+    </QueryClientProvider>
   );
 }

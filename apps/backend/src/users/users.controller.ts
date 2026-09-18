@@ -8,6 +8,7 @@ import { Repository, In } from 'typeorm';
 import { UsersService } from './users.service';
 import { User } from './user.entity';
 import { UserRole } from '../tenants/user-role.entity';
+import { UserPersonLink } from './user-person-link.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard, RequirePermission } from '../auth/permissions.guard';
 
@@ -19,6 +20,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     @InjectRepository(UserRole) private userRolesRepo: Repository<UserRole>,
+    @InjectRepository(UserPersonLink) private personLinksRepo: Repository<UserPersonLink>,
   ) {}
 
   @Get()
@@ -59,6 +61,7 @@ export class UsersController {
       tenantId?: string;
       phone?: string;
       roleIds?: string[];
+      employeeId?: string;
     },
     @Req() req: any,
   ): Promise<User> {
@@ -74,10 +77,12 @@ export class UsersController {
       tenantId: assignedTenantId,
       passwordHash: await bcrypt.hash(body.password, 12),
     });
+
+    const userId = user.id;
+    const tenantId = user.tenantId;
+
     // Assign roles if provided
     if (body.roleIds && body.roleIds.length > 0) {
-      const userId = user.id;
-      const tenantId = user.tenantId;
       for (const roleId of body.roleIds) {
         const existing = await this.userRolesRepo.findOne({ where: { userId, roleId, tenantId } });
         if (!existing) {
@@ -86,6 +91,23 @@ export class UsersController {
         }
       }
     }
+
+    // Link to employee if provided (wires the login account to HR profile)
+    if (body.employeeId) {
+      const existingLink = await this.personLinksRepo.findOne({
+        where: { userId, personType: 'employee', tenantId },
+      });
+      if (!existingLink) {
+        const link = this.personLinksRepo.create({
+          userId,
+          personType: 'employee',
+          personId: body.employeeId,
+          tenantId,
+        });
+        await this.personLinksRepo.save(link);
+      }
+    }
+
     return user;
   }
 

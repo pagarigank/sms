@@ -5,51 +5,51 @@ export class GradeEntry {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('uuid')
+  @Column({ name: 'tenantId', type: 'uuid' })
   tenantId: string;
 
-  @Column('uuid')
+  @Column({ name: 'studentId', type: 'uuid' })
   studentId: string;
 
-  @Column('uuid')
+  @Column({ name: 'enrollmentId', type: 'uuid' })
   enrollmentId: string;
 
-  @Column('uuid')
+  @Column({ name: 'classOfferingId', type: 'uuid' })
   classOfferingId: string;
 
-  @Column('uuid')
+  @Column({ name: 'gradingSystemId', type: 'uuid' })
   gradingSystemId: string;
 
-  @Column('uuid')
+  @Column({ name: 'gradeComponentId', type: 'uuid' })
   gradeComponentId: string;
 
-  @Column('uuid')
+  @Column({ name: 'termId', type: 'uuid' })
   termId: string;
 
-  @Column({ type: 'numeric', nullable: true })
+  @Column({ name: 'rawScore', type: 'numeric', nullable: true })
   rawScore: number;
 
-  @Column({ type: 'numeric', nullable: true })
+  @Column({ name: 'maxScore', type: 'numeric', nullable: true })
   maxScore: number;
 
-  @Column({ type: 'numeric', nullable: true })
+  @Column({ name: 'percentage', type: 'numeric', nullable: true })
   percentage: number;
 
-  @Column({ type: 'numeric', nullable: true })
+  @Column({ name: 'transmutedGrade', type: 'numeric', nullable: true })
   transmutedGrade: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'remarks', type: 'text', nullable: true })
   remarks: string;
 
-  @Column({ default: false })
+  @Column({ name: 'isFinalized', default: false })
   isFinalized: boolean;
 
-  @Column({ nullable: true })
+  @Column({ name: 'enteredByUserId', nullable: true })
   enteredByUserId: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
 }

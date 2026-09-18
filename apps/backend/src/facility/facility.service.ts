@@ -29,7 +29,20 @@ export class FacilityService {
   }
 
   async createBuilding(data: Partial<Building>): Promise<Building> {
-    const building = this.buildingsRepo.create(data);
+    let tenantId = data.tenantId;
+    if (!tenantId) {
+      const tenants = await this.buildingsRepo.query(`SELECT id FROM tenants ORDER BY "createdAt" ASC LIMIT 1`);
+      if (tenants.length > 0) tenantId = tenants[0].id;
+    }
+    let branchId = data.branchId;
+    if (!branchId && tenantId) {
+      const branches = await this.buildingsRepo.query(
+        `SELECT id FROM branches WHERE "tenantId" = $1 ORDER BY "createdAt" ASC LIMIT 1`,
+        [tenantId],
+      );
+      if (branches.length > 0) branchId = branches[0].id;
+    }
+    const building = this.buildingsRepo.create({ ...data, tenantId, branchId });
     return this.buildingsRepo.save(building);
   }
 

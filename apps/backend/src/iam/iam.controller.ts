@@ -28,7 +28,17 @@ export class IamController {
   @ApiQuery({ name: 'tenantId', required: false })
   @ApiResponse({ status: 200, description: 'List of roles.' })
   async findAllRoles(@Query('tenantId') tenantId?: string) {
-    return this.rolesRepo.find({ where: tenantId ? { tenantId } : {} });
+    if (!tenantId || tenantId === '00000000-0000-0000-0000-000000000000') {
+      return this.rolesRepo.find();
+    }
+    return this.rolesRepo.find({
+      where: [
+        { tenantId },
+        { tenantId: '00000000-0000-0000-0000-000000000000' },
+        { isSystem: true },
+      ],
+      order: { isSystem: 'DESC', name: 'ASC' },
+    });
   }
 
   @Get('roles/:id')

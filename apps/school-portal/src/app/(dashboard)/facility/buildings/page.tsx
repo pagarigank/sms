@@ -13,6 +13,7 @@ import { Input } from '@sms/ui';
 import { Label } from '@sms/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { cn } from '@sms/utils';
+import { useTenantStore } from '@/lib/store';
 
 interface Building {
   id: string;
@@ -40,6 +41,7 @@ export default function BuildingsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const confirm = useConfirm();
+  const { currentTenantId, currentBranchId } = useTenantStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
   const [branchFilter, setBranchFilter] = useState<string>('all');
@@ -68,13 +70,14 @@ export default function BuildingsPage() {
     queryFn: () => apiClient.tenants.list({ limit: 100 }),
   });
 
+  const activeTenantId = form.tenantId || (tenantFilter !== 'all' ? tenantFilter : currentTenantId);
   const { data: branchesRes } = useQuery<any[]>({
-    queryKey: ['branches', tenantFilter],
+    queryKey: ['branches', activeTenantId],
     queryFn: () =>
-      tenantFilter !== 'all'
-        ? apiClient.branches.list({ tenantId: tenantFilter, limit: 100 }).then((r: any) => r.data)
+      activeTenantId
+        ? apiClient.branches.list({ tenantId: activeTenantId, limit: 100 }).then((r: any) => r.data)
         : Promise.resolve([]),
-    enabled: tenantFilter !== 'all',
+    enabled: !!activeTenantId,
   });
 
   const tenants: Tenant[] = (tenantsRes?.data as unknown as Tenant[]) ?? [];
@@ -82,7 +85,11 @@ export default function BuildingsPage() {
   const buildings: Building[] = ((buildingsRes?.data as unknown) as Building[]) ?? [];
 
   const createMutation = useMutation({
-    mutationFn: (data: typeof form) => apiClient.facility.createBuilding(data),
+    mutationFn: (data: typeof form) => apiClient.facility.createBuilding({
+      ...data,
+      tenantId: data.tenantId || currentTenantId || '',
+      branchId: data.branchId || currentBranchId || '',
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buildings'] });
       setShowCreate(false);
@@ -227,7 +234,18 @@ export default function BuildingsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Buildings</h1>
             <p className="text-muted-foreground">Manage campus buildings and facilities</p>
           </div>
-          <Button onClick={() => setShowCreate(true)}>
+          <Button onClick={() => {
+            const initialTenant = currentTenantId || (tenants[0]?.id ?? '');
+            const initialBranch = currentBranchId || (branches[0]?.id ?? '');
+            setForm({
+              name: '',
+              code: '',
+              tenantId: initialTenant,
+              branchId: initialBranch,
+              address: '',
+            });
+            setShowCreate(true);
+          }}>
             <span className="flex items-center space-x-1">
               <Plus className="h-4 w-4" />
               <span>Add Building</span>
@@ -287,10 +305,9 @@ export default function BuildingsPage() {
                   <Select
                     value={form.branchId}
                     onValueChange={(value) => setForm({ ...form, branchId: value })}
-                    disabled={!form.tenantId}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={form.tenantId ? "Select branch" : "Select tenant first"} />
+                      <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
                       {branches.map((branch) => (
@@ -370,10 +387,9 @@ export default function BuildingsPage() {
                   <Select
                     value={form.branchId}
                     onValueChange={(value) => setForm({ ...form, branchId: value })}
-                    disabled={!form.tenantId}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={form.tenantId ? "Select branch" : "Select tenant first"} />
+                      <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
                       {branches.map((branch) => (
@@ -458,7 +474,7 @@ export default function BuildingsPage() {
           isLoading={isLoading}
           emptyMessage="No buildings found. Click 'Add Building' to create your first building."
         />
-
+
       </div>
     </>
   );

@@ -1,0 +1,3 @@
+undefined
+D:\sms\apps\backend:
+ΓÇëERR_PNPM_RECURSIVE_EXEC_FIRST_FAILΓÇë Command failed with exit code 2: psql -U postgres -d sms -c SELECT email, \ tenantId\ FROM users;

@@ -33,8 +33,9 @@ export class FacilityController {
   @Post('buildings')
   @ApiOperation({ summary: 'Create a building', description: 'Create a new building within a branch.' })
   @ApiResponse({ status: 201, description: 'Building created.' })
-  createBuilding(@Body() dto: CreateBuildingDto, @Headers('x-tenant-id') tenantId: string) {
-    return this.facilityService.createBuilding({ ...dto, tenantId });
+  createBuilding(@Body() dto: CreateBuildingDto, @Headers('x-tenant-id') tenantId?: string) {
+    const effectiveTenantId = tenantId || dto.tenantId;
+    return this.facilityService.createBuilding({ ...dto, tenantId: effectiveTenantId });
   }
 
   @Put('buildings/:id')

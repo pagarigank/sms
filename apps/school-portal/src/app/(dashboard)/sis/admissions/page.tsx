@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { UserPlus, Settings, GraduationCap, AlertTriangle } from 'lucide-react';
-import { Badge } from '@sms/ui';
+import { Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 
 /**
  * Pipeline stage → semantic token pair (border / surface).
@@ -78,7 +78,7 @@ export default function AdmissionsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/sis/admissions/apply"
+            href="/sis/admissions/stages"
             className="inline-flex items-center gap-2 rounded-md border border-[hsl(var(--border-strong))] bg-[hsl(var(--surface-raised))] px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-[hsl(var(--surface-muted))]"
           >
             <Settings className="h-4 w-4" /> Configure Stages
@@ -145,41 +145,55 @@ export default function AdmissionsPage() {
                     <p className="text-center text-muted-foreground text-sm py-8">No applicants</p>
                   ) : (
                     applicants.map((applicant) => (
-                      <div key={applicant.id} className="rounded-lg border bg-card p-3 hover:shadow-md transition-shadow">
-                        <p className="font-medium text-sm text-[hsl(var(--foreground))]">
-                          {applicant.lastName}, {applicant.firstName}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {applicant.gradeLevelAppliedFor || 'No level set'}
-                        </p>
+                      <div key={applicant.id} className="group relative rounded-xl border bg-card p-4 hover:shadow-lg transition-all duration-200 hover:border-primary/30">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-bold text-sm text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                              {applicant.lastName}, {applicant.firstName}
+                            </p>
+                            <p className="text-[11px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wider">
+                              Grade: {applicant.gradeLevelAppliedFor || 'Unset'}
+                            </p>
+                          </div>
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                            <span className="text-xs font-bold text-primary">
+                              {applicant.firstName.charAt(0)}{applicant.lastName.charAt(0)}
+                            </span>
+                          </div>
+                        </div>
 
                         {/* Move to stage */}
-                        <select
-                          value={stage.id}
-                          onChange={(e) =>
-                            moveStage.mutate({ applicantId: applicant.id, stageId: e.target.value })
-                          }
-                          disabled={moveStage.isPending}
-                          className="mt-2 w-full rounded border border-[hsl(var(--border-strong))] bg-background px-2 py-1 text-xs disabled:opacity-50"
-                          aria-label={`Move ${applicant.firstName} ${applicant.lastName} to another stage`}
-                        >
-                          {stages.map((s) => (
-                            <option key={s.id} value={s.id}>Move to: {s.stageName}</option>
-                          ))}
-                        </select>
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <Select
+                            value={stage.id}
+                            onValueChange={(val) =>
+                              moveStage.mutate({ applicantId: applicant.id, stageId: val })
+                            }
+                            disabled={moveStage.isPending}
+                          >
+                            <SelectTrigger aria-label={`Move ${applicant.firstName} ${applicant.lastName} to another stage`} className="h-8 text-xs font-medium border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors">
+                              <SelectValue placeholder="Move to stage..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {stages.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>Move to: {s.stageName}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
                         {/* Convert accepted applicants */}
                         {(stage.stageCode === 'accepted' || stage.stageCode === 'admitted') && (
                           <button
                             onClick={() => convert.mutate(applicant.id)}
                             disabled={convert.isPending}
-                            className="mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-[hsl(var(--status-success-ink))] disabled:opacity-50"
+                            className="mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold text-[hsl(var(--status-success-ink))] shadow-sm transition-all hover:brightness-105 active:scale-95 disabled:opacity-50"
                             style={{
                               backgroundColor: 'hsl(var(--status-success-surface))',
                               border: '1px solid hsl(var(--status-success-ink) / 0.35)',
                             }}
                           >
-                            <GraduationCap className="h-3 w-3" />
+                            <GraduationCap className="h-3.5 w-3.5" />
                             {convert.isPending ? 'Converting...' : 'Convert to Student'}
                           </button>
                         )}

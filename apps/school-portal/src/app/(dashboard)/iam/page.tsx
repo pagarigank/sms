@@ -81,6 +81,8 @@ export default function IAMPage() {
   const [userForm, setUserForm] = useState({
     email: '', password: '', firstName: '', lastName: '', middleName: '', phone: '', tenantId: '',
   });
+  const [newUserRoleIds, setNewUserRoleIds] = useState<string[]>([]);
+  const [newUserEmployeeId, setNewUserEmployeeId] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
   // ── Roles State ──────────────────────────────────────────────────
@@ -99,6 +101,13 @@ export default function IAMPage() {
     enabled: !!currentTenantId,
   });
   const users: User[] = (usersRes?.data as any) ?? [];
+
+  const { data: employeesRes } = useQuery({
+    queryKey: ['employees-iam', currentTenantId],
+    queryFn: () => apiClient.hr.getEmployees({ tenantId: currentTenantId! }),
+    enabled: !!currentTenantId && showCreateUser,
+  });
+  const employeesList: any[] = (employeesRes?.data as any[]) ?? [];
 
   const { data: rolesRes, isLoading: rolesLoading } = useQuery({
     queryKey: ['iam-roles', currentTenantId],
@@ -172,6 +181,8 @@ export default function IAMPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setShowCreateUser(false);
       setUserForm({ email: '', password: '', firstName: '', lastName: '', middleName: '', phone: '', tenantId: '' });
+      setNewUserRoleIds([]);
+      setNewUserEmployeeId('');
       toast({ title: 'User created successfully', variant: 'success' });
     },
     onError: (err: any) => toast({ title: 'Error creating user', description: err.message, variant: 'destructive' }),
@@ -514,8 +525,7 @@ export default function IAMPage() {
         </div>
       )}
 
-      {/* ── Create User Dialog ─────────────────────────────── */}
-      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+      <Dialog open={showCreateUser} onOpenChange={(open) => { setShowCreateUser(open); if (!open) { setNewUserRoleIds([]); setNewUserEmployeeId(''); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -531,10 +541,15 @@ export default function IAMPage() {
               } else if (payload.tenantId === 'platform') {
                 payload.tenantId = '';
               }
-              createUserMutation.mutate(payload);
+              createUserMutation.mutate({
+                ...payload,
+                roleIds: newUserRoleIds.length > 0 ? newUserRoleIds : undefined,
+                employeeId: newUserEmployeeId || undefined,
+              });
             }}
             className="space-y-4 py-2"
           >
+            {/* ── Section 1: Account Details ── */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="u-fname">First Name</Label>
@@ -571,6 +586,70 @@ export default function IAMPage() {
                 </button>
               </div>
             </div>
+
+            {/* ── Section 2: Link to Employee (optional) ── */}
+            <div className="rounded-lg border p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Link to Employee Record <span className="font-normal">(optional)</span></p>
+              <Select
+                value={newUserEmployeeId || 'none'}
+                onValueChange={(v) => {
+                  if (v === 'none') {
+                    setNewUserEmployeeId('');
+                  } else {
+                    setNewUserEmployeeId(v);
+                    const emp = employeesList.find((e: any) => e.id === v);
+                    if (emp) {
+                      setUserForm(f => ({
+                        ...f,
+                        firstName: f.firstName || emp.firstName || '',
+                        lastName: f.lastName || emp.lastName || '',
+                        phone: f.phone || emp.contactNumber || '',
+                      }));
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger id="u-employee">
+                  <SelectValue placeholder="Select an employee to link..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Not linked —</SelectItem>
+                  {employeesList.map((emp: any) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.lastName}, {emp.firstName} {emp.position ? `· ${emp.position}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newUserEmployeeId && (
+                <p className="text-xs text-muted-foreground">This account will be linked to the employee profile in HR.</p>
+              )}
+            </div>
+
+            {/* ── Section 3: Assign Roles (optional) ── */}
+            <div className="rounded-lg border p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Assign Roles <span className="font-normal">(optional)</span></p>
+              <div className="max-h-40 overflow-y-auto grid gap-2">
+                {roles.map((role) => (
+                  <label key={role.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 rounded px-1 py-0.5">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-muted accent-primary"
+                      checked={newUserRoleIds.includes(role.id)}
+                      onChange={(e) => {
+                        setNewUserRoleIds(prev =>
+                          e.target.checked ? [...prev, role.id] : prev.filter(id => id !== role.id)
+                        );
+                      }}
+                    />
+                    <span className="text-sm font-medium">{role.name}</span>
+                    {role.description && <span className="text-xs text-muted-foreground">— {role.description}</span>}
+                  </label>
+                ))}
+                {roles.length === 0 && <p className="text-xs text-muted-foreground">No roles available. Create roles first.</p>}
+              </div>
+            </div>
+
             {isSuperAdmin && (
               <div className="space-y-2">
                 <Label htmlFor="u-tenant">Assign Tenant (Superadmin Only) <span className="text-red-500">*</span></Label>

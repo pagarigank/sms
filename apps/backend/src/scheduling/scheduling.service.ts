@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ClassOffering } from './class-offering.entity';
 import { SchoolCalendar } from './school-calendar.entity';
 import { CalendarEvent } from './calendar-event.entity';
@@ -36,14 +36,28 @@ export class SchedulingService {
     @InjectRepository(Subject) private subjectsRepo: Repository<Subject>,
     @InjectRepository(Room) private roomsRepo: Repository<Room>,
     @InjectRepository(Employee) private employeesRepo: Repository<Employee>,
+    private dataSource: DataSource,
   ) {}
 
+  // === Roles & Scoping ===
+  async isFacultyOnly(userId: string): Promise<boolean> {
+    const roles = await this.dataSource.query(
+      `SELECT r.name FROM "roles" r JOIN "user_roles" ur ON r.id = ur."roleId" WHERE ur."userId" = $1`,
+      [userId]
+    );
+    const roleNames = roles.map((r: any) => r.name.toLowerCase());
+    const isFaculty = roleNames.includes('faculty') || roleNames.includes('teacher');
+    const isAdmin = roleNames.includes('tenant admin') || roleNames.includes('platform admin') || roleNames.includes('registrar') || roleNames.includes('principal');
+    return isFaculty && !isAdmin;
+  }
+
   // === Class Offerings ===
-  async findAllOfferings(tenantId: string, branchId?: string, schoolYearId?: string, termId?: string) {
+  async findAllOfferings(tenantId: string, branchId?: string, schoolYearId?: string, termId?: string, facultyUserId?: string) {
     const where: any = { tenantId };
     if (branchId) where.branchId = branchId;
     if (schoolYearId) where.schoolYearId = schoolYearId;
     if (termId) where.termId = termId;
+    if (facultyUserId) where.facultyEmployeeId = facultyUserId;
     return this.offeringsRepo.find({ where, order: { createdAt: 'DESC' } });
   }
 
@@ -53,15 +67,51 @@ export class SchedulingService {
     if (conflict) {
       throw new BadRequestException(`Scheduling conflict: ${conflict}`);
     }
-    const offering = this.offeringsRepo.create(data);
-    return this.offeringsRepo.save(offering);
+
+    return await this.dataSource.transaction(async (manager) => {
+      const offering = manager.create(ClassOffering, data);
+      const saved = await manager.save(offering);
+
+      if (saved.facultyEmployeeId) {
+        await manager.query(
+          `INSERT INTO teaching_loads ("tenantId", "branchId", "employeeId", "classOfferingId", "schoolYearId", "termId") VALUES ($1, $2, $3, $4, $5, $6)`,
+          [saved.tenantId, saved.branchId, saved.facultyEmployeeId, saved.id, saved.schoolYearId, saved.termId]
+        );
+      }
+      return saved;
+    });
   }
 
   async updateOffering(id: string, tenantId: string, data: Partial<ClassOffering>) {
-    const offering = await this.offeringsRepo.findOne({ where: { id, tenantId } });
-    if (!offering) throw new NotFoundException('Class offering not found');
-    Object.assign(offering, data);
-    return this.offeringsRepo.save(offering);
+    return await this.dataSource.transaction(async (manager) => {
+      const offering = await manager.findOne(ClassOffering, { where: { id, tenantId } });
+      if (!offering) throw new NotFoundException('Class offering not found');
+      
+      const conflictData = { ...offering, ...data };
+      if (data.timeSlots || data.roomId !== undefined || data.facultyEmployeeId !== undefined) {
+        const conflict = await this.checkSchedulingConflict(conflictData);
+        if (conflict) {
+          throw new BadRequestException(`Scheduling conflict: ${conflict}`);
+        }
+      }
+
+      const oldFacultyId = offering.facultyEmployeeId;
+      Object.assign(offering, data);
+      const saved = await manager.save(offering);
+
+      if (data.facultyEmployeeId !== undefined && data.facultyEmployeeId !== oldFacultyId) {
+        await manager.query(`DELETE FROM teaching_loads WHERE "classOfferingId" = $1`, [saved.id]);
+        
+        if (data.facultyEmployeeId) {
+          await manager.query(
+            `INSERT INTO teaching_loads ("tenantId", "branchId", "employeeId", "classOfferingId", "schoolYearId", "termId") VALUES ($1, $2, $3, $4, $5, $6)`,
+            [saved.tenantId, saved.branchId, saved.facultyEmployeeId, saved.id, saved.schoolYearId, saved.termId]
+          );
+        }
+      }
+
+      return saved;
+    });
   }
 
   async checkSchedulingConflict(data: Partial<ClassOffering>): Promise<string | null> {

@@ -309,10 +309,16 @@ export default function CurriculaPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...form,
+      gradeLevelId: form.gradeLevelId || undefined,
+      strandId: form.strandId || undefined,
+      programId: form.programId || undefined,
+    };
     if (editingCurriculum) {
-      updateMutation.mutate({ ...form, id: editingCurriculum.id } as Curriculum);
+      updateMutation.mutate({ ...payload, id: editingCurriculum.id } as Curriculum);
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(payload);
     }
   };
 

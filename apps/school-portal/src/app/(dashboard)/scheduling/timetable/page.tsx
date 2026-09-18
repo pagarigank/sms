@@ -73,6 +73,18 @@ export default function TimetablePage() {
     queryFn: () => apiClient.academic.listSubjects(),
   });
 
+  const { data: employees } = useQuery({
+    queryKey: ['employees', currentTenantId],
+    queryFn: () => apiClient.hr.getEmployees({ tenantId: currentTenantId! }),
+    enabled: !!currentTenantId,
+  });
+
+  const { data: rooms } = useQuery({
+    queryKey: ['rooms', currentBranchId],
+    queryFn: () => apiClient.facility.listRooms({ branchId: currentBranchId ?? undefined, limit: 100 }),
+    enabled: !!currentTenantId,
+  });
+
   const { data: timetable, isLoading } = useQuery({
     queryKey: ['timetable', currentTenantId, selectedSection, selectedTerm],
     queryFn: () =>
@@ -114,6 +126,16 @@ export default function TimetablePage() {
       toast({ title: 'Could not add class', description: error.message, variant: 'destructive' });
     },
   });
+
+  const handleSubjectChange = (subjectId: string) => {
+    const subject = ((subjects?.data as any[]) ?? []).find((s: any) => s.id === subjectId);
+    setForm({
+      ...form,
+      subjectId,
+      units: subject?.units != null ? subject.units.toString() : '3',
+      hoursPerWeek: subject?.hoursPerWeek != null ? subject.hoursPerWeek.toString() : '3',
+    });
+  };
 
   const timetableData = (timetable?.data as any) ?? {};
   const subjectNames = new Map(((subjects?.data as any[]) ?? []).map((s) => [s.id, s.title]));
@@ -178,13 +200,41 @@ export default function TimetablePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Label>Subject *</Label>
-                <Select value={form.subjectId} onValueChange={(v) => setForm({ ...form, subjectId: v })}>
+                <Select value={form.subjectId} onValueChange={handleSubjectChange}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select subject..." />
                   </SelectTrigger>
                   <SelectContent>
                     {((subjects?.data as any[]) ?? []).map((s: any) => (
                       <SelectItem key={s.id} value={s.id}>{s.code} — {s.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label>Teacher</Label>
+                <Select value={form.facultyEmployeeId} onValueChange={(v) => setForm({ ...form, facultyEmployeeId: v === 'none' ? '' : v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select teacher (optional)..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {((employees?.data as any[]) ?? []).map((e: any) => (
+                      <SelectItem key={e.id} value={e.id}>{e.lastName}, {e.firstName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label>Room</Label>
+                <Select value={form.roomId} onValueChange={(v) => setForm({ ...form, roomId: v === 'none' ? '' : v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select room (optional)..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {((rooms?.data as any[]) ?? []).map((r: any) => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

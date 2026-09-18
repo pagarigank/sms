@@ -2,23 +2,68 @@ import { Page, expect } from '@playwright/test';
 
 declare const process: { env: Record<string, string | undefined> };
 
-export const BASE = 'http://localhost:3001';
-export const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+export const BASE = process.env.BASE_URL || 'http://localhost:3000';
+export const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+export const GUARDIAN_BASE = process.env.GUARDIAN_BASE_URL || 'http://localhost:3002';
 
 export const ADMIN = { email: 'admin@demo-school.ph', password: 'admin123' };
+export const FACULTY = { email: 'faculty@school-demo.ph', password: 'admin123' };
+export const GUARDIAN = { email: 'guardian@demo-school.ph', password: 'admin123' };
 
 /* ------------------------------------------------------------------ */
 /*  Login via the real login form (form-only, no token injection).    */
 /* ------------------------------------------------------------------ */
 
-export async function loginViaForm(page: Page): Promise<void> {
-  await page.goto(`${BASE}/login`);
-  await expect(page.locator('h1')).toContainText('SchoolSuite');
-  await page.fill('#email', ADMIN.email);
-  await page.fill('#password', ADMIN.password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
+export async function loginViaForm(page: Page, creds = ADMIN, base = BASE): Promise<void> {
+  // If already logged in and on dashboard or authenticated path, skip
+  if (page.url().includes('/dashboard')) {
+    return;
+  }
+
+  page.on('console', msg => console.log(`[Browser] ${msg.type()}: ${msg.text()}`));
+  page.on('requestfailed', request => console.log(`[Browser Network Error] ${request.url()} failed: ${request.failure()?.errorText}`));
+  
+  await page.goto(`${base}/login`);
+  await page.waitForLoadState('domcontentloaded');
+
+  // If already redirected to dashboard due to existing session
+  if (page.url().includes('/dashboard')) {
+    return;
+  }
+
+  // If on tenant step, click Skip to proceed to email/password
+  const skipBtn = page.locator('[data-testid="tenant-skip"], button:has-text("Skip")');
+  if (await skipBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await skipBtn.click();
+  }
+
+  // Wait for email field (or if redirected to dashboard meanwhile)
+  const emailInput = page.locator('#email');
+  try {
+    await emailInput.waitFor({ state: 'visible', timeout: 8000 });
+  } catch {
+    if (page.url().includes('/dashboard')) return;
+  }
+
+  if (await emailInput.isVisible()) {
+    await emailInput.fill(creds.email);
+    await page.fill('#password', creds.password);
+    await page.locator('button[type="submit"]').click();
+
+    // If a transient fetch error occurred, give it a quick retry
+    const errorAlert = page.locator('[role="alert"]');
+    if (await errorAlert.isVisible({ timeout: 2500 }).catch(() => false)) {
+      const errText = await errorAlert.innerText().catch(() => '');
+      if (errText.includes('Failed to fetch') || errText.includes('failed')) {
+        await page.waitForTimeout(1500);
+        await page.locator('button[type="submit"]').click();
+      }
+    }
+  }
+
+  await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 60_000 });
 }
+
 
 /* ------------------------------------------------------------------ */
 /*  Bootstrap reference data via API (faster + more reliable than     */

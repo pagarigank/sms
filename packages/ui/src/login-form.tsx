@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, Shield,
   AlertCircle, Loader2, KeyRound, Building2,
@@ -133,10 +133,12 @@ function StepTransition({ stepKey, children }: { stepKey: string; children: Reac
     setMounted(false);
   }
 
-  // Mount one frame after render so the fade-in transition runs on every step change.
-  if (!mounted && typeof window !== 'undefined') {
-    requestAnimationFrame(() => setMounted(true));
-  }
+  useEffect(() => {
+    if (!mounted) {
+      const frame = requestAnimationFrame(() => setMounted(true));
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [mounted]);
 
   return (
     <div className={cn('transition-opacity duration-200 ease-out', mounted ? 'opacity-100' : 'opacity-0')}>

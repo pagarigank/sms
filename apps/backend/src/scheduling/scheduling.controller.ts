@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SchedulingService } from './scheduling.service';
 
@@ -16,8 +16,12 @@ export class SchedulingController {
     @Query('branchId') branchId?: string,
     @Query('schoolYearId') schoolYearId?: string,
     @Query('termId') termId?: string,
+    @Req() req?: any
   ) {
-    return this.schedulingService.findAllOfferings(tenantId, branchId, schoolYearId, termId);
+    const userId = req?.user?.sub ?? req?.user?.id;
+    const isFacultyOnly = userId ? await this.schedulingService.isFacultyOnly(userId) : false;
+    const facultyUserId = isFacultyOnly ? userId : undefined;
+    return this.schedulingService.findAllOfferings(tenantId, branchId, schoolYearId, termId, facultyUserId);
   }
 
   @Post('offerings')

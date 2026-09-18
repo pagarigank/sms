@@ -71,18 +71,10 @@ export default function FacultyLoadPage() {
 
   const assignLoadMutation = useMutation({
     mutationFn: async () => {
-      // Update the scheduling offering so it appears in getFacultyLoad
-      await apiClient.scheduling.updateOffering(selectedOfferingToAssign, {
+      // Update the scheduling offering so it appears in getFacultyLoad.
+      // The backend will automatically handle the HR teaching load assignment transactionally.
+      return apiClient.scheduling.updateOffering(selectedOfferingToAssign, {
         facultyEmployeeId: employeeId,
-      });
-      // Add the HR teaching load record
-      return apiClient.hr.assignTeachingLoad({
-        tenantId: currentTenantId,
-        branchId: currentBranchId,
-        employeeId,
-        classOfferingId: selectedOfferingToAssign,
-        termId,
-        schoolYearId: activeYearId,
       });
     },
     onSuccess: () => {

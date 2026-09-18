@@ -66,7 +66,7 @@ export const userEndpoints = (client: ApiClient) => ({
       status: params.status ?? '',
     } : undefined),
 
-  createUser: (data: { email: string; password: string; firstName?: string; lastName?: string; middleName?: string; phone?: string; tenantId?: string }) =>
+  createUser: (data: { email: string; password: string; firstName?: string; lastName?: string; middleName?: string; phone?: string; tenantId?: string; roleIds?: string[]; employeeId?: string }) =>
     client.post<User>('/api/v1/users', data),
 
   updateUser: (id: string, data: Partial<User>) =>

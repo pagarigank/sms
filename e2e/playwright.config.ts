@@ -11,9 +11,10 @@ export default defineConfig({
   globalTimeout: 600_000,
   // Use storage state from global setup
   use: {
-    baseURL: 'http://localhost:3001',
+    baseURL: 'http://localhost:3000',
     // storageState not used — tests login via UI
     headless: true,
+    trace: 'on',
   },
   projects: [
     {

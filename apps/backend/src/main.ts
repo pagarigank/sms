@@ -15,13 +15,17 @@ async function bootstrap() {
   // Global API prefix
   app.setGlobalPrefix('api/v1');
 
-  // CORS: explicit allowlist from env (falls back to localhost dev origins).
-  // The previous default `origin: '*'` combined with `credentials: true` is
-  // rejected by browsers and flagged by OWASP ASVS 14.4.
-  const origins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001,http://localhost:3002')
+  // CORS: explicit allowlist. CORS_ORIGIN (when set) is MERGED with the
+  // localhost dev origins instead of replacing them — a stale env var used
+  // to silently drop the guardian portal (port 3002), breaking its login
+  // with a browser-side "Failed to fetch". `*` with credentials is still
+  // rejected by browsers (OWASP ASVS 14.4), so explicit origins remain.
+  const devOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
+  const extraOrigins = (process.env.CORS_ORIGIN || '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
+  const origins = Array.from(new Set([...devOrigins, ...extraOrigins]));
   app.enableCors({ origin: origins, credentials: true });
 
   // Security headers (OWASP A05). CSP is disabled: this service is a JSON
