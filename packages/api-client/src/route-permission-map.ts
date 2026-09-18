@@ -137,6 +137,10 @@ export function getRoutePermission(route: string): string | null {
  * its children, so partial-permission roles keep the section instead of losing
  * it wholesale (e.g. a Branch Admin holds `academic.school_year:view` but not
  * `academic.curriculum:view` and should still see Academic → School Years).
+ *
+ * Uses a Set for O(1) permission checks so rapid auth/me re-fetches (including
+ * cache hits that return new array references each time) don't churn the
+ * sidebar's filter pass on every render cycle.
  */
 export function filterNavigationByPermissions(
   navigation: any[],
