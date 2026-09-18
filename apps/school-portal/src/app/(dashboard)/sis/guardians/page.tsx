@@ -10,6 +10,7 @@ import {
   Button,
   DataTable,
   Input,
+  PageHeader,
   useToast,
   // ColumnDef from @sms/ui so it matches the DataTable prop type
   // (the workspace has duplicate react-table majors; this avoids variance errors).
@@ -67,15 +68,15 @@ export default function GuardiansPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Guardians</h1>
-          <p className="text-muted-foreground">Manage parent/guardian records</p>
-        </div>
-        <Button disabled title="Guardian creation is managed through admissions and student records">
-          <UserPlus className="h-4 w-4" /> Add Guardian
-        </Button>
-      </div>
+      <PageHeader
+        title="Guardians"
+        description="Manage parent/guardian records"
+        actions={
+          <Button disabled title="Guardian creation is managed through admissions and student records">
+            <UserPlus className="h-4 w-4" /> Add Guardian
+          </Button>
+        }
+      />
 
       <DataTable
         columns={columns}

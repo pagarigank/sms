@@ -14,6 +14,7 @@ import {
   Button,
   DataTable,
   Input,
+  PageHeader,
   StatusDot,
   statusToVariant,
 } from '@sms/ui';
@@ -79,24 +80,24 @@ export default function EnrollmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Enrollments</h1>
-          <p className="text-muted-foreground">Manage student enrollments</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/sis/enrollments/wizard">
-              <UserPlus className="h-4 w-4" /> Enrollment Wizard
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/sis/enrollments/batch">
-              <Users className="h-4 w-4" /> Batch Re-enroll
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Enrollments"
+        description="Manage student enrollments"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/sis/enrollments/wizard">
+                <UserPlus className="h-4 w-4" /> Enrollment Wizard
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/sis/enrollments/batch">
+                <Users className="h-4 w-4" /> Batch Re-enroll
+              </Link>
+            </Button>
+          </div>
+        }
+      />
 
       <DataTable
         columns={columns}

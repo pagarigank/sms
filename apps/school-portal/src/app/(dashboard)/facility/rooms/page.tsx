@@ -18,6 +18,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -222,19 +223,19 @@ export default function RoomsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Rooms</h1>
-          <p className="text-muted-foreground">Manage rooms across all buildings</p>
-        </div>
-        <Button onClick={() => {
-          setEditingRoom(null);
-          setForm(defaultForm);
-          setShowCreate(true);
-        }}>
-          <Plus className="h-4 w-4" /> Add Room
-        </Button>
-      </div>
+      <PageHeader
+        title="Rooms"
+        description="Manage rooms across all buildings"
+        actions={
+          <Button onClick={() => {
+            setEditingRoom(null);
+            setForm(defaultForm);
+            setShowCreate(true);
+          }}>
+            <Plus className="h-4 w-4" /> Add Room
+          </Button>
+        }
+      />
 
       <DataTable
         columns={columns}

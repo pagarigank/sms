@@ -20,7 +20,6 @@ import { communicationsEndpoints } from './endpoints/communications';
 import { documentsEndpoints } from './endpoints/documents';
 import { hrEndpoints } from './endpoints/hr';
 import { reportingEndpoints } from './endpoints/reporting';
-import { reportsEndpoints } from './endpoints/reports';
 
 export class ApiClient {
   private baseUrl: string;
@@ -49,7 +48,6 @@ export class ApiClient {
     public documents;
     public hr;
     public reporting;
-    public reports;
 
   constructor(config: ApiClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, '');
@@ -77,7 +75,7 @@ export class ApiClient {
     this.documents = documentsEndpoints(this);
     this.hr = hrEndpoints(this);
     this.reporting = reportingEndpoints(this);
-    this.reports = reportsEndpoints(this);
+    
     this.invoices = invoiceEndpoints(this);
   }
 

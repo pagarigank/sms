@@ -83,3 +83,4 @@ export class InvoiceController {
     return this.invoiceService.applyPayment(id, tenantId, body.amount);
   }
 }
+

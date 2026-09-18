@@ -5,10 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
 import { FileText, CheckCircle, Clock, XCircle, Search, Plus, Loader2, AlertTriangle, ShieldCheck, Ban, Download } from 'lucide-react';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Badge } from '@sms/ui';
+import { Badge, Button, Input, Label, PageHeader } from '@sms/ui';
 
 function listOf<T>(res: unknown): T[] {
   if (Array.isArray(res)) return res as T[];
@@ -200,15 +197,15 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
-          <p className="text-muted-foreground">Registrar desk: request, assess, release, and generate official documents</p>
-        </div>
-        <Button onClick={() => setShowRequestForm((v) => !v)}>
-          <Plus className="mr-2 h-4 w-4" /> New Request
-        </Button>
-      </div>
+      <PageHeader
+        title="Documents"
+        description="Registrar desk: request, assess, release, and generate official documents"
+        actions={
+          <Button onClick={() => setShowRequestForm((v) => !v)}>
+            <Plus className="mr-2 h-4 w-4" /> New Request
+          </Button>
+        }
+      />
 
       {error && (
         <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

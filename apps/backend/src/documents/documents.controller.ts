@@ -94,7 +94,6 @@ export class DocumentsController {
     return this.docsService.createRequest({ ...body, tenantId });
   }
 
-  @Put('requests/:id/approve')
   @Put('requests/:id/status')
   @ApiOperation({ summary: 'Update request status (fee_assessed | paid | rejected)' })
   async updateRequestStatus(
@@ -197,3 +196,4 @@ export class DocumentsController {
     return this.docsService.voidDocument(id, tenantId);
   }
 }
+

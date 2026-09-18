@@ -4,15 +4,31 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, Search, Building, Edit, Trash2, BookOpen } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { cn } from '@sms/utils';
 
 interface Program {
@@ -207,18 +223,18 @@ export default function ProgramsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Programs</h1>
-            <p className="text-muted-foreground">Manage college/university programs and courses</p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <span className="flex items-center space-x-1">
-              <Plus className="h-4 w-4" />
-              <span>Add Program</span>
-            </span>
-          </Button>
-        </div>
+        <PageHeader
+            title="Programs"
+            description="Manage college/university programs and courses"
+            actions={
+              <Button onClick={() => setShowCreate(true)}>
+                <span className="flex items-center space-x-1">
+                  <Plus className="h-4 w-4" />
+                  <span>Add Program</span>
+                </span>
+              </Button>
+            }
+          />
 
         {showCreate && (
           <Dialog open={showCreate} onOpenChange={setShowCreate}>

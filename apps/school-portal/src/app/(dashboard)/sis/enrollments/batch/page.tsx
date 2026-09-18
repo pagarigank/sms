@@ -5,6 +5,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { AlertTriangle, CheckCircle, ChevronRight, Users } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 interface GradeLevelMapping {
   sourceGradeLevelId: string;
@@ -62,10 +63,7 @@ export default function ReEnrollmentBatchPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Batch Re-Enrollment</h1>
-        <p className="text-muted-foreground">Carry forward students from one school year to the next</p>
-      </div>
+      <PageHeader title="Batch Re-Enrollment" description="Carry forward students from one school year to the next" />
 
       {/* Step indicator */}
       <div className="flex items-center gap-4">

@@ -11,8 +11,9 @@ import { AttendanceRecord } from './attendance-record.entity';
 import { AttendanceConfig } from './attendance-config.entity';
 import { AttendanceExcuse } from './attendance-excuse.entity';
 import { AttendanceNotificationThreshold } from './attendance-notification-threshold.entity';
-import { GradeEntry } from './grade-entry.entity';
-import { GradeChangeRequest } from './grade-change-request.entity';
+import { GradeEntry } from '../grading/entities/grade-entry.entity';
+import { GradeChangeRequest } from '../grading/entities/grade-change-request.entity';
+import { AuditEvent } from '../config/audit-event.entity';
 import { PermanentRecord } from './permanent-record.entity';
 import { Enrollment } from '../sis/enrollment.entity';
 import { Student } from '../sis/student.entity';
@@ -49,6 +50,7 @@ import { GradingExtendedController } from './grading-extended.controller';
       AttendanceNotificationThreshold,
       GradeEntry,
       GradeChangeRequest,
+      AuditEvent,
       PermanentRecord,
       Enrollment,
       StudentSectionAssignment,

@@ -186,3 +186,4 @@ export class IamController {
     if (result.affected === 0) throw new NotFoundException('User role assignment not found');
   }
 }
+

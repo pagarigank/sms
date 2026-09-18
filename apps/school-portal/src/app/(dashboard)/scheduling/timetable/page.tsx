@@ -15,6 +15,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -143,15 +144,15 @@ export default function TimetablePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Timetable</h1>
-          <p className="text-muted-foreground">View and manage class schedules</p>
-        </div>
-        <Button onClick={() => setShowAdd(true)} disabled={!selectedSection || !selectedTerm}>
-          <Plus className="h-4 w-4" /> Add Class
-        </Button>
-      </div>
+      <PageHeader
+        title="Timetable"
+        description="View and manage class schedules"
+        actions={
+          <Button onClick={() => setShowAdd(true)} disabled={!selectedSection || !selectedTerm}>
+            <Plus className="h-4 w-4" /> Add Class
+          </Button>
+        }
+      />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="w-full sm:max-w-xs">

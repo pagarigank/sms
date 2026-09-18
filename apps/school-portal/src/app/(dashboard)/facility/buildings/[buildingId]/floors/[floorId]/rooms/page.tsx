@@ -5,15 +5,31 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useLookupValues } from '@/lib/use-lookup';
 import { useParams } from 'next/navigation';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, Search, Building, Edit, Trash2, Home, Maximize, Minimize } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { cn } from '@sms/utils';
 
 interface Room {
@@ -255,18 +271,18 @@ export default function RoomsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Rooms</h1>
-            <p className="text-muted-foreground">Manage rooms for {floor?.label || 'Floor'}</p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <span className="flex items-center space-x-1">
-              <Plus className="h-4 w-4" />
-              <span>Add Room</span>
-            </span>
-          </Button>
-        </div>
+        <PageHeader
+            title="Rooms"
+            description={`Manage rooms for ${floor?.label || 'Floor'}`}
+            actions={
+              <Button onClick={() => setShowCreate(true)}>
+                <span className="flex items-center space-x-1">
+                  <Plus className="h-4 w-4" />
+                  <span>Add Room</span>
+                </span>
+              </Button>
+            }
+          />
 
         {showCreate && (
           <Dialog open={showCreate} onOpenChange={setShowCreate}>

@@ -4,15 +4,31 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, Search, DollarSign, Edit, Trash2, CheckCircle, Percent, Tag } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { cn } from '@sms/utils';
 
 interface FeeType {
@@ -222,18 +238,18 @@ export default function FeeTypesPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Fee Types</h1>
-            <p className="text-muted-foreground">Configure fee categories for billing and invoicing</p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <span className="flex items-center space-x-1">
-              <Plus className="h-4 w-4" />
-              <span>Add Fee Type</span>
-            </span>
-          </Button>
-        </div>
+        <PageHeader
+          title="Fee Types"
+          description="Configure fee categories for billing and invoicing"
+          actions={
+            <Button onClick={() => setShowCreate(true)}>
+              <span className="flex items-center space-x-1">
+                <Plus className="h-4 w-4" />
+                <span>Add Fee Type</span>
+              </span>
+            </Button>
+          }
+        />
 
         {showCreate && (
           <Dialog open={showCreate} onOpenChange={setShowCreate}>

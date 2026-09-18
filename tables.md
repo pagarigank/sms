@@ -521,7 +521,7 @@ Session audit trail for security compliance (OWASP ASVS, Data Privacy Act RA 101
 ||| `is_active` | BOOLEAN | — | `true` | *FIX: active/default resolution rule (Phase 3 TODO)* |
 ||| `created_at` | TIMESTAMPTZ | — | `now()` | |
 
-*Index: UNIQUE(tenant_id, education_level_id, school_year_id) · idx_grading_systems_tenant_branch ON grading_systems (tenant_id, branch_id) · idx_grading_systems_edu_level ON grading_systems (education_level_id) · idx_grading_systems_active ON grading_systems (tenant_id, education_level_id, school_year_id, branch_id) WHERE is_active = true*
+*Index: UNIQUE(tenant_id, education_level_id, school_year_id, branch_id) · idx_grading_systems_tenant_branch ON grading_systems (tenant_id, branch_id) · idx_grading_systems_edu_level ON grading_systems (education_level_id) · idx_grading_systems_active ON grading_systems (tenant_id, education_level_id, school_year_id, branch_id) WHERE is_active = true — branch-aware unique per ADR-009 (tenant-default row + branch shadow row coexist)*
 
 *RLS: `tenant_isolation_grading_systems`*
 

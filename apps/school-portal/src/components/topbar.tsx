@@ -12,9 +12,9 @@ import {
   DropdownMenuTrigger,
 } from '@sms/ui';
 import { TenantSwitcher } from './tenant-switcher';
-import { LogOut, UserRound, ShieldCheck } from 'lucide-react';
+import { LogOut, UserRound, ShieldCheck, Menu } from 'lucide-react';
 
-export function Topbar() {
+export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
@@ -30,7 +30,15 @@ export function Topbar() {
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-raised)/0.8)] backdrop-blur-xl px-4 lg:px-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          className="rounded-lg p-2 text-[hsl(var(--ink-200))] transition-colors hover:bg-[hsl(var(--surface-overlay))] hover:text-[hsl(var(--ink-100))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent)/0.5)] lg:hidden"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <TenantSwitcher />
       </div>
 

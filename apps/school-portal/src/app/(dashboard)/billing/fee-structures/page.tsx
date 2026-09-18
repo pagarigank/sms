@@ -5,11 +5,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { Plus, Layers, ChevronRight, ChevronLeft, Loader2, AlertTriangle } from 'lucide-react';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  PageHeader,
+  statusToVariant,
+  StatusDot,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 
 /** Backend endpoints may return a bare array, an ApiResponse wrapper, or a paginated envelope. */
 function listOf<T>(res: unknown): T[] {
@@ -296,17 +307,15 @@ export default function FeeStructuresPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Fee Structures</h1>
-            <p className="text-muted-foreground">
-              Configure fee amounts per level, grade, and school year — the most specific structure wins
-            </p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Fee Structure
-          </Button>
-        </div>
+        <PageHeader
+          title="Fee Structures"
+          description="Configure fee amounts per level, grade, and school year — the most specific structure wins"
+          actions={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Fee Structure
+            </Button>
+          }
+        />
 
         {error ? (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

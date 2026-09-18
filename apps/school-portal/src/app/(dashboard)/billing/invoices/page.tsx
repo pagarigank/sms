@@ -5,11 +5,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { FileText, Search, Loader2, AlertTriangle, Receipt, X } from 'lucide-react';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  PageHeader,
+  statusToVariant,
+  StatusDot,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 
 /** Backend endpoints may return a bare array, an ApiResponse wrapper, or a paginated envelope. */
 function listOf<T>(res: unknown): T[] {
@@ -145,15 +156,15 @@ export default function InvoicesPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
-            <p className="text-muted-foreground">Manage invoices and statements of account</p>
-          </div>
-          <Button onClick={() => setShowGenerate(true)}>
-            <FileText className="mr-2 h-4 w-4" /> Generate Invoice
-          </Button>
-        </div>
+        <PageHeader
+          title="Invoices"
+          description="Manage invoices and statements of account"
+          actions={
+            <Button onClick={() => setShowGenerate(true)}>
+              <FileText className="mr-2 h-4 w-4" /> Generate Invoice
+            </Button>
+          }
+        />
 
         {error ? (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

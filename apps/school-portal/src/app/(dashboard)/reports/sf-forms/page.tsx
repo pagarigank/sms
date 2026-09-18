@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@sms/ui';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader } from '@sms/ui';
 import { FileText, Users, Calendar, Award } from 'lucide-react';
 
 const SF_FORMS = [
@@ -48,10 +48,7 @@ const SF_FORMS = [
 export default function SfFormsDashboardPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">DepEd School Forms</h1>
-        <p className="text-muted-foreground">Standardized reporting forms (SF1 - SF10)</p>
-      </div>
+      <PageHeader title="DepEd School Forms" description="Standardized reporting forms (SF1 - SF10)" />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {SF_FORMS.map((form) => {

@@ -9,11 +9,21 @@ import {
   Building2, BookOpen, GraduationCap, Users, Calendar, DollarSign,
   TrendingUp, Activity, AlertTriangle, Clock,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@sms/ui';
-import { Badge } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
-import { Skeleton } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+} from '@sms/ui';
 import { cn } from '@sms/utils';
 
 interface DashboardStats {
@@ -215,37 +225,38 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header with Branch Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>            <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--ink-100))]">Dashboard</h1>
-          <p className="text-[hsl(var(--ink-300))]">Branch administration overview</p>
-        </div>
-        <div className="flex items-center gap-4">
-          {permissions.includes('tenancy.branch:view') && (
-            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Branches" />
+      <PageHeader
+        title="Dashboard"
+        description="Branch administration overview"
+        actions={
+          <div className="flex items-center gap-4">
+            {permissions.includes('tenancy.branch:view') && (
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                ))}
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="quarter">This Quarter</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
               </SelectContent>
             </Select>
-          )}
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="quarter">This Quarter</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Error state */}
       {hasError && (

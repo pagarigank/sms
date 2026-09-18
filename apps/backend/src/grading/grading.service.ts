@@ -1,11 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { GradingSystem } from './entities/grading-system.entity';
 import { GradeComponent } from './entities/grade-component.entity';
 import { GradeEntry } from './entities/grade-entry.entity';
 import { HonorRollConfig } from './entities/honor-roll-config.entity';
 import { GradeChangeRequest } from './entities/grade-change-request.entity';
+import { AuditEvent } from '../config/audit-event.entity';
 import { ClassOffering } from '../scheduling/class-offering.entity';
 import { StudentSectionAssignment } from '../sis/student-section-assignment.entity';
 
@@ -124,7 +125,40 @@ export class GradingService {
     private readonly classOfferingRepo: Repository<ClassOffering>,
     @InjectRepository(StudentSectionAssignment)
     private readonly ssaRepo: Repository<StudentSectionAssignment>,
+    @InjectRepository(AuditEvent)
+    private readonly auditRepo: Repository<AuditEvent>,
   ) {}
+
+  // ============================
+  // Transmutation
+  // ============================
+
+  /**
+   * Look up the grading system's configured transmutation band table
+   * (system.config.transmutation = { "minPercentage": grade }) and return
+   * the grade. Falls back to rounding the raw percentage when the system
+   * defines no table or is type descriptive_ks1.
+   */
+  async transmuteGrade(gradingSystemId: string, percentage: number): Promise<number> {
+    if (!gradingSystemId || percentage == null || isNaN(percentage)) return percentage;
+    const system = await this.sysRepo.findOne({ where: { id: gradingSystemId } });
+    if (!system) return Math.round(percentage);
+    const table = (system.config as any)?.transmutation;
+    if (!table || typeof table !== 'object') return Math.round(percentage);
+
+    const bands = Object.entries(table as Record<string, number>)
+      .map(([min, grade]) => ({ min: Number(min), grade: Number(grade) }))
+      .filter((b) => !Number.isNaN(b.min) && !Number.isNaN(b.grade))
+      .sort((a, b) => b.min - a.min);
+    if (bands.length === 0) return Math.round(percentage);
+
+    const match = bands.find((b) => percentage >= b.min);
+    return match ? match.grade : bands[bands.length - 1].grade;
+  }
+
+  private round2(n: number): number {
+    return Math.round(n * 100) / 100;
+  }
 
   // ============================
   // Grading Systems & Components
@@ -151,10 +185,33 @@ export class GradingService {
     return this.sysRepo.save(sys);
   }
 
+  /**
+   * Resolve the active grading system for an education level + school year,
+   * following docs/decisions/009-grading-system-active-resolution.md:
+   *   (1) branch-specific active system (branch_id = query.branchId)
+   *   (2) tenant-default active system (branch_id IS NULL)
+   *   error if multiple inactive-active rows share the same scope.
+   */
   async resolveGradingSystem(tenantId: string, query: any) {
-    const where: any = { tenantId, educationLevelId: query.educationLevelId, schoolYearId: query.schoolYearId, isActive: true };
-    if (query.branchId) where.branchId = query.branchId;
-    const sys = await this.sysRepo.findOne({ where });
+    const base: any = { tenantId, educationLevelId: query.educationLevelId, schoolYearId: query.schoolYearId, isActive: true };
+
+    if (query.branchId) {
+      const branchSystems = await this.sysRepo.find({ where: { ...base, branchId: query.branchId } });
+      if (branchSystems.length > 1) {
+        throw new ConflictException(
+          `Multiple active grading systems exist for this education level, school year, and branch — resolve duplicates first`
+        );
+      }
+      if (branchSystems.length === 1) return branchSystems[0];
+    }
+
+    const defaults = await this.sysRepo.find({ where: { ...base, branchId: IsNull() } });
+    if (defaults.length > 1) {
+      throw new ConflictException(
+        `Multiple active tenant-default grading systems exist for this education level and school year — resolve duplicates first`
+      );
+    }
+    const sys = defaults[0];
     if (!sys) throw new NotFoundException('Active grading system not found');
     return sys;
   }
@@ -287,35 +344,51 @@ export class GradingService {
   }
 
   async enterGrade(tenantId: string, data: any, userId: string) {
-    // Validate descriptive grades for KS1 systems
-    if (data.gradingMode === 'descriptive_ks1' && data.descriptiveGrade) {
-      const validKinder = ['beginning', 'developing', 'consistent'];
-      const validG1to3 = ['emerging', 'developing', 'approaching', 'meeting', 'advancing'];
-      if (![...validKinder, ...validG1to3].includes(data.descriptiveGrade)) {
-        throw new BadRequestException(`Invalid descriptive grade: ${data.descriptiveGrade}`);
+    const { rawScore, maxScore, percentage: clientPct, transmutedGrade: clientTrans, descriptiveGrade, gradingMode, gradingSystemId, studentId, classOfferingId, termId, gradeComponentId } = data;
+    const score = rawScore !== undefined ? rawScore : data.score;
+
+    // === Descriptive KS1 path — no numeric computation ===
+    if (gradingMode === 'descriptive_ks1') {
+      if (descriptiveGrade) {
+        const validKinder = ['beginning', 'developing', 'consistent'];
+        const validG1to3 = ['emerging', 'developing', 'approaching', 'meeting', 'advancing'];
+        if (![...validKinder, ...validG1to3].includes(descriptiveGrade)) {
+          throw new BadRequestException(`Invalid descriptive grade: ${descriptiveGrade}`);
+        }
       }
+
+      const existing = await this.entryRepo.findOne({ where: { tenantId, studentId, classOfferingId, termId, gradeComponentId } });
+      if (existing) {
+        if (existing.locked) throw new BadRequestException('Grades are locked for this term');
+        Object.assign(existing, { score: score ?? 0, descriptiveGrade: descriptiveGrade ?? existing.descriptiveGrade, gradingMode, remarks: data.remarks ?? existing.remarks, enteredByUserId: userId });
+        return this.entryRepo.save(existing);
+      }
+
+      const entry = this.entryRepo.create({
+        tenantId, branchId: data.branchId, studentId, classOfferingId, termId,
+        gradeComponentId, gradingSystemId, score: score ?? 0,
+        percentage: null, transmutedGrade: null,
+        descriptiveGrade, gradingMode, remarks: data.remarks, enteredByUserId: userId,
+      });
+      return this.entryRepo.save(entry);
     }
 
-    // Basic upsert based on term, component, student
-    const existing = await this.entryRepo.findOne({
-      where: {
-        tenantId,
-        studentId: data.studentId,
-        classOfferingId: data.classOfferingId,
-        termId: data.termId,
-        gradeComponentId: data.gradeComponentId,
-      }
-    });
+    // === Numeric path — server computes percentage + transmuted grade ===
+    const numericMax = maxScore != null ? Number(maxScore) : 0;
+    const numericScore = score != null ? Number(score) : 0;
+    const serverPct = numericMax > 0
+      ? this.round2((numericScore / numericMax) * 100)
+      : (clientPct != null ? this.round2(Number(clientPct)) : 0);
+    const serverTrans = await this.transmuteGrade(gradingSystemId, serverPct);
 
+    const existing = await this.entryRepo.findOne({ where: { tenantId, studentId, classOfferingId, termId, gradeComponentId } });
     if (existing) {
-      if (existing.locked) throw new Error('Grades are locked for this term');
+      if (existing.locked) throw new BadRequestException('Grades are locked for this term');
       Object.assign(existing, {
-        score: data.rawScore !== undefined ? data.rawScore : data.score,
-        maxScore: data.maxScore,
-        percentage: data.percentage,
-        transmutedGrade: data.gradingMode === 'descriptive_ks1' ? null : data.transmutedGrade,
-        descriptiveGrade: data.descriptiveGrade ?? existing.descriptiveGrade,
-        gradingMode: data.gradingMode ?? existing.gradingMode,
+        score: numericScore, maxScore: numericMax || existing.maxScore,
+        percentage: serverPct, transmutedGrade: serverTrans,
+        descriptiveGrade: descriptiveGrade ?? existing.descriptiveGrade,
+        gradingMode: gradingMode ?? existing.gradingMode,
         remarks: data.remarks ?? existing.remarks,
         enteredByUserId: userId,
       });
@@ -323,24 +396,77 @@ export class GradingService {
     }
 
     const entry = this.entryRepo.create({
-      tenantId,
-      branchId: data.branchId,
-      studentId: data.studentId,
-      classOfferingId: data.classOfferingId,
-      termId: data.termId,
-      gradeComponentId: data.gradeComponentId,
-      gradingSystemId: data.gradingSystemId,
-      score: data.rawScore !== undefined ? data.rawScore : data.score,
-      maxScore: data.maxScore,
-      percentage: data.percentage,
-      transmutedGrade: data.gradingMode === 'descriptive_ks1' ? null : data.transmutedGrade,
-      descriptiveGrade: data.descriptiveGrade,
-      gradingMode: data.gradingMode ?? 'numeric',
-      remarks: data.remarks,
-      enteredByUserId: userId,
+      tenantId, branchId: data.branchId, studentId, classOfferingId, termId,
+      gradeComponentId, gradingSystemId, score: numericScore,
+      maxScore: numericMax || null, percentage: serverPct, transmutedGrade: serverTrans,
+      descriptiveGrade, gradingMode: gradingMode ?? 'numeric',
+      remarks: data.remarks, enteredByUserId: userId,
     });
-
     return this.entryRepo.save(entry);
+  }
+
+  /**
+   * Manual override of a single grade entry (config-driven audit-required path,
+   * M5/M6). Records an audit_events row capturing before/after state. Respects
+   * term locking — requires the caller to unlock first. Entry update + audit
+   * row commit in one transaction.
+   */
+  async overrideGrade(tenantId: string, id: string, body: any, userId: string) {
+    if (!body.reason) throw new BadRequestException('An override reason is required');
+
+    return this.auditRepo.manager.transaction(async (manager) => {
+      const entryRepo = manager.getRepository(GradeEntry);
+      const auditRepo = manager.getRepository(AuditEvent);
+
+      const entry = await entryRepo.findOne({ where: { id, tenantId } });
+      if (!entry) throw new NotFoundException('Grade entry not found');
+      if (entry.locked) throw new BadRequestException('Grades are locked for this term — unlock before overriding');
+
+      const before = {
+        score: entry.score,
+        percentage: entry.percentage,
+        transmutedGrade: entry.transmutedGrade,
+        descriptiveGrade: entry.descriptiveGrade,
+      };
+
+      const rawScore = body.rawScore !== undefined ? body.rawScore : body.score;
+      const numericMax = body.maxScore != null ? Number(body.maxScore) : Number(entry.maxScore ?? 0);
+      const numericScore = rawScore != null ? Number(rawScore) : Number(entry.score ?? 0);
+      const serverPct = numericMax > 0 ? this.round2((numericScore / numericMax) * 100) : this.round2(numericScore);
+
+      entry.score = numericScore;
+      if (body.maxScore != null) entry.maxScore = numericMax;
+      entry.percentage = body.gradingMode === 'descriptive_ks1' ? null : serverPct;
+      entry.transmutedGrade = body.gradingMode === 'descriptive_ks1' ? null : await this.transmuteGrade(entry.gradingSystemId, serverPct);
+      if (body.descriptiveGrade !== undefined) entry.descriptiveGrade = body.descriptiveGrade;
+      if (body.gradingMode !== undefined) entry.gradingMode = body.gradingMode;
+      if (body.remarks !== undefined) entry.remarks = body.remarks;
+      entry.isManualOverride = true;
+      entry.overrideReason = body.reason;
+      entry.overriddenBy = userId;
+      entry.overriddenAt = new Date();
+
+      const saved = await entryRepo.save(entry);
+
+      await auditRepo.save(auditRepo.create({
+        tenantId,
+        branchId: entry.branchId,
+        actorUserId: userId,
+        entityType: 'grade_entry',
+        entityId: id,
+        action: 'grade.override',
+        beforeState: before,
+        afterState: {
+          score: saved.score,
+          percentage: saved.percentage,
+          transmutedGrade: saved.transmutedGrade,
+          descriptiveGrade: saved.descriptiveGrade,
+          reason: body.reason,
+        },
+      }));
+
+      return saved;
+    });
   }
 
   async bulkEnterGrades(tenantId: string, data: { entries: any[] }, userId: string) {

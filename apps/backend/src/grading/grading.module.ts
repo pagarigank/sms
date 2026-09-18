@@ -9,6 +9,7 @@ import { GradeChangeRequest } from './entities/grade-change-request.entity';
 import { HonorRollConfig } from './entities/honor-roll-config.entity';
 import { ClassOffering } from '../scheduling/class-offering.entity';
 import { StudentSectionAssignment } from '../sis/student-section-assignment.entity';
+import { AuditEvent } from '../config/audit-event.entity';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { StudentSectionAssignment } from '../sis/student-section-assignment.enti
       HonorRollConfig,
       ClassOffering,
       StudentSectionAssignment,
+      AuditEvent,
     ]),
   ],
   controllers: [GradingController],

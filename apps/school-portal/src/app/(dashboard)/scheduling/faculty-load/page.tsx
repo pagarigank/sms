@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -90,10 +91,7 @@ export default function FacultyLoadPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Faculty Load Report</h1>
-        <p className="text-muted-foreground">Monitor faculty teaching load and capacity</p>
-      </div>
+      <PageHeader title="Faculty Load Report" description="Monitor faculty teaching load and capacity" />
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div>

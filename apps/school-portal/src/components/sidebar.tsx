@@ -10,7 +10,7 @@ import { useAuthStore } from '@/lib/store';
 import { filterNavigationByPermissions } from '@/lib/permissions';
 import {
   LayoutDashboard, Building2, GraduationCap, BookOpen, Users,
-  Settings, School, BarChart3, ClipboardList, Users2, UserCog,
+  Settings, School, BarChart3, Users2, UserCog,
   Calendar, BookMarked, DollarSign, Receipt,
   Megaphone, FileText,
 } from 'lucide-react';
@@ -66,7 +66,6 @@ const navigation = [
     { name: 'Invoices', href: '/billing/invoices' },
   ]},
   { name: 'Cashiering', href: '/cashiering', icon: Receipt, children: [
-    { name: 'Session', href: '/cashiering' },
     { name: 'Payment', href: '/cashiering/payment' },
     { name: 'Ad-Hoc Sale', href: '/cashiering/ad-hoc' },
     { name: 'Reports', href: '/cashiering/reports' },
@@ -75,8 +74,8 @@ const navigation = [
   { name: 'System', kind: 'label' as const },
   { name: 'Communications', href: '/communications', icon: Megaphone, children: [
     { name: 'Announcements', href: '/communications' },
-    { name: 'Templates', href: '/communications#templates' },
-    { name: 'Messages', href: '/communications#threads' },
+    { name: 'Templates', href: '/communications?tab=templates' },
+    { name: 'Messages', href: '/communications?tab=threads' },
   ]},
   { name: 'Documents', href: '/documents', icon: FileText },
   { name: 'Users & Roles', href: '/iam', icon: Users },
@@ -84,7 +83,7 @@ const navigation = [
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onNavigate, className }: { onNavigate?: () => void; className?: string }) {
   const pathname = usePathname();
   const token = useAuthStore((s) => s.token);
 
@@ -119,9 +118,9 @@ export function Sidebar() {
   const roleName = (user as any)?.roles?.[0]?.name ?? (user as any)?.role ?? 'School Staff';
 
   return (
-    <div className="flex h-full w-64 shrink-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-raised)/0.85)] backdrop-blur-xl">
+    <div className={cn('flex h-full w-64 shrink-0 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-raised)/0.85)] backdrop-blur-xl', className)}>
       <div className="flex h-14 items-center border-b border-[hsl(var(--border))] px-4 bg-[hsl(var(--surface-base)/0.4)]">
-        <Link href="/dashboard" className="flex items-center">
+        <Link href="/dashboard" onClick={onNavigate} className="flex items-center">
           <BrandLockup accent />
         </Link>
       </div>
@@ -152,12 +151,13 @@ export function Sidebar() {
           if (!visibleItem) return null;
 
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/') ||
-            (item.children?.some((c) => pathname === c.href.split('#')[0]));
+            (item.children?.some((c) => pathname === c.href.split('?')[0].split('#')[0]));
 
           return (
             <div key={item.name}>
               <Link
                 href={item.href}
+                onClick={onNavigate}
                 className={cn(
                   'group relative flex items-center rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150',
                   isActive
@@ -174,11 +174,12 @@ export function Sidebar() {
               {visibleItem.children && isActive && (
                 <div className="ml-[22px] mt-1 space-y-0.5 border-l border-[hsl(var(--border))] pl-3.5">
                   {visibleItem.children.map((child: { name: string; href: string }) => {
-                    const isChildActive = pathname === child.href.split('#')[0];
+                    const isChildActive = pathname === child.href.split('?')[0].split('#')[0];
                     return (
                       <Link
                         key={child.name}
                         href={child.href}
+                        onClick={onNavigate}
                         className={cn(
                           'block rounded-lg px-2.5 py-1.5 text-xs transition-all duration-150',
                           isChildActive

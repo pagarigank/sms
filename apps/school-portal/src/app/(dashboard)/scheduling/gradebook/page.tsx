@@ -11,6 +11,7 @@ import {
   Button,
   Input,
   Label,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -210,8 +211,9 @@ export default function GradebookPage() {
   });
   const gradingSystemId: string = (resolvedSystem?.data as any)?.id ?? '';
   const resolvedSystemType = (resolvedSystem?.data as any)?.type;
-  const isDescriptiveKS1 = resolvedSystemType === 'deped_ks1_kinder' || resolvedSystemType === 'deped_ks1_grades1_3';
-  const isKinder = resolvedSystemType === 'deped_ks1_kinder';
+  const resolvedDescriptorSet = (resolvedSystem?.data as any)?.config?.descriptorSet;
+  const isDescriptiveKS1 = resolvedSystemType === 'descriptive_ks1';
+  const isKinder = isDescriptiveKS1 && resolvedDescriptorSet === 'kindergarten';
 
   const { data: componentsRes } = useQuery({
     queryKey: ['grade-components', gradingSystemId],
@@ -297,7 +299,7 @@ export default function GradebookPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gradebook</h1>
+          <PageHeader title="Gradebook" />
           <p className="text-muted-foreground">
             Enter and manage student grades
             {pendingCount > 0 && (

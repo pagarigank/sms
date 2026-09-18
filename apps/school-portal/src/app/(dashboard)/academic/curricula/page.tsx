@@ -3,15 +3,32 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, Search, BookOpen, Edit, Trash2, Copy, CheckCircle, Settings, X, Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { cn } from '@sms/utils';
 
 interface Curriculum {
@@ -489,18 +506,18 @@ export default function CurriculaPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Curricula</h1>
-            <p className="text-muted-foreground">Manage curricula per education level, grade level, and school year</p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <span className="flex items-center space-x-1">
-              <Plus className="h-4 w-4" />
-              <span>Create Curriculum</span>
-            </span>
-          </Button>
-        </div>
+        <PageHeader
+            title="Curricula"
+            description="Manage curricula per education level, grade level, and school year"
+            actions={
+              <Button onClick={() => setShowCreate(true)}>
+                <span className="flex items-center space-x-1">
+                  <Plus className="h-4 w-4" />
+                  <span>Create Curriculum</span>
+                </span>
+              </Button>
+            }
+          />
 
         {showCreate && (
           <Dialog open={showCreate} onOpenChange={setShowCreate}>

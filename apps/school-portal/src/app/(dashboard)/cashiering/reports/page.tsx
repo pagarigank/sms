@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { BarChart3, AlertTriangle } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 export default function CashierReportsPage() {
   const { currentTenantId, currentBranchId } = useTenantStore();
@@ -24,21 +25,21 @@ export default function CashierReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Daily Collection Report</h1>
-          <p className="text-muted-foreground">View payment collection summary by method</p>
-        </div>
-        <div>
-          <label className="text-sm font-medium mr-2">Date:</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="flex h-9 rounded-md border px-3 py-1 text-sm"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Daily Collection Report"
+        description="View payment collection summary by method"
+        actions={
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Date:</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="flex h-9 rounded-md border px-3 py-1 text-sm"
+            />
+          </div>
+        }
+      />
 
       {!currentBranchId ? (
         <div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
+import { PageHeader } from '@sms/ui';
 
 export default function FloorsPage() {
   const { data: buildings } = useQuery({
@@ -11,10 +12,7 @@ export default function FloorsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Floors</h1>
-        <p className="text-muted-foreground">Manage building floors</p>
-      </div>
+      <PageHeader title="Floors" description="Manage building floors" />
 
       <div className="rounded-lg border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Select a Building</h2>

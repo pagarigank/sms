@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { ArrowDownUp, Download, Loader2 } from 'lucide-react';
-import { Badge } from '@sms/ui';
+import { Badge, PageHeader } from '@sms/ui';
 
 function toCsv(rows: Array<Record<string, unknown>>, columns: string[]): string {
   const header = columns.join(',');
@@ -78,19 +78,19 @@ export default function LearnerMovementReportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Learner Movement Report</h1>
-          <p className="text-muted-foreground">Promotions, retentions, and graduations for a school year</p>
-        </div>
-        <button
-          onClick={exportCsv}
-          disabled={decisions.length === 0}
-          className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
-        >
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </button>
-      </div>
+      <PageHeader
+        title="Learner Movement Report"
+        description="Promotions, retentions, and graduations for a school year"
+        actions={
+          <button
+            onClick={exportCsv}
+            disabled={decisions.length === 0}
+            className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
+          >
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div className="rounded-lg border bg-card p-4 flex flex-wrap items-end gap-4">

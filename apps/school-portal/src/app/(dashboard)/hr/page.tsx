@@ -5,11 +5,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { Users, Clock, BookOpen, Plus, Search, Loader2, AlertTriangle, Trash2 } from 'lucide-react';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  PageHeader,
+  statusToVariant,
+  StatusDot,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 
 /** Backend endpoints may return a bare array, an ApiResponse wrapper, or a paginated envelope. */
 function listOf<T>(res: unknown): T[] {
@@ -185,17 +196,17 @@ export default function HrPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">HR-Lite</h1>
-            <p className="text-muted-foreground">Employee records, time tracking, and teaching loads</p>
-          </div>
-          {activeTab === 'employees' && (
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Employee
-            </Button>
-          )}
-        </div>
+        <PageHeader
+          title="HR-Lite"
+          description="Employee records, time tracking, and teaching loads"
+          actions={
+            activeTab === 'employees' && (
+              <Button onClick={() => setShowCreate(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add Employee
+              </Button>
+            )
+          }
+        />
 
         {error ? (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

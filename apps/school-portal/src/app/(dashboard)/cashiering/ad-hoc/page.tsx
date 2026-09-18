@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
 import { Plus, Trash2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 interface SaleItem {
   description: string;
@@ -118,10 +119,7 @@ export default function AdHocSalePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Ad-Hoc Sale</h1>
-        <p className="text-muted-foreground">Non-tuition sales (uniforms, supplies, etc.)</p>
-      </div>
+      <PageHeader title="Ad-Hoc Sale" description="Non-tuition sales (uniforms, supplies, etc.)" />
 
       {!currentSession && (
         <div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-800">

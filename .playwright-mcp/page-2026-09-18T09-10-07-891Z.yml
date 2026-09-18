@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - link "SchoolSuite SMS" [ref=e6] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e13]:
+          - text: SchoolSuite
+          - generic [ref=e14]: SMS
+      - navigation "Main navigation" [ref=e15]:
+        - paragraph [ref=e16]: Overview
+        - link "Dashboard" [ref=e18] [cursor=pointer]:
+          - /url: /dashboard
+      - generic [ref=e26]:
+        - generic [ref=e27]: U
+        - generic [ref=e28]:
+          - paragraph [ref=e29]: User
+          - paragraph [ref=e30]: School Staff
+    - generic [ref=e31]:
+      - banner [ref=e32]:
+        - generic [ref=e34]:
+          - combobox "Select tenant" [ref=e35] [cursor=pointer]:
+            - generic: Tenant
+          - combobox [aria-hidden] [ref=e42]
+        - button "Open user menu" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: "?"
+          - generic [ref=e46]: User
+      - main [ref=e47]
+  - region "Notifications"

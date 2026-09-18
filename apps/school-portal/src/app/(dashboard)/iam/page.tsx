@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
@@ -19,6 +19,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  PageHeader,
   useConfirm,
   useToast,
   Select,
@@ -153,10 +154,12 @@ export default function IAMPage() {
         : [];
     return new Set(list.map((p) => p.id));
   }, [rolePermsRes]);
-  if (managing && grantedIds.size >= 0 && selectionSyncedFor !== managing.id && !rolePermsLoading) {
-    setSelectedPermissionIds([...grantedIds]);
-    setSelectionSyncedFor(managing.id);
-  }
+  useEffect(() => {
+    if (managing && !rolePermsLoading && selectionSyncedFor !== managing.id) {
+      setSelectedPermissionIds([...grantedIds]);
+      setSelectionSyncedFor(managing.id);
+    }
+  }, [managing, rolePermsLoading, grantedIds, selectionSyncedFor]);
 
   // Roles for the currently viewed user
   const { data: userRolesRes } = useQuery({
@@ -168,10 +171,12 @@ export default function IAMPage() {
 
   // Sync role IDs when dialog opens
   const [rolesSyncedFor, setRolesSyncedFor] = useState<string | null>(null);
-  if (showRoleAssign && rolesSyncedFor !== showRoleAssign.id && userRoles.length >= 0) {
-    setAssignedRoleIds(userRoles.map((r: any) => r.roleId ?? r.id));
-    setRolesSyncedFor(showRoleAssign.id);
-  }
+  useEffect(() => {
+    if (showRoleAssign && userRoles.length >= 0 && rolesSyncedFor !== showRoleAssign.id) {
+      setAssignedRoleIds(userRoles.map((r: any) => r.roleId ?? r.id));
+      setRolesSyncedFor(showRoleAssign.id);
+    }
+  }, [showRoleAssign, userRoles, rolesSyncedFor]);
 
   // ── User Mutations ────────────────────────────────────────────────
 
@@ -425,16 +430,16 @@ export default function IAMPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users & Roles</h1>
-          <p className="text-muted-foreground">Manage user accounts, roles, and permission assignments.</p>
-        </div>
-        <Button onClick={() => activeTab === 'users' ? setShowCreateUser(true) : setShowCreateRole(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {activeTab === 'users' ? 'New User' : 'New Role'}
-        </Button>
-      </div>
+      <PageHeader
+        title="Users & Roles"
+        description="Manage user accounts, roles, and permission assignments."
+        actions={
+          <Button onClick={() => activeTab === 'users' ? setShowCreateUser(true) : setShowCreateRole(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {activeTab === 'users' ? 'New User' : 'New Role'}
+          </Button>
+        }
+      />
 
       {/* Tab Bar */}
       <div className="flex gap-1 rounded-lg border bg-card p-1 w-fit">

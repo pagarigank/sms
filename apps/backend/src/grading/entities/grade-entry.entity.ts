@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
-@Entity({ name: 'grade_entries' })
+@Entity({ name: 'grade_entries', synchronize: false })
 @Index('idx_grade_entries_tenant', ['tenantId'])
 @Index('idx_grade_entries_student_term', ['tenantId', 'studentId', 'termId'])
 @Index('idx_grade_entries_class_component', ['classOfferingId', 'gradeComponentId'])

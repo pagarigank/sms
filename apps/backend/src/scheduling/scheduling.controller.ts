@@ -97,3 +97,4 @@ export class SchedulingController {
     return this.schedulingService.getStudentSchedule(studentId, tenantId);
   }
 }
+

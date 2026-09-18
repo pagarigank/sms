@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { FileText, AlertCircle } from 'lucide-react';
 import { Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { EducationFormData } from './types';
@@ -174,35 +175,46 @@ export function GuardianStep({ formData, onUpdate }: GuardianStepProps) {
   );
 }
 
-interface DocumentsStepProps {
-  onSubmit: () => void;
-  isSubmitting: boolean;
-}
+export function DocumentsStep() {
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const docTypes = [
+    { name: 'Birth Certificate (PSA)', note: 'Certified true copy from the Philippine Statistics Authority' },
+    { name: 'Report Card / Form 138', note: 'Latest report card from the previous school (if applicable)' },
+    { name: 'Certificate of Good Moral Character', note: 'Issued by the previous school within the last 6 months' },
+    { name: 'Medical Certificate', note: 'Physical exam clearance from a licensed physician' },
+  ];
 
-export function DocumentsStep({ onSubmit, isSubmitting }: DocumentsStepProps) {
-  const docTypes = ['Birth Certificate (PSA)', 'Report Card / Form 138', 'Certificate of Good Moral Character', 'Medical Certificate'];
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <h2 className="text-2xl font-bold tracking-tight">Supporting Documents</h2>
         <p className="text-sm text-muted-foreground">
-          Upload necessary requirements. You may skip this and submit physical copies to the registrar later.
+          These are the requirements collected by the registrar at submission. Mark which ones you can provide now;
+          you may also submit physical copies in person.
         </p>
       </div>
       <div className="space-y-3 mt-4">
         {docTypes.map((docType) => (
-          <div key={docType} className="flex items-center justify-between p-4 border rounded-xl hover:border-primary/50 transition-colors bg-muted/20">
-            <div className="flex items-center gap-4">
+          <label
+            key={docType.name}
+            className="flex items-start gap-4 p-4 border rounded-xl hover:border-primary/50 transition-colors bg-muted/20 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              checked={!!checked[docType.name]}
+              onChange={(e) => setChecked((prev) => ({ ...prev, [docType.name]: e.target.checked }))}
+              className="mt-1 h-4 w-4 rounded border-border accent-primary"
+            />
+            <div className="flex items-start gap-4 flex-1">
               <div className="p-2 bg-background rounded-lg border shadow-sm">
                 <FileText className="h-5 w-5 text-muted-foreground" />
               </div>
               <div>
-                <p className="font-semibold text-sm">{docType}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG, or PNG (max 5MB)</p>
+                <p className="font-semibold text-sm">{docType.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{docType.note}</p>
               </div>
             </div>
-            <span className="text-xs text-muted-foreground">Upload</span>
-          </div>
+          </label>
         ))}
       </div>
       <div className="mt-8 p-4 bg-primary/5 border border-primary/20 rounded-xl flex items-start gap-3">
@@ -210,7 +222,8 @@ export function DocumentsStep({ onSubmit, isSubmitting }: DocumentsStepProps) {
         <div>
           <p className="text-sm font-semibold text-primary">Ready to submit?</p>
           <p className="text-sm text-primary/80 mt-1 leading-relaxed">
-            By submitting this application, you certify that all information provided is true and correct to the best of your knowledge.
+            By submitting this application, you certify that all information provided is true and correct to the best
+            of your knowledge. The registrar will verify required documents when they are submitted.
           </p>
         </div>
       </div>

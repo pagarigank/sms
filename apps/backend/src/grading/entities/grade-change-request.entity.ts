@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
-@Entity({ name: 'grade_change_requests' })
+@Entity({ name: 'grade_change_requests', synchronize: false })
 @Index('idx_grade_change_tenant', ['tenantId'])
 @Index('idx_grade_change_student', ['studentId', 'status'])
 export class GradeChangeRequest {
@@ -22,10 +22,13 @@ export class GradeChangeRequest {
   @Column('uuid', { name: 'term_id' })
   termId: string;
 
+  @Column('uuid', { name: 'grade_entry_id', nullable: true })
+  gradeEntryId: string;
+
   @Column('jsonb', { name: 'old_grade', nullable: true })
   oldGrade: any;
 
-  @Column('jsonb', { name: 'new_grade' })
+  @Column('jsonb', { name: 'new_grade', nullable: true })
   newGrade: any;
 
   @Column()

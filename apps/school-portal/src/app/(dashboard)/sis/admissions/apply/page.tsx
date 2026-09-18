@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { CheckCircle2, ChevronLeft, ChevronRight, Sparkles, ArrowLeft, AlertCircle } from 'lucide-react';
-import { Button, Card } from '@sms/ui';
+import { Button, Card, PageHeader } from '@sms/ui';
 import Link from 'next/link';
 import { FormStepper } from '@/components/sis/form-stepper';
 import { StudentInfoStep, AcademicStep, GuardianStep, DocumentsStep } from './steps';
@@ -83,10 +83,7 @@ export default function ApplicationFormPage() {
             <CheckCircle2 className="h-10 w-10 text-green-500" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Application Submitted!</h1>
-            <p className="text-muted-foreground leading-relaxed">
-              Your application has entered the admissions pipeline. The school will review it and contact you shortly regarding the next steps.
-            </p>
+            <PageHeader title="Application Submitted!" description="Your application has entered the admissions pipeline. The school will review it and contact you shortly regarding the next steps." />
           </div>
           <div className="pt-6 flex flex-col gap-3">
             <Button
@@ -117,8 +114,7 @@ export default function ApplicationFormPage() {
     <div className="min-h-[calc(100vh-4rem)] bg-muted/10 py-10">
       <div className="max-w-3xl mx-auto space-y-8 px-4">
         <div className="text-center space-y-2 animate-in slide-in-from-top-4 fade-in duration-500">
-          <h1 className="text-4xl font-extrabold tracking-tight">Student Application</h1>
-          <p className="text-muted-foreground text-lg">Complete the form below to apply for enrollment</p>
+          <PageHeader title="Student Application" description="Complete the form below to apply for enrollment" />
         </div>
 
         <FormStepper steps={STEPS_CONFIG} currentStep={step} />
@@ -128,7 +124,7 @@ export default function ApplicationFormPage() {
             {step === 0 && <StudentInfoStep formData={formData} onUpdate={updateField} />}
             {step === 1 && <AcademicStep formData={formData} educationLevels={educationLevels} gradeLevels={gradeLevels} onUpdate={updateField} />}
             {step === 2 && <GuardianStep formData={formData} onUpdate={updateField} />}
-            {step === 3 && <DocumentsStep onSubmit={() => submitApplication.mutate()} isSubmitting={submitApplication.isPending} />}
+            {step === 3 && <DocumentsStep />}
           </div>
 
           <div className="mt-10 pt-6 border-t flex items-center justify-between">

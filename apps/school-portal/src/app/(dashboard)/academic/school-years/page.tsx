@@ -3,15 +3,31 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, Search, Calendar, Edit, Trash2, CheckCircle, Repeat, ListOrdered, X } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 
 interface SchoolYear {
   id: string;
@@ -342,18 +358,18 @@ export default function SchoolYearsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">School Years</h1>
-            <p className="text-muted-foreground">Manage academic school years and their terms</p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <span className="flex items-center space-x-1">
-              <Plus className="h-4 w-4" />
-              <span>Add School Year</span>
-            </span>
-          </Button>
-        </div>
+        <PageHeader
+            title="School Years"
+            description="Manage academic school years and their terms"
+            actions={
+              <Button onClick={() => setShowCreate(true)}>
+                <span className="flex items-center space-x-1">
+                  <Plus className="h-4 w-4" />
+                  <span>Add School Year</span>
+                </span>
+              </Button>
+            }
+          />
 
         {showCreate && (
           <Dialog open={showCreate} onOpenChange={setShowCreate}>

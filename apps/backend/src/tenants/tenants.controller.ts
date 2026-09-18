@@ -83,3 +83,4 @@ export class TenantsController {
     return this.tenantsService.setStatus(id, 'active');
   }
 }
+

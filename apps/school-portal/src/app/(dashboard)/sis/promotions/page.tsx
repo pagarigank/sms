@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownUp, Download, Loader2, TrendingUp, Plus } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
-import { Badge, Button, Input, Label, useToast } from '@sms/ui';
+import { Badge, Button, Input, Label, PageHeader, useToast } from '@sms/ui';
 
 interface Decision {
   id: string;
@@ -86,20 +86,20 @@ export default function PromotionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Promotions</h1>
-          <p className="text-muted-foreground">Promotion, retention, and graduation decisions for a school year</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={exportCsv} disabled={decisions.length === 0}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Record Decision
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Promotions"
+        description="Promotion, retention, and graduation decisions for a school year"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportCsv} disabled={decisions.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Record Decision
+            </Button>
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="rounded-lg border bg-card p-4 flex flex-wrap items-end gap-4">

@@ -38,3 +38,4 @@ export class SfFormsController {
     return this.sfFormsService.getSf9(tenantId, studentId, schoolYearId);
   }
 }
+

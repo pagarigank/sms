@@ -117,3 +117,4 @@ export class HrController {
     return this.hrService.getEmployeeDtrSummary(tenantId, employeeId, month);
   }
 }
+

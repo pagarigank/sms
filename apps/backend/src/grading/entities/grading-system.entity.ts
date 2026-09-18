@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index, Unique } from 'typeorm';
 
-@Entity({ name: 'grading_systems' })
-@Unique('idx_grading_systems_unique', ['tenantId', 'educationLevelId', 'schoolYearId'])
+@Entity({ name: 'grading_systems', synchronize: false })
+@Unique('idx_grading_systems_unique', ['tenantId', 'educationLevelId', 'schoolYearId', 'branchId'])
 @Index('idx_grading_systems_tenant_branch', ['tenantId', 'branchId'])
 @Index('idx_grading_systems_edu_level', ['educationLevelId'])
 export class GradingSystem {

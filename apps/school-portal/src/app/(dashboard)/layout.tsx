@@ -21,6 +21,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const [mounted, setMounted] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Defer auth redirect to client side only, once, after first paint.
   // Avoids a useEffect→setTimeout→router.replace cascade on every navigation.
@@ -39,9 +40,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex h-screen flex-col bg-background">
             <ImpersonationBanner />
             <div className="flex flex-1 overflow-hidden">
-              <Sidebar />
+              <Sidebar className="hidden lg:flex" />
+              {/* Mobile drawer */}
+              {sidebarOpen && (
+                <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+                  <div
+                    className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                    onClick={() => setSidebarOpen(false)}
+                  />
+                  <div className="absolute inset-y-0 left-0 shadow-2xl shadow-black/20">
+                    <Sidebar onNavigate={() => setSidebarOpen(false)} />
+                  </div>
+                </div>
+              )}
               <div className="flex flex-1 flex-col overflow-hidden">
-                <Topbar />
+                <Topbar onOpenMenu={() => setSidebarOpen(true)} />
                 <main className="flex-1 overflow-y-auto p-6">
                   {mounted && isAuthenticated ? children : null}
                 </main>

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { Save, CheckCircle, XCircle, Clock, ShieldCheck, Users, AlertTriangle } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 interface RosterStudent {
   studentId: string;
@@ -86,25 +87,27 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
-          <p className="text-muted-foreground">Record daily attendance for classes</p>
-        </div>
-        <button
-          onClick={() => saveAttendance.mutate()}
-          disabled={!selectedClass || markedCount === 0 || saveAttendance.isPending}
-          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          {saveAttendance.isPending ? 'Saving...' : `Save Attendance (${markedCount}/${rosterList.length})`}
-        </button>
-        {saveAttendance.isError && (
-          <span className="text-sm text-red-600">
-            {saveAttendance.error instanceof Error ? saveAttendance.error.message : 'Save failed'}
-          </span>
-        )}
-      </div>
+      <PageHeader
+        title="Attendance"
+        description="Record daily attendance for classes"
+        actions={
+          <>
+            <button
+              onClick={() => saveAttendance.mutate()}
+              disabled={!selectedClass || markedCount === 0 || saveAttendance.isPending}
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {saveAttendance.isPending ? 'Saving...' : `Save Attendance (${markedCount}/${rosterList.length})`}
+            </button>
+            {saveAttendance.isError && (
+              <span className="text-sm text-red-600">
+                {saveAttendance.error instanceof Error ? saveAttendance.error.message : 'Save failed'}
+              </span>
+            )}
+          </>
+        }
+      />
 
       <div className="flex gap-4">
         <div>

@@ -3,16 +3,32 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, Building, Check, Trash2, Edit, PauseCircle, PlayCircle, Search } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
-import { Checkbox } from '@sms/ui';
 import { cn } from '@sms/utils';
 
 interface Department {
@@ -289,18 +305,18 @@ export default function DepartmentsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Departments</h1>
-            <p className="text-muted-foreground">Manage academic departments across tenants and branches</p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <span className="flex items-center space-x-1">
-              <Plus className="h-4 w-4" />
-              <span>Add Department</span>
-            </span>
-          </Button>
-        </div>
+        <PageHeader
+          title="Departments"
+          description="Manage academic departments across tenants and branches"
+          actions={
+            <Button onClick={() => setShowCreate(true)}>
+              <span className="flex items-center space-x-1">
+                <Plus className="h-4 w-4" />
+                <span>Add Department</span>
+              </span>
+            </Button>
+          }
+        />
 
         {showCreate && (
           <Dialog open={showCreate} onOpenChange={setShowCreate}>

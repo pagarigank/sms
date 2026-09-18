@@ -1,19 +1,23 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { FacilityService } from './facility.service';
 import { CreateBuildingDto } from './dto/create-building.dto';
 import { CreateFloorDto } from './dto/create-floor.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomAssetDto } from './dto/create-room-asset.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard, RequirePermission } from '../auth/permissions.guard';
 
 @ApiTags('facility')
 @ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('facility')
 export class FacilityController {
   constructor(private readonly facilityService: FacilityService) {}
 
   // === Buildings ===
   @Get('buildings')
+  @RequirePermission('facility.building', 'view')
   @ApiOperation({ summary: 'List buildings', description: 'Returns all buildings for a branch.' })
   @ApiQuery({ name: 'tenantId', required: true })
   @ApiQuery({ name: 'branchId', required: false })
@@ -23,6 +27,7 @@ export class FacilityController {
   }
 
   @Get('buildings/:id')
+  @RequirePermission('facility.building', 'view')
   @ApiOperation({ summary: 'Get building detail', description: 'Returns a building with all floors and rooms.' })
   @ApiResponse({ status: 200, description: 'Building with nested floors and rooms.' })
   @ApiResponse({ status: 404, description: 'Building not found.' })
@@ -31,6 +36,7 @@ export class FacilityController {
   }
 
   @Post('buildings')
+  @RequirePermission('facility.building', 'create')
   @ApiOperation({ summary: 'Create a building', description: 'Create a new building within a branch.' })
   @ApiResponse({ status: 201, description: 'Building created.' })
   createBuilding(@Body() dto: CreateBuildingDto, @Headers('x-tenant-id') tenantId?: string) {
@@ -39,6 +45,7 @@ export class FacilityController {
   }
 
   @Put('buildings/:id')
+  @RequirePermission('facility.building', 'edit')
   @ApiOperation({ summary: 'Update a building' })
   @ApiResponse({ status: 200, description: 'Building updated.' })
   updateBuilding(@Param('id') id: string, @Body() dto: Partial<CreateBuildingDto>, @Headers('x-tenant-id') tenantId: string) {
@@ -46,6 +53,7 @@ export class FacilityController {
   }
 
   @Delete('buildings/:id')
+  @RequirePermission('facility.building', 'edit')
   @ApiOperation({ summary: 'Delete a building', description: 'Soft-delete a building (cascades to floors/rooms).' })
   @ApiResponse({ status: 200, description: 'Building deleted.' })
   removeBuilding(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
@@ -54,6 +62,7 @@ export class FacilityController {
 
   // === Floors ===
   @Get('buildings/:buildingId/floors')
+  @RequirePermission('facility.floor', 'view')
   @ApiOperation({ summary: 'List floors in a building' })
   @ApiResponse({ status: 200, description: 'List of floors with rooms.' })
   findFloors(@Param('buildingId') buildingId: string, @Headers('x-tenant-id') tenantId: string) {
@@ -61,6 +70,7 @@ export class FacilityController {
   }
 
   @Get('floors/:id')
+  @RequirePermission('facility.floor', 'view')
   @ApiOperation({ summary: 'Get floor detail' })
   @ApiResponse({ status: 200, description: 'Floor with rooms.' })
   findOneFloor(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
@@ -68,6 +78,7 @@ export class FacilityController {
   }
 
   @Post('floors')
+  @RequirePermission('facility.floor', 'create')
   @ApiOperation({ summary: 'Create a floor', description: 'Add a floor to a building. Unique per (building, floor_number).' })
   @ApiResponse({ status: 201, description: 'Floor created.' })
   @ApiResponse({ status: 409, description: 'Floor number already exists in this building.' })
@@ -76,6 +87,7 @@ export class FacilityController {
   }
 
   @Put('floors/:id')
+  @RequirePermission('facility.floor', 'edit')
   @ApiOperation({ summary: 'Update a floor' })
   @ApiResponse({ status: 200, description: 'Floor updated.' })
   updateFloor(@Param('id') id: string, @Body() dto: Partial<CreateFloorDto>, @Headers('x-tenant-id') tenantId: string) {
@@ -83,6 +95,7 @@ export class FacilityController {
   }
 
   @Delete('floors/:id')
+  @RequirePermission('facility.floor', 'edit')
   @ApiOperation({ summary: 'Delete a floor' })
   @ApiResponse({ status: 200, description: 'Floor deleted.' })
   removeFloor(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
@@ -91,6 +104,7 @@ export class FacilityController {
 
   // === Rooms ===
   @Get('rooms')
+  @RequirePermission('facility.room', 'view')
   @ApiOperation({ summary: 'List rooms', description: 'Returns rooms with optional filtering.' })
   @ApiQuery({ name: 'branchId', required: false })
   @ApiQuery({ name: 'floorId', required: false })
@@ -110,6 +124,7 @@ export class FacilityController {
   }
 
   @Get('floors/:floorId/rooms')
+  @RequirePermission('facility.room', 'view')
   @ApiOperation({ summary: 'List rooms on a floor' })
   @ApiResponse({ status: 200, description: 'List of rooms.' })
   findRoomsByFloor(@Param('floorId') floorId: string, @Headers('x-tenant-id') tenantId: string) {
@@ -117,6 +132,7 @@ export class FacilityController {
   }
 
   @Get('rooms/:id')
+  @RequirePermission('facility.room', 'view')
   @ApiOperation({ summary: 'Get room detail', description: 'Returns room with floor info and assets.' })
   @ApiResponse({ status: 200, description: 'Room detail.' })
   findOneRoom(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
@@ -124,6 +140,7 @@ export class FacilityController {
   }
 
   @Post('rooms')
+  @RequirePermission('facility.room', 'create')
   @ApiOperation({ summary: 'Create a room', description: 'Create a room within a floor. Supports room type, capacity, equipment tags, and status.' })
   @ApiResponse({ status: 201, description: 'Room created.' })
   createRoom(@Body() dto: CreateRoomDto, @Headers('x-tenant-id') tenantId: string) {
@@ -131,6 +148,7 @@ export class FacilityController {
   }
 
   @Put('rooms/:id')
+  @RequirePermission('facility.room', 'edit')
   @ApiOperation({ summary: 'Update a room', description: 'Update room attributes (type, capacity, status, equipment tags).' })
   @ApiResponse({ status: 200, description: 'Room updated.' })
   updateRoom(@Param('id') id: string, @Body() dto: CreateRoomDto, @Headers('x-tenant-id') tenantId: string) {
@@ -138,6 +156,7 @@ export class FacilityController {
   }
 
   @Delete('rooms/:id')
+  @RequirePermission('facility.room', 'edit')
   @ApiOperation({ summary: 'Delete a room' })
   @ApiResponse({ status: 200, description: 'Room deleted.' })
   removeRoom(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
@@ -146,6 +165,7 @@ export class FacilityController {
 
   // === Room Conflict Check (Stub) ===
   @Get('rooms/:roomId/conflict-check')
+  @RequirePermission('facility.room', 'view')
   @ApiOperation({
     summary: 'Check room availability (stub)',
     description: 'Returns whether a room is free for a given time slot. Full implementation in Phase 5 with class_offerings.',
@@ -172,6 +192,7 @@ export class FacilityController {
 
   // === Room Assets ===
   @Get('rooms/:roomId/assets')
+  @RequirePermission('facility.room', 'view')
   @ApiOperation({ summary: 'List room assets', description: 'Returns all assets (projectors, PCs, etc.) for a room.' })
   @ApiResponse({ status: 200, description: 'List of room assets.' })
   findAssets(@Param('roomId') roomId: string, @Headers('x-tenant-id') tenantId: string) {
@@ -179,6 +200,7 @@ export class FacilityController {
   }
 
   @Post('room-assets')
+  @RequirePermission('facility.room', 'create')
   @ApiOperation({ summary: 'Add a room asset', description: 'Register a lightweight asset (projector, aircon, PC) for a room. Supports asset tag, type, condition, and maintenance flag.' })
   @ApiResponse({ status: 201, description: 'Asset created.' })
   createAsset(@Body() dto: CreateRoomAssetDto, @Headers('x-tenant-id') tenantId: string) {
@@ -186,6 +208,7 @@ export class FacilityController {
   }
 
   @Delete('room-assets/:id')
+  @RequirePermission('facility.room', 'edit')
   @ApiOperation({ summary: 'Remove a room asset' })
   @ApiResponse({ status: 200, description: 'Asset removed.' })
   removeAsset(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {

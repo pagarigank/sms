@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { Badge } from '@sms/ui';
+import { Badge, PageHeader } from '@sms/ui';
 
 export default function HonorRollPage() {
   const { data: configs, isLoading } = useQuery({
@@ -18,10 +18,7 @@ export default function HonorRollPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Honor Roll Configuration</h1>
-        <p className="text-muted-foreground">Configure honor roll thresholds per education level</p>
-      </div>
+      <PageHeader title="Honor Roll Configuration" description="Configure honor roll thresholds per education level" />
 
       <div className="rounded-lg border bg-card shadow-sm">
         <table className="w-full text-sm">

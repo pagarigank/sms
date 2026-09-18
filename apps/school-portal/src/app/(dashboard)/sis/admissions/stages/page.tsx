@@ -4,15 +4,25 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  PageHeader,
+  StatusDot,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, StatusDot } from '@sms/ui';
 import { Plus, Search, Edit, ArrowLeft } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Checkbox } from '@sms/ui';
 import Link from 'next/link';
 
 interface Stage {
@@ -155,9 +165,8 @@ export default function PipelineStagesPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configure Pipeline Stages</h1>
-          <p className="text-muted-foreground">Manage the Kanban stages for the Admissions Pipeline.</p>
+        <div className="min-w-0 flex-1">
+          <PageHeader title="Configure Pipeline Stages" description="Manage the Kanban stages for the Admissions Pipeline." />
         </div>
       </div>
 

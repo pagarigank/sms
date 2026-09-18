@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { DollarSign, Download } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 function downloadCsv(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -21,7 +22,7 @@ export default function RevenueReportPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const { data: report, isLoading } = useQuery({
+  const { data: report, isLoading, isError } = useQuery({
     queryKey: ['revenue-report', currentTenantId, currentBranchId, startDate, endDate],
     queryFn: () => apiClient.reporting.getRevenueReport({
       tenantId: currentTenantId!,
@@ -36,30 +37,30 @@ export default function RevenueReportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Revenue Report</h1>
-          <p className="text-muted-foreground">Revenue by payment method and daily trend</p>
-        </div>
-        <button
-          onClick={() => {
-            if (!data) return;
-            const lines = ['section,date_or_method,total'];
-            lines.push(`summary,Total Revenue,${data.totalRevenue ?? 0}`);
-            for (const row of data.byMethod ?? []) {
-              lines.push(`byMethod,${row.method},${row.total}`);
-            }
-            for (const row of data.dailyTrend ?? []) {
-              lines.push(`dailyTrend,${row.date},${row.total}`);
-            }
-            downloadCsv('revenue-report.csv', lines.join('\n'));
-          }}
-          disabled={!data}
-          className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
-        >
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </button>
-      </div>
+      <PageHeader
+        title="Revenue Report"
+        description="Revenue by payment method and daily trend"
+        actions={
+          <button
+            onClick={() => {
+              if (!data) return;
+              const lines = ['section,date_or_method,total'];
+              lines.push(`summary,Total Revenue,${data.totalRevenue ?? 0}`);
+              for (const row of data.byMethod ?? []) {
+                lines.push(`byMethod,${row.method},${row.total}`);
+              }
+              for (const row of data.dailyTrend ?? []) {
+                lines.push(`dailyTrend,${row.date},${row.total}`);
+              }
+              downloadCsv('revenue-report.csv', lines.join('\n'));
+            }}
+            disabled={!data}
+            className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
+          >
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div className="rounded-lg border bg-card p-4">
@@ -78,6 +79,11 @@ export default function RevenueReportPage() {
       {isLoading ? (
         <div className="flex items-center justify-center p-8">
           <div className="animate-spin h-8 w-8 border-b-2 border-primary rounded-full" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <p className="font-medium text-destructive">Failed to load revenue report</p>
+          <p className="text-sm text-muted-foreground mt-1">Try adjusting the date range or try again later.</p>
         </div>
       ) : data ? (
         <>

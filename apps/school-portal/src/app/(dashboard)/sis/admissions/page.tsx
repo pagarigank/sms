@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { UserPlus, Settings, GraduationCap, AlertTriangle } from 'lucide-react';
-import { Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
+import { Badge, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 
 /**
  * Pipeline stage → semantic token pair (border / surface).
@@ -29,10 +29,35 @@ interface Applicant {
   id: string;
   firstName: string;
   lastName: string;
+  middleName?: string;
   status: string;
+  stageId?: string;
   gradeLevelAppliedFor?: string;
   email?: string;
   phone?: string;
+  source?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  'online-form': 'Online Form',
+  walkin: 'Walk-in',
+  referral: 'Referral',
+};
+
+function formatSource(source?: string): string {
+  if (!source) return 'Manual';
+  return SOURCE_LABELS[source] ?? source;
+}
+
+function formatDate(value?: string): string {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return '';
+  }
 }
 
 export default function AdmissionsPage() {
@@ -71,26 +96,26 @@ export default function AdmissionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Admissions Pipeline</h1>
-          <p className="text-muted-foreground">Track applicants through the admission process</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/sis/admissions/stages"
-            className="inline-flex items-center gap-2 rounded-md border border-[hsl(var(--border-strong))] bg-[hsl(var(--surface-raised))] px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-[hsl(var(--surface-muted))]"
-          >
-            <Settings className="h-4 w-4" /> Configure Stages
-          </Link>
-          <Link
-            href="/sis/admissions/apply"
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-          >
-            <UserPlus className="h-4 w-4" /> New Applicant
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Admissions Pipeline"
+        description="Track applicants through the admission process"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/sis/admissions/stages"
+              className="inline-flex items-center gap-2 rounded-md border border-[hsl(var(--border-strong))] bg-[hsl(var(--surface-raised))] px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-[hsl(var(--surface-muted))]"
+            >
+              <Settings className="h-4 w-4" /> Configure Stages
+            </Link>
+            <Link
+              href="/sis/admissions/apply"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              <UserPlus className="h-4 w-4" /> New Applicant
+            </Link>
+          </div>
+        }
+      />
 
       {actionError && (
         <div
@@ -146,8 +171,11 @@ export default function AdmissionsPage() {
                   ) : (
                     applicants.map((applicant) => (
                       <div key={applicant.id} className="group relative rounded-xl border bg-card p-4 hover:shadow-lg transition-all duration-200 hover:border-primary/30">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
+                        <Link
+                          href={`/sis/admissions/${applicant.id}`}
+                          className="flex items-start justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1">
                             <p className="font-bold text-sm text-foreground line-clamp-1 group-hover:text-primary transition-colors">
                               {applicant.lastName}, {applicant.firstName}
                             </p>
@@ -160,6 +188,21 @@ export default function AdmissionsPage() {
                               {applicant.firstName.charAt(0)}{applicant.lastName.charAt(0)}
                             </span>
                           </div>
+                        </Link>
+
+                        <div className="mt-2 space-y-1">
+                          <Badge variant="outline" className="text-[10px] font-medium uppercase tracking-wide">
+                            {formatSource(applicant.source)}
+                          </Badge>
+                          {applicant.email && (
+                            <p className="text-xs text-muted-foreground truncate">{applicant.email}</p>
+                          )}
+                          {applicant.phone && (
+                            <p className="text-xs text-muted-foreground truncate">{applicant.phone}</p>
+                          )}
+                          {formatDate(applicant.createdAt) && (
+                            <p className="text-[10px] text-muted-foreground/70">Applied {formatDate(applicant.createdAt)}</p>
+                          )}
                         </div>
 
                         {/* Move to stage */}

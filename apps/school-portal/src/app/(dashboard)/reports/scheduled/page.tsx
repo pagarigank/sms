@@ -9,6 +9,7 @@ import {
   Button,
   Input,
   Label,
+  PageHeader,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -61,7 +62,7 @@ export default function ScheduledReportsPage() {
   const [frequency, setFrequency] = useState<string>('');
   const [recipients, setRecipients] = useState('');
 
-  const { data: subs, isLoading } = useQuery({
+  const { data: subs, isLoading, isError } = useQuery({
     queryKey: ['scheduled-reports', currentTenantId],
     queryFn: () => apiClient.reporting.getScheduledReports({ tenantId: currentTenantId! }),
     enabled: !!currentTenantId,
@@ -133,21 +134,24 @@ export default function ScheduledReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Scheduled Reports</h1>
-          <p className="text-muted-foreground">
-            Recurring report summaries delivered to subscriber inboxes
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> New subscription
-        </Button>
-      </div>
+      <PageHeader
+        title="Scheduled Reports"
+        description="Recurring report summaries delivered to subscriber inboxes"
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New subscription
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center p-8">
           <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <p className="font-medium text-destructive">Failed to load scheduled reports</p>
+          <p className="text-sm text-muted-foreground mt-1">Try again later or contact support.</p>
         </div>
       ) : subList.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center">

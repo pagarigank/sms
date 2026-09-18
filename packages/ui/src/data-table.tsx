@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   useReactTable,
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   flexRender,
   type ColumnDef,
@@ -81,32 +82,55 @@ function DataTable<TData, TValue>({
   const handleSortingChange: (updater: Updater<SortingState>) => void =
     onSortingChange ?? setInternalSorting;
 
+  // Server-driven tables pass `pagination`/`onPaginationChange`/`pageCount`.
+  // Everything else gets automatic client-side pagination instead of rendering
+  // every row on a single page.
+  const isManualPagination =
+    pagination != null || onPaginationChange != null || pageCount != null;
+  const [internalPagination, setInternalPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const pageState = pagination ?? internalPagination;
+  const handlePaginationChange: (updater: Updater<PaginationState>) => void =
+    onPaginationChange ??
+    ((updater) =>
+      setInternalPagination((prev) =>
+        typeof updater === 'function' ? updater(prev) : updater
+      ));
+
   const table = useReactTable({
     data,
     columns,
-    pageCount: pageCount ?? -1,
+    ...(isManualPagination ? { pageCount: pageCount ?? -1 } : {}),
     state: {
-      pagination,
+      pagination: pageState,
       // Only feed sorting state to the table when client-side sorting is on,
       // so server-driven pages don't get silently re-sorted.
       ...(sortingProp || onSortingChange || sortable ? { sorting } : {}),
     },
+    onPaginationChange: handlePaginationChange,
     onSortingChange: sortable || onSortingChange ? handleSortingChange : undefined,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: isManualPagination ? undefined : getPaginationRowModel(),
     getSortedRowModel: sortable || onSortingChange ? getSortedRowModel() : undefined,
-    manualPagination: true,
+    manualPagination: isManualPagination,
     enableSorting: sortable || !!onSortingChange,
   });
 
   const colCount = columns.length;
-  const pageSize = pagination?.pageSize ?? 10;
+  const pageSize = pageState.pageSize;
   const rowsOnPage = table.getRowModel().rows.length;
-  const showingRange =
-    totalRows != null && pagination
+  const totalRowsSafe = totalRows ?? data.length;
+  const showingRange = isManualPagination
+    ? totalRows != null && pagination
       ? `${pagination.pageIndex * pageSize + 1}–${pagination.pageIndex * pageSize + rowsOnPage} of ${totalRows}`
-      : null;
-  const canPaginate = !!pagination && (onPaginationChange != null || pageCount != null);
-  const pageCountSafe = pageCount ?? Math.max(1, Math.ceil((totalRows ?? rowsOnPage) / pageSize));
+      : null
+    : `${pageState.pageIndex * pageSize + 1}–${pageState.pageIndex * pageSize + rowsOnPage} of ${totalRowsSafe}`;
+  const canPaginate = isManualPagination
+    ? (onPaginationChange != null || pageCount != null)
+    : totalRowsSafe > pageSize;
+  const pageCountSafe = pageCount ?? Math.max(1, Math.ceil(totalRowsSafe / pageSize));
 
   const cellPadding = density === 'compact' ? 'px-3 py-2' : undefined;
 
@@ -202,10 +226,10 @@ function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {pagination && canPaginate && (
+      {canPaginate && (
         <div className="flex flex-col items-center justify-between gap-3 px-1.5 py-1 sm:flex-row">
           <p className="text-xs text-[hsl(var(--ink-300))]">
-            {showingRange ?? `Page ${pagination.pageIndex + 1} of ${pageCountSafe}`}
+            {showingRange ?? `Page ${pageState.pageIndex + 1} of ${pageCountSafe}`}
           </p>
           <div className="flex items-center gap-1.5">
             <Select

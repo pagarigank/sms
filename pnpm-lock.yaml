@@ -363,9 +363,6 @@ importers:
       next:
         specifier: ^15.0.0
         version: 15.5.25(@playwright/test@1.63.0)(@types/node@20.19.43)(react-dom@19.2.8)(react@19.2.8)
-      next-intl:
-        specifier: ^4.14.2
-        version: 4.14.2(next@15.5.25)(react@19.2.8)
       react:
         specifier: ^19.0.0
         version: 19.2.8
@@ -375,9 +372,6 @@ importers:
       react-hook-form:
         specifier: ^7.87.0
         version: 7.87.0(react@19.2.8)
-      recharts:
-        specifier: ^3.10.1
-        version: 3.10.1(@types/react@19.2.18)(react-dom@19.2.8)(react-is@19.2.8)(react@19.2.8)(redux@5.0.1)
       tailwind-merge:
         specifier: ^2.6.1
         version: 2.6.1

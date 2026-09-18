@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Unique, Index } from 'typeorm';
 
-@Entity({ name: 'honor_roll_configs' })
+@Entity({ name: 'honor_roll_configs', synchronize: false })
 @Unique('idx_honor_roll_unique', ['tenantId', 'educationLevelId', 'schoolYearId'])
 @Index('idx_honor_roll_active', ['tenantId', 'branchId', 'educationLevelId', 'schoolYearId'])
 export class HonorRollConfig {

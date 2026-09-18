@@ -1,0 +1,29 @@
+- generic [ref=f2e2]:
+  - complementary [aria-hidden] [ref=f2e3]:
+    - generic [ref=f2e10]:
+      - text: SchoolSuite
+      - generic [ref=f2e11]: SMS
+    - generic [ref=f2e12]:
+      - generic [ref=f2e13]: School Administration
+      - heading [level=2] [ref=f2e15]: One portal for your whole campus.
+      - paragraph [ref=f2e16]: Manage student records, enrollment, scheduling, and billing from a single, secure administration portal.
+    - list [ref=f2e17]:
+      - listitem [ref=f2e18]: Multi-tenant school support
+      - listitem [ref=f2e23]: Audit-logged every action
+      - listitem [ref=f2e27]: OIDC + MFA ready
+    - paragraph [ref=f2e32]: SchoolSuite SMS · School Administration Portal
+  - generic [ref=f2e33]:
+    - heading "SchoolSuite — Sign in to School Administration Portal" [level=1] [ref=f2e34]
+    - generic [ref=f2e37]:
+      - generic [ref=f2e42]:
+        - text: School / Tenant
+        - textbox "School / Tenant" [active] [ref=f2e44]:
+          - /placeholder: e.g. demo-school
+      - paragraph [ref=f2e45]:
+        - text: "Your school's slug (also the subdomain:"
+        - code [ref=f2e46]: school.schoolsuite.ph
+        - text: )
+      - generic [ref=f2e47]:
+        - button "Skip" [ref=f2e48] [cursor=pointer]
+        - button "Continue" [disabled] [ref=f2e49]
+    - paragraph [ref=f2e52]: SchoolSuite SMS · School Administration Portal

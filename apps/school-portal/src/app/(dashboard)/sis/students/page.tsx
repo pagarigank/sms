@@ -20,6 +20,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -139,16 +140,16 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Students</h1>
-          <p className="text-muted-foreground">Manage student records and profiles</p>
-        </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <UserPlus className="h-4 w-4" />
-          Add Student
-        </Button>
-      </div>
+      <PageHeader
+        title="Students"
+        description="Manage student records and profiles"
+        actions={
+          <Button onClick={() => setShowCreate(true)}>
+            <UserPlus className="h-4 w-4" />
+            Add Student
+          </Button>
+        }
+      />
 
       <DataTable
         columns={columns}
@@ -307,8 +308,8 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={onBack}>← Back</Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{student.lastName}, {student.firstName}</h1>
+        <div className="min-w-0 flex-1">
+          <PageHeader title={`${student.lastName}, ${student.firstName}`} />
           <p className="text-muted-foreground">
             LRN: {student.lrn || 'N/A'} ·{' '}
             <span className="inline-flex translate-y-0.5">

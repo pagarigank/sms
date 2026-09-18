@@ -5,12 +5,27 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { Plus, Tag, CheckCircle, Clock, XCircle, Loader2, AlertTriangle } from 'lucide-react';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  statusToVariant,
+  StatusDot,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 
 /** Backend endpoints may return a bare array, an ApiResponse wrapper, or a paginated envelope. */
 function listOf<T>(res: unknown): T[] {
@@ -156,20 +171,20 @@ export default function DiscountsPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Discounts &amp; Scholarships</h1>
-            <p className="text-muted-foreground">Manage discount types and student discount grants</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowCreateGrant(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Grant Discount
-            </Button>
-            <Button onClick={() => setShowCreateType(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Discount Type
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Discounts & Scholarships"
+          description="Manage discount types and student discount grants"
+          actions={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowCreateGrant(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Grant Discount
+              </Button>
+              <Button onClick={() => setShowCreateType(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add Discount Type
+              </Button>
+            </div>
+          }
+        />
 
         {typesError ? (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

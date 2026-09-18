@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label } from '@sms/ui';
+import { Button, Label, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { Printer, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useTenantStore } from '@/lib/store';
@@ -23,7 +23,7 @@ export default function Sf1Page() {
   });
   const sections = (sectionsRes?.data as any[]) ?? [];
 
-  const { data: sf1Data, isLoading } = useQuery({
+  const { data: sf1Data, isLoading, isError } = useQuery({
     queryKey: ['sf1', sectionId],
     queryFn: () => apiClient.reporting.getSf1(sectionId).then(r => r.data as any),
     enabled: !!sectionId,
@@ -41,10 +41,7 @@ export default function Sf1Page() {
           <Link href="/reports/sf-forms" className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">SF1 - School Register</h1>
-            <p className="text-muted-foreground">Select a section to generate the master list</p>
-          </div>
+          <PageHeader title="SF1 - School Register" description="Select a section to generate the master list" />
         </div>
 
         <div className="flex items-end space-x-4 rounded-lg border bg-card p-4 shadow-sm">
@@ -68,7 +65,12 @@ export default function Sf1Page() {
       </div>
 
       {/* Printable Area */}
-      {sf1Data && (
+      {isError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center print:hidden">
+          <p className="font-medium text-destructive">Failed to load the school register</p>
+          <p className="text-sm text-muted-foreground mt-1">Reselect the section or try again later.</p>
+        </div>
+      ) : sf1Data && (
         <div className="rounded-lg border bg-white p-8 shadow-sm print:m-0 print:border-none print:shadow-none print:p-0">
           <style dangerouslySetInnerHTML={{ __html: `
             @media print {

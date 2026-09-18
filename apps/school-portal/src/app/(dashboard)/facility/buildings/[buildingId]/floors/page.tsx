@@ -5,14 +5,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  PageHeader,
+  statusToVariant,
+  StatusDot,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import type { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, Search, Edit, Trash2, Layers, ChevronLeft } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
 
 interface Floor {
   id: string;
@@ -205,8 +216,10 @@ export default function FloorsPage() {
             >
               <ChevronLeft className="mr-1 h-4 w-4" /> Back to Buildings
             </Link>
-            <h1 className="text-3xl font-bold tracking-tight">Floors</h1>
-            <p className="text-muted-foreground">Manage floors for {building?.name || 'this building'}</p>
+            <PageHeader
+              title="Floors"
+              description={`Manage floors for ${building?.name || 'this building'}`}
+            />
           </div>
           <Button onClick={openCreate}>
             <span className="flex items-center space-x-1">

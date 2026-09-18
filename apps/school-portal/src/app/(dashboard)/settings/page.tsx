@@ -4,16 +4,34 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
-import { DataTable } from '@sms/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusDot,
+  statusToVariant,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  useConfirm,
+  useToast,
+} from '@sms/ui';
 import { ColumnDef } from '@tanstack/react-table';
-import { useToast, useConfirm, Badge, statusToVariant, StatusDot } from '@sms/ui';
 import { Plus, ListTree, Braces, Hash, Flag, ScrollText } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sms/ui';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sms/ui';
 
 /**
  * FR-CFG-2/3/5/7/8 — tenant configuration manager (the school-portal half of
@@ -387,10 +405,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Lookups, custom fields, numbering, feature flags and the config audit log</p>
-      </div>
+      <PageHeader title="Settings" description="Lookups, custom fields, numbering, feature flags and the config audit log" />
 
       <Tabs defaultValue="lookups">
         <TabsList>

@@ -1,11 +1,14 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, NotFoundException, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ReportingService } from './reporting.service';
 import { ScheduledReportDispatcher } from './scheduled-report-dispatcher.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard, RequirePermission } from '../auth/permissions.guard';
 
 @ApiTags('reporting')
 @ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('reporting')
 export class ReportingController {
   constructor(
@@ -15,6 +18,7 @@ export class ReportingController {
 
   // === Dashboard ===
   @Get('dashboard')
+  @RequirePermission('reporting.dashboard', 'view')
   @ApiOperation({ summary: 'Get dashboard aggregation stats' })
   async getDashboardStats(
     @Headers('x-tenant-id') tenantId: string,
@@ -26,6 +30,7 @@ export class ReportingController {
 
   // === Enrollment Reports ===
   @Get('enrollment')
+  @RequirePermission('reporting.dashboard', 'view')
   @ApiOperation({ summary: 'Get enrollment report with breakdowns' })
   async getEnrollmentReport(
     @Headers('x-tenant-id') tenantId: string,
@@ -38,6 +43,7 @@ export class ReportingController {
 
   // === Revenue Reports ===
   @Get('revenue')
+  @RequirePermission('reporting.dashboard', 'view')
   @ApiOperation({ summary: 'Get revenue report by method and daily trend' })
   async getRevenueReport(
     @Headers('x-tenant-id') tenantId: string,
@@ -50,7 +56,8 @@ export class ReportingController {
 
   // === AR Aging ===
   @Get('ar-aging')
-  @ApiOperation({ summary: 'Get AR aging report' })
+  @RequirePermission('reporting.dashboard', 'view')
+  @ApiOperation({ summary: 'Get accounts receivable aging report' })
   async getARAgingReport(
     @Headers('x-tenant-id') tenantId: string,
     @Query('branchId') branchId?: string,
@@ -60,6 +67,7 @@ export class ReportingController {
 
   // === Discount Utilization ===
   @Get('discounts')
+  @RequirePermission('reporting.dashboard', 'view')
   @ApiOperation({ summary: 'Get discount/scholarship utilization report' })
   async getDiscountReport(@Headers('x-tenant-id') tenantId: string) {
     return this.reportingService.getDiscountReport(tenantId);
@@ -67,6 +75,7 @@ export class ReportingController {
 
   // === Learner Movement ===
   @Get('learner-movement')
+  @RequirePermission('reporting.dashboard', 'view')
   @ApiOperation({ summary: 'Get learner movement (promotion/retention/graduation) report' })
   async getLearnerMovementReport(
     @Headers('x-tenant-id') tenantId: string,
@@ -77,12 +86,14 @@ export class ReportingController {
 
   // === Report Templates ===
   @Get('templates')
+  @RequirePermission('reporting.dashboard', 'view')
   @ApiOperation({ summary: 'List report templates' })
   async getTemplates(@Headers('x-tenant-id') tenantId: string) {
     return this.reportingService.getTemplates(tenantId);
   }
 
   @Post('templates')
+  @RequirePermission('reporting.export', 'export')
   @ApiOperation({ summary: 'Create custom report template' })
   async createTemplate(@Headers('x-tenant-id') tenantId: string, @Body() body: any) {
     return this.reportingService.createTemplate({ ...body, tenantId });
@@ -90,12 +101,14 @@ export class ReportingController {
 
   // === Scheduled Reports ===
   @Get('scheduled')
+  @RequirePermission('reporting.dashboard', 'view')
   @ApiOperation({ summary: 'List scheduled report subscriptions' })
   async getScheduledReports(@Headers('x-tenant-id') tenantId: string) {
     return this.reportingService.getScheduledReports(tenantId);
   }
 
   @Post('scheduled')
+  @RequirePermission('reporting.export', 'export')
   @ApiOperation({ summary: 'Create scheduled report subscription' })
   async createScheduledReport(@Headers('x-tenant-id') tenantId: string, @Body() body: any, @Req() req: any) {
     // Stamp who created it so notifications can attribute the dispatch.
@@ -107,6 +120,7 @@ export class ReportingController {
   }
 
   @Post('scheduled/:id/run')
+  @RequirePermission('reporting.export', 'export')
   @ApiOperation({ summary: 'Run a scheduled report now (dispatches immediately, stamps lastRun)' })
   async runScheduledReport(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
     const sub = await this.reportingService.findScheduledReport(id, tenantId);
@@ -115,6 +129,7 @@ export class ReportingController {
   }
 
   @Put('scheduled/:id/toggle')
+  @RequirePermission('reporting.export', 'export')
   @ApiOperation({ summary: 'Toggle scheduled report active/inactive' })
   async toggleScheduledReport(
     @Param('id') id: string,

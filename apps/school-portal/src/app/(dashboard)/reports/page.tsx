@@ -8,11 +8,12 @@ import {
   BarChart3, Users, DollarSign, GraduationCap, TrendingUp,
   AlertCircle, Calendar, FileText, ArrowRight
 } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 export default function ReportsPage() {
   const { currentTenantId, currentBranchId } = useTenantStore();
 
-  const { data: dashboard, isLoading } = useQuery({
+  const { data: dashboard, isLoading, isError } = useQuery({
     queryKey: ['dashboard-stats', currentTenantId, currentBranchId],
     queryFn: () => apiClient.reporting.getDashboardStats({
       tenantId: currentTenantId!,
@@ -64,16 +65,17 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports & Analytics</h1>
-          <p className="text-muted-foreground">Operational dashboards and regulatory reports</p>
-        </div>
-      </div>
+      <PageHeader title="Reports & Analytics" description="Operational dashboards and regulatory reports" />
 
       {isLoading ? (
         <div className="flex items-center justify-center p-8">
           <div className="animate-spin h-8 w-8 border-b-2 border-primary rounded-full" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+          <p className="mt-4 font-medium">Failed to load dashboard stats</p>
+          <p className="text-sm text-muted-foreground">The Reports hub is still available — select a report below.</p>
         </div>
       ) : stats ? (
         <>

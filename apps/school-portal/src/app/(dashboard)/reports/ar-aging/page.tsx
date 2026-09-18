@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { AlertCircle, Download } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 function downloadCsv(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -26,7 +27,7 @@ const AGING_BRACKETS = [
 export default function ARAgingReportPage() {
   const { currentTenantId, currentBranchId } = useTenantStore();
 
-  const { data: report, isLoading } = useQuery({
+  const { data: report, isLoading, isError } = useQuery({
     queryKey: ['ar-aging', currentTenantId, currentBranchId],
     queryFn: () => apiClient.reporting.getARAgingReport({
       tenantId: currentTenantId!,
@@ -40,31 +41,36 @@ export default function ARAgingReportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">AR Aging Report</h1>
-          <p className="text-muted-foreground">Outstanding balances by age bracket</p>
-        </div>
-        <button
-          onClick={() => {
-            if (!data) return;
-            const lines = ['bracket,amount'];
-            for (const bracket of AGING_BRACKETS) {
-              lines.push(`${bracket.label},${data.aging?.[bracket.key] ?? 0}`);
-            }
-            lines.push(`Total Outstanding,${data.totalOutstanding ?? 0}`);
-            downloadCsv('ar-aging-report.csv', lines.join('\n'));
-          }}
-          disabled={!data}
-          className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
-        >
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </button>
-      </div>
+      <PageHeader
+        title="AR Aging Report"
+        description="Outstanding balances by age bracket"
+        actions={
+          <button
+            onClick={() => {
+              if (!data) return;
+              const lines = ['bracket,amount'];
+              for (const bracket of AGING_BRACKETS) {
+                lines.push(`${bracket.label},${data.aging?.[bracket.key] ?? 0}`);
+              }
+              lines.push(`Total Outstanding,${data.totalOutstanding ?? 0}`);
+              downloadCsv('ar-aging-report.csv', lines.join('\n'));
+            }}
+            disabled={!data}
+            className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
+          >
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center p-8">
           <div className="animate-spin h-8 w-8 border-b-2 border-primary rounded-full" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <p className="font-medium text-destructive">Failed to load AR aging report</p>
+          <p className="text-sm text-muted-foreground mt-1">Try again later or contact support.</p>
         </div>
       ) : data ? (
         <>

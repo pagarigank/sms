@@ -18,6 +18,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -287,21 +288,21 @@ export default function SectionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Sections</h1>
-          <p className="text-muted-foreground">Manage class sections, capacity, and rosters</p>
-        </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setForm({ name: '', gradeLevelId: '', homeroom: '', capacity: '40' });
-            setShowForm(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> Add Section
-        </Button>
-      </div>
+      <PageHeader
+        title="Sections"
+        description="Manage class sections, capacity, and rosters"
+        actions={
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setForm({ name: '', gradeLevelId: '', homeroom: '', capacity: '40' });
+              setShowForm(true);
+            }}
+          >
+            <Plus className="h-4 w-4" /> Add Section
+          </Button>
+        }
+      />
 
       <DataTable
         columns={columns}

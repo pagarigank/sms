@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { ChevronLeft, ChevronRight, AlertTriangle, X, Search, User, BookOpen, Layers, Users, CheckSquare } from 'lucide-react';
-import { Button, Card } from '@sms/ui';
+import { Button, Card, PageHeader } from '@sms/ui';
 import { cn } from '@sms/utils';
 import { FormStepper } from '@/components/sis/form-stepper';
 import { StudentSearchStep, CurriculumStep, SubjectsStep, SectionStep } from './steps';
@@ -209,8 +209,7 @@ export default function EnrollmentWizardPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-10">
       <div className="text-center space-y-2 animate-in slide-in-from-top-4 fade-in duration-500">
-        <h1 className="text-4xl font-extrabold tracking-tight">Enrollment Wizard</h1>
-        <p className="text-muted-foreground text-lg">Enroll a student into a school year, curriculum, and section.</p>
+        <PageHeader title="Enrollment Wizard" description="Enroll a student into a school year, curriculum, and section." />
       </div>
 
       <div className="relative mt-8 mb-12 animate-in fade-in duration-700 delay-100 hidden sm:block">

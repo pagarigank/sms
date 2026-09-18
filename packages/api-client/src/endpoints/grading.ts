@@ -6,9 +6,6 @@ export const gradingEndpoints = (client: ApiClient) => ({
   listGradingSystems: (params?: { educationLevelId?: string; schoolYearId?: string; branchId?: string }) =>
     client.get<GradingSystem[]>('/api/v1/grading/systems', params as Record<string, string>),
 
-  getGradingSystem: (id: string) =>
-    client.get<GradingSystem>(`/api/v1/grading/systems/${id}`),
-
   createGradingSystem: (data: { educationLevelId: string; schoolYearId: string; name: string; type: string; branchId?: string; config?: Record<string, unknown> }) =>
     client.post<GradingSystem>('/api/v1/grading/systems', data),
 
@@ -38,4 +35,8 @@ export const gradingEndpoints = (client: ApiClient) => ({
 
   seedDepEdSystem: (data: { tier: string; educationLevelId: string; schoolYearId: string; branchId?: string }) =>
     client.post<{ system: any; components: any[] }>('/api/v1/grading/systems/seed-deped', data),
+
+  // Grade Entries
+  overrideGradeEntry: (id: string, data: { reason: string; rawScore?: number; score?: number; maxScore?: number; descriptiveGrade?: string; gradingMode?: string; remarks?: string }) =>
+    client.post<{ id: string; percentage: number; transmutedGrade: number | null; isManualOverride: boolean; overrideReason: string }>(`/api/v1/grading/entries/${id}/override`, data),
 });

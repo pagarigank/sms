@@ -13,7 +13,7 @@ import { GradeLevel } from '../academic/grade-level.entity';
 import { EducationLevel } from '../education-levels/education-level.entity';
 import { Subject } from '../academic/subject.entity';
 import { ClassOffering } from '../scheduling/class-offering.entity';
-import { GradeEntry } from '../scheduling/grade-entry.entity';
+import { GradeEntry } from '../grading/entities/grade-entry.entity';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -296,7 +296,7 @@ export class DocumentsService {
     const m = this.templatesRepo.manager;
 
     const entries = await m.getRepository(GradeEntry).find({
-      where: { studentId, tenantId, isFinalized: true },
+      where: { studentId, tenantId, locked: true },
     });
     if (entries.length === 0) return [];
 

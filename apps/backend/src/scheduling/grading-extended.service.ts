@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { GradeEntry } from './grade-entry.entity';
-import { GradeChangeRequest } from './grade-change-request.entity';
+import { GradeEntry } from '../grading/entities/grade-entry.entity';
+import { GradeChangeRequest } from '../grading/entities/grade-change-request.entity';
+import { AuditEvent } from '../config/audit-event.entity';
 import { PermanentRecord } from './permanent-record.entity';
 import { ClassOffering } from './class-offering.entity';
 import { Subject } from '../academic/subject.entity';
@@ -16,138 +17,10 @@ export class GradingExtendedService {
     @InjectRepository(GradeEntry) private gradeEntriesRepo: Repository<GradeEntry>,
     @InjectRepository(GradeChangeRequest) private changeRequestsRepo: Repository<GradeChangeRequest>,
     @InjectRepository(PermanentRecord) private permanentRecordsRepo: Repository<PermanentRecord>,
+    @InjectRepository(AuditEvent) private auditRepo: Repository<AuditEvent>,
   ) {}
 
   // === Grade Entries ===
-  async getGradebook(classOfferingId: string, tenantId: string) {
-    return this.gradeEntriesRepo.find({
-      where: { classOfferingId, tenantId },
-      order: { studentId: 'ASC', gradeComponentId: 'ASC' },
-    });
-  }
-
-  async enterGrade(data: Partial<GradeEntry>, enteredByUserId?: string) {
-    const entry = await this.normalizeGradeEntry(data);
-    if (enteredByUserId) entry.enteredByUserId = enteredByUserId;
-    return this.gradeEntriesRepo.save(entry);
-  }
-
-  async bulkEnterGrades(entries: Partial<GradeEntry>[]) {
-    const results = { created: 0, updated: 0, errors: [] as any[] };
-
-    for (const raw of entries) {
-      try {
-        const entry = await this.normalizeGradeEntry(raw);
-        const existing = await this.gradeEntriesRepo.findOne({
-          where: {
-            studentId: entry.studentId,
-            classOfferingId: entry.classOfferingId,
-            gradeComponentId: entry.gradeComponentId,
-            termId: entry.termId,
-            tenantId: entry.tenantId,
-          },
-        });
-
-        if (existing) {
-          Object.assign(existing, entry);
-          await this.gradeEntriesRepo.save(existing);
-          results.updated++;
-        } else {
-          const newEntry = this.gradeEntriesRepo.create(entry);
-          await this.gradeEntriesRepo.save(newEntry);
-          results.created++;
-        }
-      } catch (error: any) {
-        results.errors.push({
-          entry: raw,
-          error: error.message,
-          status: error.getStatus?.() ?? 400,
-        });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * Complete a client-supplied grade entry so it satisfies the NOT NULL
-   * foreign keys on grade_entries, and derive the computed score columns.
-   *
-   * Clients (the gradebook grid) send only { studentId, classOfferingId,
-   * gradeComponentId, rawScore } — everything else is derivable server-side:
-   *   termId            ← class offering
-   *   gradingSystemId   ← grade component
-   *   enrollmentId      ← the student's enrollment in the offering's school year
-   *   percentage        ← rawScore / maxScore × 100 (rawScore as-is when no max is set)
-   *   transmutedGrade   ← the grading system's configured transmutation table
-   *                       (e.g. DepEd Order 8 s. 2015 — nothing hard-coded here)
-   */
-  private async normalizeGradeEntry(data: Partial<GradeEntry>): Promise<GradeEntry> {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throw new BadRequestException('Request body must be a JSON object');
-    }
-
-    const missing: string[] = [];
-    if (!data.studentId) missing.push('studentId');
-    if (!data.classOfferingId) missing.push('classOfferingId');
-    if (!data.gradeComponentId) missing.push('gradeComponentId');
-    if (missing.length) throw new BadRequestException(`Missing required field(s): ${missing.join(', ')}`);
-
-    // `score` is a common client alias for rawScore — accept it but never store it.
-    const payload: Partial<GradeEntry> & { score?: unknown } = { ...data };
-    if (payload.rawScore == null && payload.score != null) payload.rawScore = payload.score as number;
-    delete payload.score;
-
-    const rawScore = payload.rawScore == null ? null : Number(payload.rawScore);
-    if (rawScore != null && Number.isNaN(rawScore)) {
-      throw new BadRequestException('rawScore (or score) must be a number');
-    }
-    const maxScore = payload.maxScore == null ? null : Number(payload.maxScore);
-    if (maxScore != null && (Number.isNaN(maxScore) || maxScore <= 0)) {
-      throw new BadRequestException('maxScore must be a positive number');
-    }
-
-    const offeringsRepo = this.gradeEntriesRepo.manager.getRepository(ClassOffering);
-    const offering = await offeringsRepo.findOne({ where: { id: payload.classOfferingId, tenantId: payload.tenantId } });
-    if (!offering) throw new NotFoundException(`Class offering ${payload.classOfferingId} not found`);
-
-    const componentsRepo = this.gradeEntriesRepo.manager.getRepository(GradeComponent);
-    const component = await componentsRepo.findOne({ where: { id: payload.gradeComponentId, tenantId: payload.tenantId } });
-    if (!component) throw new NotFoundException(`Grade component ${payload.gradeComponentId} not found`);
-
-    let enrollmentId: string | undefined = payload.enrollmentId;
-    if (!enrollmentId) {
-      const enrollment = await this.gradeEntriesRepo.manager.getRepository(Enrollment).findOne({
-        where: { tenantId: payload.tenantId, studentId: payload.studentId, schoolYearId: offering.schoolYearId },
-        order: { createdAt: 'DESC' },
-      });
-      if (!enrollment) {
-        throw new BadRequestException(
-          `No enrollment found for student ${payload.studentId} in the class offering's school year — cannot record a grade`,
-        );
-      }
-      enrollmentId = enrollment.id;
-    }
-
-    const percentage =
-      rawScore == null ? null : maxScore ? (rawScore / maxScore) * 100 : rawScore;
-    const roundedPercentage = percentage == null ? null : Math.round(percentage * 100) / 100;
-    const transmutedGrade =
-      roundedPercentage == null ? null : await this.transmuteGrade(component.gradingSystemId, roundedPercentage);
-
-    return this.gradeEntriesRepo.create({
-      ...payload,
-      tenantId: payload.tenantId!,
-      enrollmentId,
-      termId: payload.termId ?? offering.termId,
-      gradingSystemId: component.gradingSystemId,
-      rawScore,
-      maxScore,
-      percentage: roundedPercentage,
-      transmutedGrade,
-    });
-  }
-
   /**
    * Transmute a percentage into the grading system's reported grade using its
    * configured `config.transmutation` band table ({ "minPercentage": grade }).
@@ -168,19 +41,6 @@ export class GradingExtendedService {
 
     const match = bands.find((b) => percentage >= b.min);
     return match ? match.grade : bands[bands.length - 1].grade;
-  }
-
-  async finalizeGrades(classOfferingId: string, termId: string, tenantId: string) {
-    const entries = await this.gradeEntriesRepo.find({
-      where: { classOfferingId, termId, tenantId },
-    });
-
-    for (const entry of entries) {
-      entry.isFinalized = true;
-      await this.gradeEntriesRepo.save(entry);
-    }
-
-    return { finalized: entries.length };
   }
 
   /**
@@ -220,57 +80,137 @@ export class GradingExtendedService {
         classOfferingId: e.classOfferingId,
         subjectName: subject?.title ?? 'Subject',
         componentName: component?.name ?? 'Component',
-        rawScore: e.rawScore,
+        rawScore: e.score,
         maxScore: e.maxScore,
         percentage: e.percentage,
         transmutedGrade: e.transmutedGrade,
-        isFinalized: e.isFinalized,
+        isFinalized: e.locked,
         termId: e.termId,
       };
     });
   }
 
   // === Grade Change Requests ===
-  async createChangeRequest(data: Partial<GradeChangeRequest>) {
-    const request = this.changeRequestsRepo.create(data);
+
+  /** Matches a canonical UUID string (avoids persisting 'system' etc. into uuid FKs). */
+  private isUuid(v: string | null | undefined): v is string {
+    return !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
+  }
+
+  async createChangeRequest(data: Partial<GradeChangeRequest> & { newScore?: number; maxScore?: number }) {
+    // Normalize legacy flat newScore payloads into the canonical new_grade JSONB.
+    const row: Partial<GradeChangeRequest> = { ...data };
+    row.newGrade = row.newGrade ?? {};
+    if (data.newScore !== undefined) row.newGrade.score = data.newScore;
+    if (data.maxScore !== undefined) row.newGrade.maxScore = data.maxScore;
+    delete (row as any).newScore;
+    delete (row as any).maxScore;
+
+    // Snapshot the current entry into old_grade so the diff is auditable.
+    if (row.gradeEntryId) {
+      const current = await this.gradeEntriesRepo.findOne({ where: { id: row.gradeEntryId } });
+      if (current) {
+        row.branchId = row.branchId ?? current.branchId;
+        row.studentId = row.studentId ?? current.studentId;
+        row.classOfferingId = row.classOfferingId ?? current.classOfferingId;
+        row.termId = row.termId ?? current.termId;
+        row.oldGrade = {
+          score: current.score,
+          percentage: current.percentage,
+          descriptiveGrade: current.descriptiveGrade,
+          locked: current.locked,
+        };
+      }
+    }
+
+    const request = this.changeRequestsRepo.create(row as any);
     return this.changeRequestsRepo.save(request);
   }
 
   async approveChangeRequest(id: string, tenantId: string, approvedBy: string) {
-    const request = await this.changeRequestsRepo.findOne({ where: { id, tenantId } });
-    if (!request) throw new NotFoundException('Grade change request not found');
-    if (request.status !== 'pending') throw new BadRequestException('Request is not pending');
+    // Reject/Optimistic: re-fetch + write within a transaction so the applied
+    // grade change and its audit row commit atomically.
+    return this.changeRequestsRepo.manager.transaction(async (manager) => {
+      const gcrRepo = manager.getRepository(GradeChangeRequest);
+      const entryRepo = manager.getRepository(GradeEntry);
+      const auditRepo = manager.getRepository(AuditEvent);
 
-    // Update the grade entry, keeping the computed columns consistent.
-    if (request.gradeEntryId) {
-      const gradeEntry = await this.gradeEntriesRepo.findOne({ where: { id: request.gradeEntryId } });
-      if (gradeEntry) {
-        gradeEntry.rawScore = request.newScore;
-        const percentage =
-          gradeEntry.maxScore && gradeEntry.maxScore > 0
-            ? (Number(request.newScore) / Number(gradeEntry.maxScore)) * 100
-            : Number(request.newScore);
+      const request = await gcrRepo.findOne({ where: { id, tenantId } });
+      if (!request) throw new NotFoundException('Grade change request not found');
+      if (request.status !== 'pending') throw new BadRequestException('Request is not pending');
+      if (request.gradeEntryId) {
+        const gradeEntry = await entryRepo.findOne({ where: { id: request.gradeEntryId } });
+        if (!gradeEntry) throw new NotFoundException('Target grade entry not found');
+        if (gradeEntry.locked) {
+          throw new BadRequestException('Cannot approve change request: grades are locked for this term');
+        }
+
+        const ng = request.newGrade ?? {};
+        const newScore = Number(ng.score ?? ng.percentage ?? ng.transmutedGrade ?? gradeEntry.score ?? 0);
+        const max = ng.maxScore != null ? Number(ng.maxScore) : Number(gradeEntry.maxScore ?? 0);
+        const percentage = max > 0 ? (newScore / max) * 100 : newScore;
+
+        gradeEntry.score = newScore;
         gradeEntry.percentage = Math.round(percentage * 100) / 100;
         gradeEntry.transmutedGrade = await this.transmuteGrade(gradeEntry.gradingSystemId, gradeEntry.percentage);
-        await this.gradeEntriesRepo.save(gradeEntry);
+        if (ng.descriptiveGrade) gradeEntry.descriptiveGrade = ng.descriptiveGrade;
+        gradeEntry.isManualOverride = true;
+        gradeEntry.overrideReason = request.reason;
+        gradeEntry.overriddenAt = new Date();
+        if (this.isUuid(request.approvedBy ?? approvedBy)) {
+          gradeEntry.overriddenBy = request.approvedBy ?? approvedBy;
+        }
+        await entryRepo.save(gradeEntry);
       }
-    }
 
-    request.status = 'approved';
-    request.approvedByUserId = approvedBy;
-    request.approvedAt = new Date();
-    return this.changeRequestsRepo.save(request);
+      request.status = 'approved';
+      if (this.isUuid(approvedBy)) request.approvedBy = approvedBy;
+      request.approvedAt = new Date();
+      const saved = await gcrRepo.save(request);
+
+      await auditRepo.save(auditRepo.create({
+        tenantId,
+        branchId: request.branchId,
+        actorUserId: this.isUuid(approvedBy) ? approvedBy : undefined,
+        entityType: 'grade_change_request',
+        entityId: id,
+        action: 'grade-change-request.approve',
+        beforeState: { status: 'pending' },
+        afterState: { status: 'approved', approvedBy: saved.approvedBy, approvedAt: saved.approvedAt, newGrade: saved.newGrade },
+      }));
+
+      return saved;
+    });
   }
 
   async rejectChangeRequest(id: string, tenantId: string, approvedBy: string, reason?: string) {
-    const request = await this.changeRequestsRepo.findOne({ where: { id, tenantId } });
-    if (!request) throw new NotFoundException('Grade change request not found');
+    return this.changeRequestsRepo.manager.transaction(async (manager) => {
+      const gcrRepo = manager.getRepository(GradeChangeRequest);
+      const auditRepo = manager.getRepository(AuditEvent);
 
-    request.status = 'rejected';
-    request.approvedByUserId = approvedBy;
-    request.approvedAt = new Date();
-    if (reason) request.reason = reason;
-    return this.changeRequestsRepo.save(request);
+      const request = await gcrRepo.findOne({ where: { id, tenantId } });
+      if (!request) throw new NotFoundException('Grade change request not found');
+      if (request.status !== 'pending') throw new BadRequestException('Only pending requests can be rejected');
+
+      request.status = 'rejected';
+      if (this.isUuid(approvedBy)) request.approvedBy = approvedBy;
+      request.approvedAt = new Date();
+      if (reason) request.reason = reason;
+      const saved = await gcrRepo.save(request);
+
+      await auditRepo.save(auditRepo.create({
+        tenantId,
+        branchId: request.branchId,
+        actorUserId: this.isUuid(approvedBy) ? approvedBy : undefined,
+        entityType: 'grade_change_request',
+        entityId: id,
+        action: 'grade-change-request.reject',
+        beforeState: { status: 'pending' },
+        afterState: { status: 'rejected', approvedBy: saved.approvedBy, approvedAt: saved.approvedAt, reason: saved.reason },
+      }));
+
+      return saved;
+    });
   }
 
   async getChangeRequests(tenantId: string, classOfferingId?: string) {

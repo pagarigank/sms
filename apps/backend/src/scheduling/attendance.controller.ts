@@ -1,15 +1,19 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers, Req, BadRequestException, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard, RequirePermission } from '../auth/permissions.guard';
 
 @ApiTags('attendance')
 @ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   // === Roster ===
   @Get('roster')
+  @RequirePermission('attendance.record', 'view')
   @ApiOperation({ summary: 'Get the student roster for a class offering (attendance-entry grid)' })
   async getRoster(
     @Headers('x-tenant-id') tenantId: string,
@@ -20,6 +24,7 @@ export class AttendanceController {
 
   // === Records ===
   @Get('records')
+  @RequirePermission('attendance.record', 'view')
   @ApiOperation({ summary: 'Get attendance records for a class on a date' })
   async getRecords(
     @Headers('x-tenant-id') tenantId: string,
@@ -30,12 +35,14 @@ export class AttendanceController {
   }
 
   @Post('records')
+  @RequirePermission('attendance.record', 'edit')
   @ApiOperation({ summary: 'Record attendance for a student' })
   async recordAttendance(@Body() data: any, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
     return this.attendanceService.recordAttendance({ ...data, tenantId }, req.user?.id ?? req.user?.userId ?? req.user?.sub);
   }
 
   @Post('records/bulk')
+  @RequirePermission('attendance.record', 'edit')
   @ApiOperation({ summary: 'Bulk record attendance for a class' })
   async bulkRecord(@Body() body: { records: any[] }, @Headers('x-tenant-id') tenantId: string, @Req() req: any) {
     if (!body || !Array.isArray(body.records)) {
@@ -46,6 +53,7 @@ export class AttendanceController {
   }
 
   @Get('students/:studentId/summary')
+  @RequirePermission('attendance.record', 'view')
   @ApiOperation({ summary: 'Get student attendance summary' })
   async getSummary(
     @Param('studentId') studentId: string,
@@ -56,6 +64,7 @@ export class AttendanceController {
   }
 
   @Get('students/:studentId/threshold-check')
+  @RequirePermission('attendance.record', 'view')
   @ApiOperation({ summary: 'Check if student exceeds absence notification thresholds' })
   async checkThresholds(@Param('studentId') studentId: string, @Headers('x-tenant-id') tenantId: string) {
     return this.attendanceService.checkAbsenceThresholds(tenantId, studentId);
@@ -63,12 +72,14 @@ export class AttendanceController {
 
   // === Config ===
   @Get('config')
+  @RequirePermission('attendance.record', 'view')
   @ApiOperation({ summary: 'Get attendance configuration' })
   async getConfigs(@Headers('x-tenant-id') tenantId: string, @Query('branchId') branchId?: string) {
     return this.attendanceService.getConfigs(tenantId, branchId);
   }
 
   @Post('config')
+  @RequirePermission('config.lookup', 'edit')
   @ApiOperation({ summary: 'Create attendance configuration' })
   async createConfig(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
     return this.attendanceService.createConfig({ ...data, tenantId });
@@ -76,18 +87,21 @@ export class AttendanceController {
 
   // === Excuses ===
   @Get('excuses')
+  @RequirePermission('attendance.record', 'view')
   @ApiOperation({ summary: 'List attendance excuses' })
   async getExcuses(@Headers('x-tenant-id') tenantId: string, @Query('studentId') studentId?: string) {
     return this.attendanceService.getExcuses(tenantId, studentId);
   }
 
   @Post('excuses')
+  @RequirePermission('attendance.record', 'edit')
   @ApiOperation({ summary: 'Submit an attendance excuse' })
   async createExcuse(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
     return this.attendanceService.createExcuse({ ...data, tenantId });
   }
 
   @Put('excuses/:id/review')
+  @RequirePermission('attendance.record', 'edit')
   @ApiOperation({ summary: 'Review/approve/reject an excuse' })
   async reviewExcuse(
     @Param('id') id: string,
@@ -99,12 +113,14 @@ export class AttendanceController {
 
   // === Thresholds ===
   @Get('thresholds')
+  @RequirePermission('config.lookup', 'view')
   @ApiOperation({ summary: 'Get notification thresholds' })
   async getThresholds(@Headers('x-tenant-id') tenantId: string, @Query('branchId') branchId?: string) {
     return this.attendanceService.getThresholds(tenantId, branchId);
   }
 
   @Post('thresholds')
+  @RequirePermission('config.lookup', 'edit')
   @ApiOperation({ summary: 'Create notification threshold' })
   async createThreshold(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
     return this.attendanceService.createThreshold({ ...data, tenantId });

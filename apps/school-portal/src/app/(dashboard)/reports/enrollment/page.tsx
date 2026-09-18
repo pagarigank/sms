@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { Users, Download } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 function downloadCsv(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -30,7 +31,7 @@ export default function EnrollmentReportPage() {
     [schoolYears],
   );
 
-  const { data: report, isLoading } = useQuery({
+  const { data: report, isLoading, isError } = useQuery({
     queryKey: ['enrollment-report', currentTenantId, currentBranchId, schoolYearId],
     queryFn: () => apiClient.reporting.getEnrollmentReport({
       tenantId: currentTenantId!,
@@ -44,30 +45,30 @@ export default function EnrollmentReportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Enrollment Report</h1>
-          <p className="text-muted-foreground">Enrollment summary by status and grade level</p>
-        </div>
-        <button
-          onClick={() => {
-            if (!data) return;
-            const lines = ['section,name,count'];
-            lines.push(`total,Total Enrollments,${data.total ?? 0}`);
-            for (const [status, count] of Object.entries(data.byStatus ?? {})) {
-              lines.push(`byStatus,${status},${count}`);
-            }
-            for (const row of data.byGradeLevel ?? []) {
-              lines.push(`byGradeLevel,"${row.gradeLevelName ?? row.gradeLevelId ?? 'Unassigned'}",${row.count}`);
-            }
-            downloadCsv('enrollment-report.csv', lines.join('\n'));
-          }}
-          disabled={!data}
-          className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
-        >
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </button>
-      </div>
+      <PageHeader
+        title="Enrollment Report"
+        description="Enrollment summary by status and grade level"
+        actions={
+          <button
+            onClick={() => {
+              if (!data) return;
+              const lines = ['section,name,count'];
+              lines.push(`total,Total Enrollments,${data.total ?? 0}`);
+              for (const [status, count] of Object.entries(data.byStatus ?? {})) {
+                lines.push(`byStatus,${status},${count}`);
+              }
+              for (const row of data.byGradeLevel ?? []) {
+                lines.push(`byGradeLevel,"${row.gradeLevelName ?? row.gradeLevelId ?? 'Unassigned'}",${row.count}`);
+              }
+              downloadCsv('enrollment-report.csv', lines.join('\n'));
+            }}
+            disabled={!data}
+            className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
+          >
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div className="rounded-lg border bg-card p-4">
@@ -91,6 +92,11 @@ export default function EnrollmentReportPage() {
       {isLoading ? (
         <div className="flex items-center justify-center p-8">
           <div className="animate-spin h-8 w-8 border-b-2 border-primary rounded-full" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <p className="font-medium text-destructive">Failed to load enrollment report</p>
+          <p className="text-sm text-muted-foreground mt-1">Try again later or contact support.</p>
         </div>
       ) : data ? (
         <>

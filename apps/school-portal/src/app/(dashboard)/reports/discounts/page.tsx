@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
 import { BadgePercent, Download, Loader2 } from 'lucide-react';
+import { PageHeader } from '@sms/ui';
 
 function toCsv(rows: Array<Record<string, unknown>>, columns: string[]): string {
   const header = columns.join(',');
@@ -51,19 +52,19 @@ export default function DiscountsReportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Discount Utilization</h1>
-          <p className="text-muted-foreground">Scholarship and discount usage across the tenant</p>
-        </div>
-        <button
-          onClick={exportCsv}
-          disabled={!byTypeName.length}
-          className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
-        >
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </button>
-      </div>
+      <PageHeader
+        title="Discount Utilization"
+        description="Scholarship and discount usage across the tenant"
+        actions={
+          <button
+            onClick={exportCsv}
+            disabled={!byTypeName.length}
+            className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
+          >
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center p-8">
