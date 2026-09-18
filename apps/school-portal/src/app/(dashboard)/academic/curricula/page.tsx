@@ -144,6 +144,14 @@ export default function CurriculaPage() {
     queryFn: () => apiClient.academic.listSchoolYears({ limit: 100 }),
   });
 
+  // All grade levels for name resolution (needed even when the table is
+  // filtered to one education level — a curriculum row may reference a
+  // grade level from a different level than the filter).
+  const { data: allGradeLevelsRes } = useQuery({
+    queryKey: ['grade-levels', 'all'],
+    queryFn: () => apiClient.academic.listGradeLevels({ limit: 200 }),
+  });
+
   const { data: strandsRes } = useQuery({
     queryKey: ['strands'],
     queryFn: () => apiClient.academic.listStrands({ limit: 100 }),
@@ -274,6 +282,24 @@ export default function CurriculaPage() {
     return curriculumYearLevels.find((gl) => gl.id === id)?.name ?? 'Unknown Year';
   };
 
+  // Name resolvers for the curricula table (FR-ACA-3 display).
+  // The backend returns only ID fields; we enrich from the lookup lists the
+  // page already loads.
+  const educationLevelName = (id: string) =>
+    educationLevels.find((e) => e.id === id)?.name ?? id;
+  const gradeLevelNameForCurricula = (id: string) =>
+    (allGradeLevelsRes?.data ?? []).find((g: GradeLevel) => g.id === id)?.name ?? id;
+  const schoolYearNameForCurricula = (id: string) =>
+    schoolYears.find((s) => s.id === id)?.name ?? id;
+
+  const enrichedCurricula: (Curriculum & { educationLevelName?: string; gradeLevelName?: string; schoolYearName?: string })[] =
+    curricula.map((c) => ({
+      ...c,
+      educationLevelName: educationLevelName(c.educationLevelId),
+      gradeLevelName: c.gradeLevelId ? gradeLevelNameForCurricula(c.gradeLevelId) : undefined,
+      schoolYearName: schoolYearNameForCurricula(c.schoolYearId),
+    }));
+
   const addSubjectMutation = useMutation({
     mutationFn: (data: { curriculumId: string; subjectId: string; termId?: string; yearLevelId?: string }) =>
       apiClient.academic.createCurriculumSubject({
@@ -357,7 +383,7 @@ export default function CurriculaPage() {
     {
       accessorKey: 'educationLevelName',
       header: 'Education Level',
-      cell: ({ row }) => row.original.educationLevelName || row.original.educationLevelId,
+      cell: ({ row }) => educationLevelName(row.original.educationLevelId),
     },
     {
       accessorKey: 'gradeLevelName',
@@ -367,7 +393,7 @@ export default function CurriculaPage() {
     {
       accessorKey: 'schoolYearName',
       header: 'School Year',
-      cell: ({ row }) => row.original.schoolYearName || row.original.schoolYearId,
+      cell: ({ row }) => schoolYearNameForCurricula(row.original.schoolYearId),
     },
     {
       accessorKey: 'status',
@@ -806,7 +832,7 @@ export default function CurriculaPage() {
 
         <DataTable
           columns={columns as any}
-          data={curricula}
+          data={enrichedCurricula}
           isLoading={isLoading}
           emptyMessage="No curricula found."
           emptyDescription="Get started by creating your first curriculum for this academic year."
