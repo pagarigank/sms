@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
 import { PlayCircle, StopCircle, Receipt, DollarSign, AlertTriangle, CreditCard, PieChart, Activity, X } from 'lucide-react';
-import { useToast, Badge, Button, Label, Input } from '@sms/ui';
+import { Badge, Button, Input, Label, PageHeader, useToast } from '@sms/ui';
 import { cn } from '@sms/utils';
 
 export default function CashieringPage() {
@@ -77,40 +77,45 @@ export default function CashieringPage() {
   const summary = (sessionSummary?.data as any) ?? null;
   const methodsList = ((methods?.data as any[]) ?? []);
 
+  // Compute cash-only total from summary.byMethod using payment methods with isCash=true
+  const cashTotal = useMemo(() => {
+    if (!summary?.byMethod || methodsList.length === 0) return 0;
+    const cashMethod = methodsList.find((m) => m.isCash === true);
+    if (!cashMethod) return 0;
+    const cashData = summary.byMethod[cashMethod.code] || summary.byMethod[cashMethod.name] || summary.byMethod[cashMethod.id];
+    return cashData?.total || 0;
+  }, [summary?.byMethod, methodsList]);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600">
-            Cashiering
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your daily till, monitor transactions, and process payments.
-          </p>
-        </div>
-        {!session ? (
-          <Button
-            size="lg"
-            onClick={() => setShowOpenForm(true)}
-            className="group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-emerald-700 text-white shadow-lg hover:shadow-emerald-500/25 transition-all"
-          >
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
-            <PlayCircle className="mr-2 h-5 w-5 relative z-10" /> 
-            <span className="relative z-10 font-semibold tracking-wide">Open Session</span>
-          </Button>
-        ) : (
-          <Button
-            size="lg"
-            onClick={() => setShowCloseForm(true)}
-            className="group relative overflow-hidden bg-gradient-to-r from-rose-500 to-rose-700 text-white shadow-lg hover:shadow-rose-500/25 transition-all"
-          >
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
-            <StopCircle className="mr-2 h-5 w-5 relative z-10" /> 
-            <span className="relative z-10 font-semibold tracking-wide">Close Session</span>
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Cashiering"
+        description="Manage your daily till, monitor transactions, and process payments."
+        actions={
+          !session ? (
+            <Button
+              size="lg"
+              onClick={() => setShowOpenForm(true)}
+              className="group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-emerald-700 text-white shadow-lg hover:shadow-emerald-500/25 transition-all"
+            >
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+              <PlayCircle className="mr-2 h-5 w-5 relative z-10" /> 
+              <span className="relative z-10 font-semibold tracking-wide">Open Session</span>
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              onClick={() => setShowCloseForm(true)}
+              className="group relative overflow-hidden bg-gradient-to-r from-rose-500 to-rose-700 text-white shadow-lg hover:shadow-rose-500/25 transition-all"
+            >
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+              <StopCircle className="mr-2 h-5 w-5 relative z-10" /> 
+              <span className="relative z-10 font-semibold tracking-wide">Close Session</span>
+            </Button>
+          )
+        }
+      />
 
       {/* Session Status Banner */}
       {session ? (
@@ -237,7 +242,7 @@ export default function CashieringPage() {
                 </div>
                 <p className="text-sm font-medium text-emerald-500/80">Expected in Drawer</p>
                 <p className="mt-2 text-3xl font-bold text-emerald-500">
-                  <span className="text-lg opacity-70">₱</span>{Number(Number(session.openingFloat) + Number(summary.totalAmount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  <span className="text-lg opacity-70">₱</span>{Number(Number(session.openingFloat) + cashTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>

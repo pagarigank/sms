@@ -1,7 +1,7 @@
 /**
  * Route-to-Permission mapping (backend copy).
- * Kept in sync with `packages/api-client/src/route-permission-map.ts` and
- * `apps/school-portal/src/lib/route-permission-map.ts`.
+ * Kept in sync with `apps/school-portal/src/lib/route-permission-map.ts`,
+ * the canonical frontend copy.
  *
  * IMPORTANT: every code below must exist in the seeded `permissions` catalog
  * (`apps/backend/src/migrations/001-phase1-rls-and-seed.sql` +

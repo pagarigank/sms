@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label, Input } from '@sms/ui';
+import { Button, Input, Label, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { Printer, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useTenantStore } from '@/lib/store';
@@ -36,6 +36,24 @@ export default function Sf2Page() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const daysArray = Array.from({ length: 25 }, (_, i) => i + 1); // DepEd SF2 usually shows 25 columns for weekdays
 
+  const statusMarker: Record<string, string> = { present: 'P', late: 'L', absent: 'A', excused: 'E' };
+
+  const attendanceFor = (studentId: string, day: number) => {
+    const byDay = (sf2Data as any)?.attendanceByStudent?.[studentId];
+    return byDay?.[day];
+  };
+
+  const monthlyTotals = (studentId: string) => {
+    const byDay = (sf2Data as any)?.attendanceByStudent?.[studentId] ?? {};
+    let absent = 0;
+    let late = 0;
+    for (const rec of Object.values(byDay) as any[]) {
+      if (rec.status === 'absent') absent += 1;
+      if (rec.status === 'late') late += 1;
+    }
+    return { absent, late };
+  };
+
   return (
     <div className="space-y-6">
       {/* Non-printable UI header */}
@@ -44,10 +62,7 @@ export default function Sf2Page() {
           <Link href="/reports/sf-forms" className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">SF2 - Daily Attendance</h1>
-            <p className="text-muted-foreground">Select a section and month to generate attendance</p>
-          </div>
+          <PageHeader title="SF2 - Daily Attendance" description="Select a section and month to generate attendance" />
         </div>
 
         <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-card p-4 shadow-sm">
@@ -125,30 +140,46 @@ export default function Sf2Page() {
               <tr className="bg-gray-200 font-bold">
                 <td colSpan={28} className="border border-black p-1">MALE</td>
               </tr>
-              {sf2Data.students.males.map((student: any) => (
-                <tr key={student.id}>
-                  <td className="border border-black p-1">{`${student.lastName}, ${student.firstName}`}</td>
-                  {daysArray.map(d => (
-                    <td key={d} className="border border-black p-0.5 text-center"></td>
-                  ))}
-                  <td className="border border-black p-0.5"></td>
-                  <td className="border border-black p-0.5"></td>
-                </tr>
-              ))}
+              {sf2Data.students.males.map((student: any) => {
+                const totals = monthlyTotals(student.id);
+                return (
+                  <tr key={student.id}>
+                    <td className="border border-black p-1">{`${student.lastName}, ${student.firstName}`}</td>
+                    {daysArray.map(d => {
+                      const rec = attendanceFor(student.id, d);
+                      return (
+                        <td key={d} className="border border-black p-0.5 text-center">
+                          {rec ? statusMarker[rec.status] ?? rec.status : ''}
+                        </td>
+                      );
+                    })}
+                    <td className="border border-black p-0.5 text-center">{totals.absent || ''}</td>
+                    <td className="border border-black p-0.5 text-center">{totals.late || ''}</td>
+                  </tr>
+                );
+              })}
               
               <tr className="bg-gray-200 font-bold">
                 <td colSpan={28} className="border border-black p-1">FEMALE</td>
               </tr>
-              {sf2Data.students.females.map((student: any) => (
-                <tr key={student.id}>
-                  <td className="border border-black p-1">{`${student.lastName}, ${student.firstName}`}</td>
-                  {daysArray.map(d => (
-                    <td key={d} className="border border-black p-0.5 text-center"></td>
-                  ))}
-                  <td className="border border-black p-0.5"></td>
-                  <td className="border border-black p-0.5"></td>
-                </tr>
-              ))}
+              {sf2Data.students.females.map((student: any) => {
+                const totals = monthlyTotals(student.id);
+                return (
+                  <tr key={student.id}>
+                    <td className="border border-black p-1">{`${student.lastName}, ${student.firstName}`}</td>
+                    {daysArray.map(d => {
+                      const rec = attendanceFor(student.id, d);
+                      return (
+                        <td key={d} className="border border-black p-0.5 text-center">
+                          {rec ? statusMarker[rec.status] ?? rec.status : ''}
+                        </td>
+                      );
+                    })}
+                    <td className="border border-black p-0.5 text-center">{totals.absent || ''}</td>
+                    <td className="border border-black p-0.5 text-center">{totals.late || ''}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

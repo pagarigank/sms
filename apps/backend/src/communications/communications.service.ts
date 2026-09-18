@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotificationTemplate } from './notification-template.entity';
@@ -12,6 +12,8 @@ import { ConfigEngineService } from '../config/config-engine.service';
 
 @Injectable()
 export class CommunicationsService {
+  private readonly logger = new Logger(CommunicationsService.name);
+
   constructor(
     @InjectRepository(NotificationTemplate) private templatesRepo: Repository<NotificationTemplate>,
     @InjectRepository(NotificationRule) private rulesRepo: Repository<NotificationRule>,
@@ -130,7 +132,10 @@ export class CommunicationsService {
         }
       }
 
-      // Log the dispatch (recipientContact records the channel-appropriate contact)
+      // Record the dispatch intent. No SMS/email/push provider is wired yet
+      // (Phase 8.1), so the log stays in `queued` - never `sent`. The payload
+      // carries an explicit marker so the audit trail shows that nothing was
+      // actually transmitted, instead of faking a delivery.
       const log = this.logsRepo.create({
         tenantId: data.tenantId,
         branchId: data.branchId,
@@ -138,16 +143,23 @@ export class CommunicationsService {
         channel: template.channel,
         recipientUserId: data.recipientUserId,
         recipientContact: contact,
-        payload: data.variables,
+        payload: {
+          ...data.variables,
+          _delivery: {
+            status: 'queued',
+            provider: 'unconfigured',
+            note: 'No SMS/email/push provider configured; intent recorded only.',
+          },
+        },
         status: 'queued',
       });
       await this.logsRepo.save(log);
 
-      // TODO: Wire to real SMS/email/push provider via ChannelConfig
-      // For now, mark as sent
-      log.status = 'sent';
-      log.sentAt = new Date();
-      await this.logsRepo.save(log);
+      this.logger.warn(
+        `Notification queued but NOT transmitted (provider unconfigured) - ` +
+          `rule ${rule.id}, template ${template.id}, channel ${template.channel}, ` +
+          `contact ${contact}`,
+      );
 
       results.push(log);
     }
@@ -177,6 +189,9 @@ export class CommunicationsService {
   async publishAnnouncement(id: string, tenantId: string) {
     const announcement = await this.announcementsRepo.findOne({ where: { id, tenantId } });
     if (!announcement) throw new NotFoundException('Announcement not found');
+    // Queue intent only: no broadcast provider is wired yet. `sentAt` here is
+    // the queue timestamp - the audience is NOT actually notified until a
+    // ChannelConfig-backed provider exists (Phase 8.1).
     announcement.sentAt = new Date();
     return this.announcementsRepo.save(announcement);
   }

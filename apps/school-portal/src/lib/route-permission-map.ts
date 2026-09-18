@@ -3,8 +3,8 @@
  * Maps frontend route paths to required backend permission codes
  * Used by the frontend to filter navigation items based on user permissions.
  *
- * NOTE: kept byte-for-byte in sync with
- * `packages/api-client/src/route-permission-map.ts` (the shared copy).
+ * NOTE: this is the canonical frontend copy, kept in sync with
+ * `apps/backend/src/common/route-permission-map.ts` (server-side enforcement).
  *
  * IMPORTANT: every code below must exist in the seeded `permissions` catalog
  * (`apps/backend/src/migrations/001-phase1-rls-and-seed.sql` +
@@ -95,8 +95,8 @@ export const ROUTE_PERMISSION_MAP: RoutePermission[] = [
 
   // Communications
   { route: '/communications', permission: 'communications.announcement:view', children: [
-    { route: '/communications#templates', permission: 'communications.template:view' },
-    { route: '/communications#threads', permission: 'communications.message:view' },
+    { route: '/communications?tab=templates', permission: 'communications.template:view' },
+    { route: '/communications?tab=threads', permission: 'communications.message:view' },
   ]},
 
   // Documents

@@ -5,10 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
 import { Bell, MessageSquare, Send, Megaphone, Plus, Settings, Loader2, AlertTriangle, Rocket } from 'lucide-react';
-import { Button } from '@sms/ui';
-import { Input } from '@sms/ui';
-import { Label } from '@sms/ui';
-import { Badge } from '@sms/ui';
+import { Badge, Button, Input, Label, PageHeader } from '@sms/ui';
 
 function listOf<T>(res: unknown): T[] {
   if (Array.isArray(res)) return res as T[];
@@ -67,6 +64,12 @@ export default function CommunicationsPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'announcements' | 'templates' | 'threads'>('announcements');
   const [error, setError] = useState('');
+
+  // Support deep-links from the sidebar (e.g. /communications?tab=templates).
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab === 'templates' || tab === 'threads') setActiveTab(tab);
+  }, []);
 
   // --- Announcements ---
   const { data: announcements, isLoading: loadingAnn } = useQuery({
@@ -183,27 +186,29 @@ export default function CommunicationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Communications</h1>
-          <p className="text-muted-foreground">Announcements, notification templates, and parent messaging</p>
-        </div>
-        {activeTab === 'announcements' && (
-          <Button onClick={() => setShowAnnForm((v) => !v)}>
-            <Plus className="mr-2 h-4 w-4" /> New Announcement
-          </Button>
-        )}
-        {activeTab === 'templates' && (
-          <Button onClick={() => setShowTplForm((v) => !v)}>
-            <Plus className="mr-2 h-4 w-4" /> New Template
-          </Button>
-        )}
-        {activeTab === 'threads' && (
-          <Button onClick={() => setShowThreadForm((v) => !v)}>
-            <Plus className="mr-2 h-4 w-4" /> New Thread
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Communications"
+        description="Announcements, notification templates, and parent messaging"
+        actions={
+          <>
+            {activeTab === 'announcements' && (
+              <Button onClick={() => setShowAnnForm((v) => !v)}>
+                <Plus className="mr-2 h-4 w-4" /> New Announcement
+              </Button>
+            )}
+            {activeTab === 'templates' && (
+              <Button onClick={() => setShowTplForm((v) => !v)}>
+                <Plus className="mr-2 h-4 w-4" /> New Template
+              </Button>
+            )}
+            {activeTab === 'threads' && (
+              <Button onClick={() => setShowThreadForm((v) => !v)}>
+                <Plus className="mr-2 h-4 w-4" /> New Thread
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {error && (
         <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -311,7 +316,7 @@ export default function CommunicationsPage() {
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">{ann.title}</h3>
                   {ann.sentAt ? (
-                    <Badge variant="success">Published</Badge>
+                    <Badge variant="outline">Queued - no provider</Badge>
                   ) : (
                     <Button size="sm" variant="outline" onClick={() => publishAnnouncement.mutate(ann.id)} disabled={publishAnnouncement.isPending}>
                       <Rocket className="mr-1.5 h-3.5 w-3.5" /> Publish

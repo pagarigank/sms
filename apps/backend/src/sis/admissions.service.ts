@@ -7,6 +7,9 @@ import { ApplicantStageTransition } from './applicant-stage-transition.entity';
 import { SectionAssignmentRule } from './section-assignment-rule.entity';
 import { Student } from './student.entity';
 import { Enrollment } from './enrollment.entity';
+import { SchoolYear } from '../academic/school-year.entity';
+import { GradeLevel } from '../academic/grade-level.entity';
+import { Curriculum } from '../academic/curriculum.entity';
 
 @Injectable()
 export class AdmissionsService {
@@ -17,6 +20,9 @@ export class AdmissionsService {
     @InjectRepository(SectionAssignmentRule) private rulesRepo: Repository<SectionAssignmentRule>,
     @InjectRepository(Student) private studentsRepo: Repository<Student>,
     @InjectRepository(Enrollment) private enrollmentsRepo: Repository<Enrollment>,
+    @InjectRepository(SchoolYear) private schoolYearsRepo: Repository<SchoolYear>,
+    @InjectRepository(GradeLevel) private gradeLevelsRepo: Repository<GradeLevel>,
+    @InjectRepository(Curriculum) private curriculaRepo: Repository<Curriculum>,
     private dataSource: DataSource,
   ) {}
 
@@ -103,19 +109,25 @@ export class AdmissionsService {
   }
 
   /**
-   * Convert an accepted applicant into a real Student (G-23 completion).
-   * Applicant is marked 'enrolled' and linked via metadata for traceability.
-   */
-  /**
-   * Convert an accepted applicant into a real student.
+   * Convert an accepted applicant into a real student with an enrollment.
    *
-   * Student creation + applicant stage-move run in ONE transaction: a failure
-   * between the two writes would leave a student with an applicant still
-   * 'pending', and the name-based double-conversion guard would then block
-   * any retry — an operator dead-end. Rolling back together keeps both rows
-   * consistent (either both commit or neither does).
+   * Student creation + enrollment creation + applicant stage-move run in ONE
+   * transaction: a failure between the writes would leave inconsistent state.
+   * Rolling back together keeps all rows consistent.
    */
-  async convertApplicantToStudent(id: string, tenantId: string) {
+  async convertApplicantToStudent(
+    id: string,
+    tenantId: string,
+    enrollmentOptions?: {
+      schoolYearId?: string;
+      gradeLevelId?: string;
+      curriculumId?: string;
+      sectionId?: string;
+      strandId?: string;
+      programId?: string;
+      notes?: string;
+    },
+  ) {
     const applicant = await this.findOneApplicant(id, tenantId);
 
     // Guard against double conversion
@@ -130,8 +142,56 @@ export class AdmissionsService {
 
     return this.dataSource.transaction(async (manager) => {
       const studentsRepo = manager.getRepository(Student);
+      const enrollmentsRepo = manager.getRepository(Enrollment);
       const applicantsRepo = manager.getRepository(Applicant);
       const stagesRepo = manager.getRepository(ApplicantStageConfig);
+      const schoolYearsRepo = manager.getRepository(SchoolYear);
+      const gradeLevelsRepo = manager.getRepository(GradeLevel);
+      const curriculaRepo = manager.getRepository(Curriculum);
+
+      // Resolve enrollment defaults if not provided
+      let schoolYearId = enrollmentOptions?.schoolYearId;
+      if (!schoolYearId) {
+        const activeSY = await schoolYearsRepo.findOne({
+          where: { tenantId, status: 'active' },
+          order: { startDate: 'DESC' },
+        });
+        schoolYearId = activeSY?.id;
+        if (!schoolYearId) {
+          throw new BadRequestException(
+            'No active school year found. Please provide schoolYearId or activate a school year.',
+          );
+        }
+      }
+
+      let gradeLevelId = enrollmentOptions?.gradeLevelId;
+      if (!gradeLevelId) {
+        const firstGL = await gradeLevelsRepo.findOne({
+          where: { tenantId },
+          order: { code: 'ASC' },
+        });
+        gradeLevelId = firstGL?.id;
+        if (!gradeLevelId) {
+          throw new BadRequestException(
+            'No grade level found. Please provide gradeLevelId or configure grade levels.',
+          );
+        }
+      }
+
+      let curriculumId = enrollmentOptions?.curriculumId;
+      if (!curriculumId) {
+        const branchId = applicant.branchId;
+        const curriculum = await curriculaRepo.findOne({
+          where: { tenantId, branchId, gradeLevelId },
+          order: { createdAt: 'DESC' },
+        });
+        curriculumId = curriculum?.id;
+        if (!curriculumId) {
+          throw new BadRequestException(
+            `No curriculum found for branch ${branchId} and grade level ${gradeLevelId}. Please provide curriculumId.`,
+          );
+        }
+      }
 
       const saved = await studentsRepo.save(
         studentsRepo.create({
@@ -148,6 +208,25 @@ export class AdmissionsService {
         }),
       );
 
+      // Create enrollment for the new student
+      const enrollment = await enrollmentsRepo.save(
+        enrollmentsRepo.create({
+          tenantId,
+          branchId: applicant.branchId ?? tenantId,
+          studentId: saved.id,
+          schoolYearId,
+          curriculumId,
+          gradeLevelId,
+          sectionId: enrollmentOptions?.sectionId ?? undefined,
+          strandId: enrollmentOptions?.strandId ?? undefined,
+          programId: enrollmentOptions?.programId ?? undefined,
+          status: 'enrolled',
+          enrolledAt: new Date(),
+          notes: enrollmentOptions?.notes ?? `Converted from applicant ${applicant.id}`,
+          customFields: { convertedFromApplicantId: applicant.id },
+        }),
+      );
+
       // Move applicant to the terminal 'enrolled' stage if configured
       const enrolledStage = await stagesRepo.findOne({
         where: { tenantId, stageCode: 'enrolled', isActive: true },
@@ -155,11 +234,16 @@ export class AdmissionsService {
       if (enrolledStage) {
         applicant.stageId = enrolledStage.id;
         applicant.status = enrolledStage.stageCode;
-        applicant.notes = [applicant.notes, `Converted to student ${saved.id}`].filter(Boolean).join(' | ');
+        applicant.notes = [
+          applicant.notes,
+          `Converted to student ${saved.id} with enrollment ${enrollment.id}`,
+        ]
+          .filter(Boolean)
+          .join(' | ');
         await applicantsRepo.save(applicant);
       }
 
-      return saved;
+      return { student: saved, enrollment };
     });
   }
 

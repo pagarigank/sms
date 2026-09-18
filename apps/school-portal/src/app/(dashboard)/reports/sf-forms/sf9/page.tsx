@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label } from '@sms/ui';
+import { Button, Label, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sms/ui';
 import { Printer, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useTenantStore } from '@/lib/store';
@@ -28,7 +28,7 @@ export default function Sf9Page() {
   });
   const schoolYears = (schoolYearsRes?.data as any[]) ?? [];
 
-  const { data: sf9Data, isLoading } = useQuery({
+  const { data: sf9Data, isLoading, isError } = useQuery({
     queryKey: ['sf9', studentId, schoolYearId],
     queryFn: () => apiClient.reporting.getSf9(studentId, { schoolYearId }).then(r => r.data as any),
     enabled: !!studentId && !!schoolYearId,
@@ -45,10 +45,7 @@ export default function Sf9Page() {
           <Link href="/reports/sf-forms" className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">SF9 - Report Card</h1>
-            <p className="text-muted-foreground">Select a student and school year to generate the report card</p>
-          </div>
+          <PageHeader title="SF9 - Report Card" description="Select a student and school year to generate the report card" />
         </div>
 
         <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-card p-4 shadow-sm">
@@ -87,7 +84,12 @@ export default function Sf9Page() {
       </div>
 
       {/* Printable Area */}
-      {sf9Data && (
+      {isError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center print:hidden">
+          <p className="font-medium text-destructive">Failed to load the report card</p>
+          <p className="text-sm text-muted-foreground mt-1">Re-select the student or school year and try again.</p>
+        </div>
+      ) : sf9Data && (
         <div className="rounded-lg border bg-white p-8 shadow-sm print:m-0 print:border-none print:shadow-none print:p-0">
           <style dangerouslySetInnerHTML={{ __html: `
             @media print {

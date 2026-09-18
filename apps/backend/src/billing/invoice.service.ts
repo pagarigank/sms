@@ -420,7 +420,10 @@ export class InvoiceService {
 
   async getARAging(tenantId: string, branchId?: string) {
     const invoices = await this.invoicesRepo.find({
-      where: { tenantId, status: 'open' },
+      where: [
+        { tenantId, status: 'open' },
+        { tenantId, status: 'partial' },
+      ],
       order: { dueDate: 'ASC' },
     });
 

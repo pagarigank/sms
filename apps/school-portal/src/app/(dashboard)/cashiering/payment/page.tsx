@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore, useAuthStore } from '@/lib/store';
 import { Receipt, CheckCircle, Loader2, AlertTriangle, Search, User, CreditCard, ChevronDown, ChevronUp, Printer, Check, X, Mail } from 'lucide-react';
-import { Button, Input, Label, Badge } from '@sms/ui';
+import { Badge, Button, Input, Label, PageHeader } from '@sms/ui';
 import { cn } from '@sms/utils';
 
 interface Student {
@@ -132,9 +132,14 @@ export default function PaymentEntryPage() {
     setSelectedAllocations({});
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (successData) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-500">
+      <>
+      <div className="flex min-h-[70vh] items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-500 print:hidden">
         <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/20 bg-card/60 p-8 shadow-2xl backdrop-blur-xl">
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
           <div className="absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
@@ -153,7 +158,7 @@ export default function PaymentEntryPage() {
 
             <div className="w-full rounded-2xl border border-white/10 bg-background/50 p-6 shadow-inner">
               <p className="text-sm font-semibold tracking-widest text-muted-foreground uppercase mb-2">Total Paid</p>
-              <p className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-500">
+              <p className="text-4xl font-bold gradient-text">
                 <span className="text-2xl mr-1 opacity-70">₱</span>
                 {Number(successData.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </p>
@@ -175,7 +180,7 @@ export default function PaymentEntryPage() {
             </div>
 
             <div className="w-full grid grid-cols-2 gap-3 pt-4">
-              <Button variant="outline" className="h-12 w-full rounded-xl gap-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10">
+              <Button variant="outline" onClick={handlePrint} className="h-12 w-full rounded-xl gap-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10">
                 <Printer className="h-4 w-4" /> Print Receipt
               </Button>
               <Button onClick={() => setSuccessData(null)} className="h-12 w-full rounded-xl bg-foreground text-background hover:bg-foreground/90">
@@ -185,6 +190,43 @@ export default function PaymentEntryPage() {
           </div>
         </div>
       </div>
+
+      {/* Printable receipt (only rendered on paper) */}
+      <div className="hidden print:block p-8 text-black">
+        <div className="text-center mb-6">
+          <h1 className="text-xl font-bold uppercase">Official Receipt</h1>
+          <p className="text-sm">School Management System - Cashiering</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm mb-6">
+          <p><strong>Receipt No.:</strong> {successData.receipt?.orNumberDisplay || (successData.receipt ? `OR-${successData.receipt.orNumber}` : 'N/A')}</p>
+          <p><strong>Date:</strong> {new Date().toLocaleString()}</p>
+          <p><strong>Student:</strong> {selectedStudent ? `${selectedStudent.lastName}, ${selectedStudent.firstName}` : 'N/A'}</p>
+          <p><strong>Student No.:</strong> {selectedStudent?.studentNumber || 'N/A'}</p>
+          <p><strong>Payment Method:</strong> {methods.find(m => m.code === successData.method)?.name || successData.method}</p>
+          <p><strong>Transaction Ref.:</strong> {successData.id}</p>
+        </div>
+        <table className="w-full border-collapse border border-black text-sm">
+          <thead>
+            <tr>
+              <th className="border border-black p-2 text-left">Description</th>
+              <th className="border border-black p-2 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="border border-black p-2">Total Amount Paid</td>
+              <td className="border border-black p-2 text-right">
+                ₱{Number(successData.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="mt-16 grid grid-cols-2 gap-8 text-sm">
+          <div className="border-t border-black pt-1">Cashier Signature</div>
+          <div className="border-t border-black pt-1">Payer / Guardian Signature</div>
+        </div>
+      </div>
+      </>
     );
   }
 
@@ -192,14 +234,7 @@ export default function PaymentEntryPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-      <div>
-        <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600">
-          Process Payment
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Select outstanding balances and process payments securely.
-        </p>
-      </div>
+      <PageHeader title="Process Payment" description="Select outstanding balances and process payments securely." />
 
       {!session && (
         <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 backdrop-blur-sm shadow-[0_0_15px_rgba(245,158,11,0.1)] flex items-center gap-3 text-amber-600 dark:text-amber-400">
@@ -506,7 +541,7 @@ export default function PaymentEntryPage() {
             <div className="p-6 bg-background/80 backdrop-blur-md border-t border-border/50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
               <div className="flex justify-between items-end mb-6">
                 <span className="font-semibold text-muted-foreground uppercase tracking-widest text-xs">Total Due</span>
-                <span className="font-black text-3xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-500">
+                <span className="font-black text-3xl tracking-tight gradient-text">
                   <span className="text-xl mr-1 opacity-70">₱</span>
                   {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>

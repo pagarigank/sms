@@ -10,9 +10,8 @@ import { Badge, Button } from '@sms/ui';
 export default function BillingPage() {
   const { selectedStudentId } = useStudentStore();
   const [selectedAllocations, setSelectedAllocations] = useState<Record<string, { amount: number; invoiceId: string; type: 'invoice' | 'installment' }>>({});
-  const [mockSuccess, setMockSuccess] = useState(false);
   
-  const { data: soa, isLoading, refetch } = useQuery({
+  const { data: soa, isLoading } = useQuery({
     queryKey: ['student-soa', selectedStudentId],
     queryFn: () => apiClient.invoices.getSOA(selectedStudentId!),
     enabled: !!selectedStudentId,
@@ -37,20 +36,6 @@ export default function BillingPage() {
     });
   };
 
-  const handleMockPay = () => {
-    // Since we don't have a real gateway connected in the Guardian Portal yet,
-    // this handles the mock success interaction. 
-    setTimeout(() => {
-      setMockSuccess(true);
-      setSelectedAllocations({});
-    }, 1500);
-  };
-
-  const resetMock = () => {
-    setMockSuccess(false);
-    refetch();
-  };
-
   if (!selectedStudentId) {
     return (
       <div className="flex flex-col items-center justify-center p-16 space-y-4">
@@ -60,28 +45,11 @@ export default function BillingPage() {
     );
   }
 
-  if (mockSuccess) {
-    return (
-      <div className="flex items-center justify-center p-16">
-        <div className="space-y-6 text-center">
-          <CheckCircle className="mx-auto h-20 w-20 text-[hsl(var(--status-success-ink))]" />
-          <h1 className="text-3xl font-bold text-[hsl(var(--status-success-ink))]">Payment Initiated</h1>
-          <p className="text-ink-200 max-w-md mx-auto">
-            Your payment selection has been recorded. In a live environment, you would be redirected to the secure payment gateway (e.g. GCash or PayMaya) right now.
-          </p>
-          <Button variant="outline" onClick={resetMock} className="mt-4">
-            Return to Statement of Account
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 pb-24">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-ink-100">Statement of Account</h1>
-        <p className="text-ink-200 mt-1">Select balances to pay online securely.</p>
+        <p className="text-ink-200 mt-1">View your balances, installment schedule, and payment history.</p>
       </div>
 
       {isLoading ? (
@@ -294,9 +262,15 @@ export default function BillingPage() {
               </div>
             </div>
             
-            <Button size="lg" className="w-full sm:w-auto px-12 h-14 text-lg shadow-lg shadow-accent/20" onClick={handleMockPay}>
-              Pay Now
-            </Button>
+            <div className="flex flex-col items-center sm:items-end gap-2">
+              <Button size="lg" className="w-full sm:w-auto px-12 h-14 text-lg" disabled>
+                Pay Now
+              </Button>
+              <p className="text-xs text-ink-300 text-center sm:text-right flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                Online payment gateway is not connected yet - please settle at the cashier's office.
+              </p>
+            </div>
           </div>
         </div>
       )}
