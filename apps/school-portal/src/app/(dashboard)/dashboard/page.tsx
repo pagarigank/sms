@@ -133,7 +133,7 @@ export default function DashboardPage() {
   });
 
   const branchesQuery = useQuery({
-    queryKey: ['branches', currentTenantId],
+    queryKey: ['branches'],
     queryFn: () => apiClient.branches.list({ limit: 100 }),
     enabled: !!currentTenantId && permissions.includes('tenancy.branch:view'),
     staleTime: 5 * 60 * 1000,

@@ -32,15 +32,16 @@ export default function ApplicationFormPage() {
   const [formData, setFormData] = useState<EducationFormData>(INITIAL_FORM);
 
   const { data: educationLevels } = useQuery({
-    queryKey: ['education-levels'],
+    queryKey: ['education-levels', currentTenantId],
     queryFn: () => apiClient.academic.listEducationLevels(),
+    enabled: !!currentTenantId,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: gradeLevels } = useQuery({
-    queryKey: ['grade-levels', formData.educationLevelId],
+    queryKey: ['grade-levels', currentTenantId, formData.educationLevelId],
     queryFn: () => apiClient.academic.listGradeLevels({ educationLevelId: formData.educationLevelId }),
-    enabled: !!formData.educationLevelId,
+    enabled: !!currentTenantId && !!formData.educationLevelId,
     staleTime: 5 * 60 * 1000,
   });
 
