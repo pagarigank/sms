@@ -14,55 +14,102 @@ interface StudentInfoStepProps {
 
 export function StudentInfoStep({ formData, onUpdate }: StudentInfoStepProps) {
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold tracking-tight">Personal Details</h2>
-        <p className="text-sm text-muted-foreground">Provide the applicant's basic personal information.</p>
+    <div className="space-y-8">
+      {/* Personal Details */}
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">Personal Details</h2>
+          <p className="text-sm text-muted-foreground">Provide the applicant's basic personal information.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-4 space-y-2">
+            <label htmlFor="firstName" className="text-sm font-medium">First Name <span className="text-destructive">*</span></label>
+            <Input id="firstName" value={formData.firstName} onChange={(e) => onUpdate('firstName', e.target.value)} required />
+          </div>
+          <div className="md:col-span-4 space-y-2">
+            <label htmlFor="middleName" className="text-sm font-medium">Middle Name</label>
+            <Input id="middleName" value={formData.middleName} onChange={(e) => onUpdate('middleName', e.target.value)} />
+          </div>
+          <div className="md:col-span-4 space-y-2">
+            <label htmlFor="lastName" className="text-sm font-medium">Last Name <span className="text-destructive">*</span></label>
+            <Input id="lastName" value={formData.lastName} onChange={(e) => onUpdate('lastName', e.target.value)} required />
+          </div>
+          <div className="md:col-span-3 space-y-2">
+            <label htmlFor="suffix" className="text-sm font-medium">Suffix</label>
+            <Input id="suffix" value={formData.suffix} onChange={(e) => onUpdate('suffix', e.target.value)} placeholder="Jr., III, etc." />
+          </div>
+          <div className="md:col-span-5 space-y-2">
+            <label htmlFor="birthDate" className="text-sm font-medium">Birth Date <span className="text-destructive">*</span></label>
+            <Input id="birthDate" type="date" value={formData.birthDate} onChange={(e) => onUpdate('birthDate', e.target.value)} required />
+          </div>
+          <div className="md:col-span-4 space-y-2">
+            <label htmlFor="sex" className="text-sm font-medium">Sex <span className="text-destructive">*</span></label>
+            <Select value={formData.sex} onValueChange={(val) => onUpdate('sex', val)}>
+              <SelectTrigger id="sex"><SelectValue placeholder="Select sex" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-12 space-y-2">
+            <label htmlFor="address" className="text-sm font-medium">Residential Address <span className="text-destructive">*</span></label>
+            <Input id="address" value={formData.address} onChange={(e) => onUpdate('address', e.target.value)} required placeholder="Full residential address" />
+          </div>
+          <div className="md:col-span-6 space-y-2">
+            <label htmlFor="phone" className="text-sm font-medium">Phone Number</label>
+            <Input id="phone" type="tel" value={formData.phone} onChange={(e) => onUpdate('phone', e.target.value)} placeholder="+63 900 000 0000" />
+          </div>
+          <div className="md:col-span-6 space-y-2">
+            <label htmlFor="email" className="text-sm font-medium">Email Address</label>
+            <Input id="email" type="email" value={formData.email} onChange={(e) => onUpdate('email', e.target.value)} placeholder="student@example.com" />
+          </div>
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-4 space-y-2">
-          <Label htmlFor="firstName">First Name <span className="text-destructive">*</span></Label>
-          <Input id="firstName" value={formData.firstName} onChange={(e) => onUpdate('firstName', e.target.value)} required />
+
+      {/* Government ID */}
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">Government Identification</h3>
+          <p className="text-sm text-muted-foreground">For PSA/COMELEC verification purposes. Optional but recommended.</p>
         </div>
-        <div className="md:col-span-4 space-y-2">
-          <Label htmlFor="middleName">Middle Name</Label>
-          <Input id="middleName" value={formData.middleName} onChange={(e) => onUpdate('middleName', e.target.value)} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label htmlFor="govIdType" className="text-sm font-medium">ID Type</label>
+            <Select value={formData.govIdType ?? ''} onValueChange={(val) => onUpdate('govIdType', val)}>
+              <SelectTrigger id="govIdType"><SelectValue placeholder="Select ID type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PSA Birth Certificate">PSA Birth Certificate</SelectItem>
+                <SelectItem value="PhilSys ID">PhilSys ID (National ID)</SelectItem>
+                <SelectItem value="Passport">Passport</SelectItem>
+                <SelectItem value="UMID">UMID</SelectItem>
+                <SelectItem value="Driver's License">Driver's License</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="govIdNumber" className="text-sm font-medium">ID Number</label>
+            <Input id="govIdNumber" value={formData.govIdNumber ?? ''} onChange={(e) => onUpdate('govIdNumber', e.target.value)} placeholder="ID number" />
+          </div>
         </div>
-        <div className="md:col-span-4 space-y-2">
-          <Label htmlFor="lastName">Last Name <span className="text-destructive">*</span></Label>
-          <Input id="lastName" value={formData.lastName} onChange={(e) => onUpdate('lastName', e.target.value)} required />
+      </div>
+
+      {/* Health & Special Needs */}
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">Health & Special Needs</h3>
+          <p className="text-sm text-muted-foreground">Optional information to support the student's welfare.</p>
         </div>
-        <div className="md:col-span-3 space-y-2">
-          <Label htmlFor="suffix">Suffix</Label>
-          <Input id="suffix" value={formData.suffix} onChange={(e) => onUpdate('suffix', e.target.value)} placeholder="Jr., III" />
-        </div>
-        <div className="md:col-span-5 space-y-2">
-          <Label htmlFor="birthDate">Birth Date <span className="text-destructive">*</span></Label>
-          <Input id="birthDate" type="date" value={formData.birthDate} onChange={(e) => onUpdate('birthDate', e.target.value)} required />
-        </div>
-        <div className="md:col-span-4 space-y-2">
-          <Label htmlFor="sex">Sex <span className="text-destructive">*</span></Label>
-          <Select value={formData.sex} onValueChange={(val) => onUpdate('sex', val)}>
-            <SelectTrigger id="sex">
-              <SelectValue placeholder="Select sex" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="md:col-span-12 space-y-2">
-          <Label htmlFor="address">Address <span className="text-destructive">*</span></Label>
-          <Input id="address" value={formData.address} onChange={(e) => onUpdate('address', e.target.value)} required placeholder="Full residential address" />
-        </div>
-        <div className="md:col-span-6 space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
-          <Input id="phone" type="tel" value={formData.phone} onChange={(e) => onUpdate('phone', e.target.value)} placeholder="+63 900 000 0000" />
-        </div>
-        <div className="md:col-span-6 space-y-2">
-          <Label htmlFor="email">Email Address</Label>
-          <Input id="email" type="email" value={formData.email} onChange={(e) => onUpdate('email', e.target.value)} placeholder="student@example.com" />
+        <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-2">
+            <label htmlFor="healthFlags" className="text-sm font-medium">Health Flags / Conditions</label>
+            <Input id="healthFlags" value={formData.healthFlags ?? ''} onChange={(e) => onUpdate('healthFlags', e.target.value)} placeholder="e.g., Asthma, Diabetes, Allergy to penicillin" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="iepNotes" className="text-sm font-medium">IEP / Special Education Notes</label>
+            <Input id="iepNotes" value={formData.iepNotes ?? ''} onChange={(e) => onUpdate('iepNotes', e.target.value)} placeholder="e.g., Student has an IEP for dyslexia" />
+          </div>
         </div>
       </div>
     </div>

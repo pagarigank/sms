@@ -18,6 +18,25 @@ import { ApplicantStageConfig } from './applicant-stage-config.entity';
 import { ApplicantStageTransition } from './applicant-stage-transition.entity';
 import { Applicant } from './applicant.entity';
 import { SectionAssignmentRule } from './section-assignment-rule.entity';
+import { SchoolYear } from '../academic/school-year.entity';
+import { GradeLevel } from '../academic/grade-level.entity';
+import { Curriculum } from '../academic/curriculum.entity';
+import { StudentImmunization } from './student-immunization.entity';
+import { StudentMedication } from './student-medication.entity';
+import { StudentCarePlan } from './student-care-plan.entity';
+import { StudentAllergy } from './student-allergy.entity';
+import { StudentScreening } from './student-screening.entity';
+import { StudentIEP } from './student-iep.entity';
+import { Student504Plan } from './student-504-plan.entity';
+import { StudentEvaluation } from './student-evaluation.entity';
+import { StudentAccommodation } from './student-accommodation.entity';
+import { StudentDisciplineIncident } from './student-discipline-incident.entity';
+import { StudentIntervention } from './student-intervention.entity';
+import { StudentSELAssessment } from './student-sel-assessment.entity';
+import { StudentLearningProfile } from './student-learning-profile.entity';
+import { StudentGoal } from './student-goal.entity';
+import { StudentFamilyContext } from './student-family-context.entity';
+import { StudentCommunicationLog } from './student-communication-log.entity';
 import { SisService } from './sis.service';
 import { SisController } from './sis.controller';
 import { AdmissionsService } from './admissions.service';
@@ -50,6 +69,25 @@ import { ConfigEngineModule } from '../config/config.module';
       ApplicantStageTransition,
       Applicant,
       SectionAssignmentRule,
+      SchoolYear,
+      GradeLevel,
+      Curriculum,
+      StudentImmunization,
+      StudentMedication,
+      StudentCarePlan,
+      StudentAllergy,
+      StudentScreening,
+      StudentIEP,
+      Student504Plan,
+      StudentEvaluation,
+      StudentAccommodation,
+      StudentDisciplineIncident,
+      StudentIntervention,
+      StudentSELAssessment,
+      StudentLearningProfile,
+      StudentGoal,
+      StudentFamilyContext,
+      StudentCommunicationLog,
     ]),
   ],
   providers: [SisService, AdmissionsService],

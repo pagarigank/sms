@@ -51,13 +51,31 @@ export class SchedulingService {
     return isFaculty && !isAdmin;
   }
 
+  async getEmployeeIdForUser(userId: string): Promise<string | null> {
+    const res = await this.dataSource.query(
+      `SELECT "personId" FROM "user_person_links" WHERE "userId" = $1 AND "personType" = 'employee' LIMIT 1`,
+      [userId]
+    );
+    return res[0]?.personId || null;
+  }
+
   // === Class Offerings ===
   async findAllOfferings(tenantId: string, branchId?: string, schoolYearId?: string, termId?: string, facultyUserId?: string) {
     const where: any = { tenantId };
     if (branchId) where.branchId = branchId;
     if (schoolYearId) where.schoolYearId = schoolYearId;
     if (termId) where.termId = termId;
-    if (facultyUserId) where.facultyEmployeeId = facultyUserId;
+    
+    if (facultyUserId) {
+      const employeeId = await this.getEmployeeIdForUser(facultyUserId);
+      if (employeeId) {
+        where.facultyEmployeeId = employeeId;
+      } else {
+        // If the user is a faculty but has no linked employee profile, they should see no offerings
+        return [];
+      }
+    }
+    
     return this.offeringsRepo.find({ where, order: { createdAt: 'DESC' } });
   }
 

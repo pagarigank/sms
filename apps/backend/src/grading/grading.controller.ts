@@ -85,29 +85,30 @@ export class GradingController {
   // ============================
   @Get('class/:classOfferingId/gradebook')
   @RequirePermission('grading.gradebook', 'view')
-  getGradebook(@Headers() headers, @Param('classOfferingId') classOfferingId: string) {
-    return this.gradingService.getGradebook(this.getTenantId(headers), classOfferingId);
+  getGradebook(@Headers() headers, @Param('classOfferingId') classOfferingId: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.sub;
+    return this.gradingService.getGradebook(this.getTenantId(headers), classOfferingId, userId);
   }
 
   @Post('entries')
   @RequirePermission('grading.gradebook', 'edit')
   enterGrade(@Headers() headers, @Body() body, @Req() req: any) {
     // Ideally user ID comes from auth context, for now we mock or use body if available
-    const userId = req.user?.id || '00000000-0000-0000-0000-000000000000';
+    const userId = req.user?.id || req.user?.sub;
     return this.gradingService.enterGrade(this.getTenantId(headers), body, userId);
   }
 
   @Post('entries/:id/override')
   @RequirePermission('grading.gradebook', 'edit')
   overrideGrade(@Headers() headers, @Param('id') id: string, @Body() body, @Req() req: any) {
-    const userId = req.user?.id || '00000000-0000-0000-0000-000000000000';
+    const userId = req.user?.id || req.user?.sub;
     return this.gradingService.overrideGrade(this.getTenantId(headers), id, body, userId);
   }
 
   @Post('entries/bulk')
   @RequirePermission('grading.gradebook', 'edit')
   bulkEnterGrades(@Headers() headers, @Body() body, @Req() req: any) {
-    const userId = req.user?.id || '00000000-0000-0000-0000-000000000000';
+    const userId = req.user?.id || req.user?.sub;
     return this.gradingService.bulkEnterGrades(this.getTenantId(headers), body, userId);
   }
 

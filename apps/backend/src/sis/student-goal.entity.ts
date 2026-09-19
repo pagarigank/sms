@@ -1,14 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
-@Entity({ name: 'student_documents' })
-@Index('idx_student_documents_student', ['studentId'])
-@Index('idx_student_documents_tenant', ['tenantId'])
-export class StudentDocument {
+@Entity({ name: 'student_goals' })
+@Index('idx_student_goals_student', ['studentId'])
+export class StudentGoal {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-
-  @Column('uuid')
-  tenantId: string;
 
   @Column('uuid')
   studentId: string;
@@ -23,43 +19,47 @@ export class StudentDocument {
   category: string;
 
   @Column({ nullable: true })
-  documentType: string;
+  type: string;
 
   @Column({ nullable: true })
-  fileName: string;
-
-  @Column({ nullable: true })
-  filePath: string;
-
-  @Column({ nullable: true })
-  fileSize: number;
-
-  @Column({ nullable: true })
-  mimeType: string;
-
-  @Column({ nullable: true })
-  uploadedBy: string;
+  priority: string;
 
   @Column({ type: 'date', nullable: true })
-  documentDate: Date;
+  startDate: Date;
 
-  @Column({ nullable: true })
-  expiryDate: Date;
+  @Column({ type: 'date', nullable: true })
+  targetDate: Date;
+
+  @Column({ type: 'date', nullable: true })
+  completedDate: Date;
 
   @Column({ default: 'active' })
   status: string;
 
   @Column({ nullable: true })
-  accessLevel: string;
+  ownerId: string;
 
   @Column({ type: 'jsonb', default: () => "'[]'" })
-  tags: string[];
+  milestones: Array<{
+    description: string;
+    targetDate: string;
+    completed: boolean;
+    completedDate?: string;
+  }>;
 
-  @Column({ nullable: true })
-  linkedEntityType: string;
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  progressUpdates: Array<{
+    date: string;
+    progress: number;
+    notes?: string;
+    updatedBy?: string;
+  }>;
 
-  @Column({ nullable: true })
-  linkedEntityId: string;
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  linkedEntities: Array<{
+    entityType: string;
+    entityId: string;
+  }>;
 
   @Column({ type: 'jsonb', default: () => "'{}'" })
   customFields: Record<string, any>;

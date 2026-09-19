@@ -16,9 +16,43 @@ import { HealthRecord } from './health-record.entity';
 import { StudentMergeAudit } from './student-merge-audit.entity';
 import { EnrollmentSubject } from './enrollment-subject.entity';
 import { GradeLevel } from '../academic/grade-level.entity';
+import { SchoolYear } from '../academic/school-year.entity';
 import { InvoiceService } from '../billing/invoice.service';
 import { NumberingService } from '../config/numbering.service';
 import { Logger } from '@nestjs/common';
+
+// Health Module
+import { StudentImmunization } from './student-immunization.entity';
+import { StudentMedication } from './student-medication.entity';
+import { StudentCarePlan } from './student-care-plan.entity';
+import { StudentAllergy } from './student-allergy.entity';
+import { StudentScreening } from './student-screening.entity';
+
+// Special Education
+import { StudentIEP } from './student-iep.entity';
+import { Student504Plan } from './student-504-plan.entity';
+import { StudentEvaluation } from './student-evaluation.entity';
+import { StudentAccommodation } from './student-accommodation.entity';
+
+// MTSS/Behavioral
+import { StudentDisciplineIncident } from './student-discipline-incident.entity';
+import { StudentIntervention } from './student-intervention.entity';
+import { StudentSELAssessment } from './student-sel-assessment.entity';
+
+// Cognitive/Learning
+import { StudentLearningProfile } from './student-learning-profile.entity';
+
+// Goals
+import { StudentGoal } from './student-goal.entity';
+
+// Documents
+import { StudentDocument as ExtendedStudentDocument } from './student-document.entity';
+
+// Family/Cultural Context
+import { StudentFamilyContext } from './student-family-context.entity';
+
+// Communication
+import { StudentCommunicationLog } from './student-communication-log.entity';
 
 @Injectable()
 export class SisService {
@@ -32,15 +66,41 @@ export class SisService {
     @InjectRepository(StudentGuardian) private studentGuardiansRepo: Repository<StudentGuardian>,
     @InjectRepository(Enrollment) private enrollmentsRepo: Repository<Enrollment>,
     @InjectRepository(Section) private sectionsRepo: Repository<Section>,
+    @InjectRepository(SchoolYear) private schoolYearsRepo: Repository<SchoolYear>,
     @InjectRepository(StudentSectionAssignment) private assignmentsRepo: Repository<StudentSectionAssignment>,
     @InjectRepository(EnrollmentHold) private holdsRepo: Repository<EnrollmentHold>,
-    @InjectRepository(StudentDocument) private documentsRepo: Repository<StudentDocument>,
+    
     @InjectRepository(StudentTransfer) private transfersRepo: Repository<StudentTransfer>,
     @InjectRepository(PromotionDecision) private promotionsRepo: Repository<PromotionDecision>,
     @InjectRepository(BehaviorIncident) private incidentsRepo: Repository<BehaviorIncident>,
     @InjectRepository(HealthRecord) private healthRepo: Repository<HealthRecord>,
     @InjectRepository(StudentMergeAudit) private mergeAuditRepo: Repository<StudentMergeAudit>,
     @InjectRepository(EnrollmentSubject) private enrollmentSubjectsRepo: Repository<EnrollmentSubject>,
+    // Health Module
+    @InjectRepository(StudentImmunization) private immunizationsRepo: Repository<StudentImmunization>,
+    @InjectRepository(StudentMedication) private medicationsRepo: Repository<StudentMedication>,
+    @InjectRepository(StudentCarePlan) private carePlansRepo: Repository<StudentCarePlan>,
+    @InjectRepository(StudentAllergy) private allergiesRepo: Repository<StudentAllergy>,
+    @InjectRepository(StudentScreening) private screeningsRepo: Repository<StudentScreening>,
+    // Special Education
+    @InjectRepository(StudentIEP) private iepsRepo: Repository<StudentIEP>,
+    @InjectRepository(Student504Plan) private plans504Repo: Repository<Student504Plan>,
+    @InjectRepository(StudentEvaluation) private evaluationsRepo: Repository<StudentEvaluation>,
+    @InjectRepository(StudentAccommodation) private accommodationsRepo: Repository<StudentAccommodation>,
+    // MTSS/Behavioral
+    @InjectRepository(StudentDisciplineIncident) private disciplineIncidentsRepo: Repository<StudentDisciplineIncident>,
+    @InjectRepository(StudentIntervention) private interventionsRepo: Repository<StudentIntervention>,
+    @InjectRepository(StudentSELAssessment) private selAssessmentsRepo: Repository<StudentSELAssessment>,
+    // Cognitive/Learning
+    @InjectRepository(StudentLearningProfile) private learningProfilesRepo: Repository<StudentLearningProfile>,
+    // Goals
+    @InjectRepository(StudentGoal) private goalsRepo: Repository<StudentGoal>,
+    // Documents
+    @InjectRepository(ExtendedStudentDocument) private extendedDocumentsRepo: Repository<ExtendedStudentDocument>,
+    // Family/Cultural Context
+    @InjectRepository(StudentFamilyContext) private familyContextsRepo: Repository<StudentFamilyContext>,
+    // Communication
+    @InjectRepository(StudentCommunicationLog) private communicationLogsRepo: Repository<StudentCommunicationLog>,
     private dataSource: DataSource,
   ) {}
 
@@ -128,25 +188,150 @@ export class SisService {
 
   async getStudent360(id: string, tenantId: string) {
     const student = await this.findStudentById(id, tenantId);
-    const guardians = await this.studentGuardiansRepo.find({ where: { studentId: id } });
-    const enrollments = await this.enrollmentsRepo.find({ where: { studentId: id }, order: { enrolledAt: 'DESC' } });
-    const documents = await this.documentsRepo.find({ where: { studentId: id }, order: { createdAt: 'DESC' } });
-    const holds = await this.holdsRepo.find({ where: { studentId: id, isActive: true } });
-    const incidents = await this.incidentsRepo.find({ where: { studentId: id }, order: { incidentDate: 'DESC' } });
-    const healthRecords = await this.healthRepo.find({ where: { studentId: id }, order: { recordDate: 'DESC' } });
-    const transfers = await this.transfersRepo.find({ where: { studentId: id }, order: { createdAt: 'DESC' } });
-    const promotions = await this.promotionsRepo.find({ where: { studentId: id }, order: { decidedAt: 'DESC' } });
-
-    return {
-      student,
+    
+    // Fetch all related data in parallel
+    const [
       guardians,
       enrollments,
-      documents,
       holds,
       incidents,
       healthRecords,
       transfers,
       promotions,
+      // Health Module
+      immunizations,
+      medications,
+      carePlans,
+      allergies,
+      screenings,
+      // Special Education
+      ieps,
+      plans504,
+      evaluations,
+      accommodations,
+      // MTSS/Behavioral
+      disciplineIncidents,
+      interventions,
+      selAssessments,
+      // Cognitive/Learning
+      learningProfiles,
+      // Goals
+      goals,
+      // Extended Documents
+      extendedDocuments,
+      // Family/Cultural Context
+      familyContexts,
+      // Communication
+      communicationLogs,
+    ] = await Promise.all([
+      this.studentGuardiansRepo.find({ where: { studentId: id } }),
+      this.enrollmentsRepo.find({ where: { studentId: id }, order: { enrolledAt: 'DESC' } }),
+      this.holdsRepo.find({ where: { studentId: id, isActive: true } }),
+      this.incidentsRepo.find({ where: { studentId: id }, order: { incidentDate: 'DESC' } }),
+      this.healthRepo.find({ where: { studentId: id }, order: { recordDate: 'DESC' } }),
+      this.transfersRepo.find({ where: { studentId: id }, order: { createdAt: 'DESC' } }),
+      this.promotionsRepo.find({ where: { studentId: id }, order: { decidedAt: 'DESC' } }),
+      // Health Module
+      this.immunizationsRepo.find({ where: { studentId: id } }),
+      this.medicationsRepo.find({ where: { studentId: id } }),
+      this.carePlansRepo.find({ where: { studentId: id } }),
+      this.allergiesRepo.find({ where: { studentId: id } }),
+      this.screeningsRepo.find({ where: { studentId: id } }),
+      // Special Education
+      this.iepsRepo.find({ where: { studentId: id } }),
+      this.plans504Repo.find({ where: { studentId: id } }),
+      this.evaluationsRepo.find({ where: { studentId: id } }),
+      this.accommodationsRepo.find({ where: { studentId: id } }),
+      // MTSS/Behavioral
+      this.disciplineIncidentsRepo.find({ where: { studentId: id }, order: { incidentDate: 'DESC' } }),
+      this.interventionsRepo.find({ where: { studentId: id } }),
+      this.selAssessmentsRepo.find({ where: { studentId: id } }),
+      // Cognitive/Learning
+      this.learningProfilesRepo.find({ where: { studentId: id } }),
+      // Goals
+      this.goalsRepo.find({ where: { studentId: id } }),
+      // Extended Documents
+      this.extendedDocumentsRepo.find({ where: { studentId: id }, order: { createdAt: 'DESC' } }),
+      // Family/Cultural Context
+      this.familyContextsRepo.find({ where: { studentId: id } }),
+      // Communication
+      this.communicationLogsRepo.find({ where: { studentId: id }, order: { communicationDate: 'DESC' } }),
+    ]);
+
+    // Fetch related entities for human-readable names
+    const guardianIds = guardians.map(g => g.guardianId);
+    const guardianMap = new Map<string, { firstName: string; middleName: string; lastName: string; suffix?: string }>();
+    if (guardianIds.length > 0) {
+      const guardianEntities = await this.guardiansRepo.find({ where: { id: In(guardianIds) } });
+      for (const g of guardianEntities) {
+        guardianMap.set(g.id, { firstName: g.firstName, middleName: g.middleName, lastName: g.lastName, suffix: g.suffix });
+      }
+    }
+
+    const schoolYearIds = [...new Set(enrollments.map(e => e.schoolYearId).filter(Boolean))];
+    const schoolYearMap = new Map<string, string>();
+    if (schoolYearIds.length > 0) {
+      const syEntities = await this.schoolYearsRepo.find({ where: { id: In(schoolYearIds) } });
+      for (const sy of syEntities) schoolYearMap.set(sy.id, sy.name);
+    }
+
+    const sectionIds = [...new Set(enrollments.map(e => e.sectionId).filter(Boolean))];
+    const sectionMap = new Map<string, string>();
+    if (sectionIds.length > 0) {
+      const secEntities = await this.sectionsRepo.find({ where: { id: In(sectionIds) } });
+      for (const s of secEntities) sectionMap.set(s.id, s.name);
+    }
+
+    // Enrich guardians with names
+    const enrichedGuardians = guardians.map(g => ({
+      ...g,
+      guardianName: guardianMap.has(g.guardianId)
+        ? [guardianMap.get(g.guardianId)!.firstName, guardianMap.get(g.guardianId)!.middleName, guardianMap.get(g.guardianId)!.lastName, guardianMap.get(g.guardianId)!.suffix].filter(Boolean).join(' ')
+        : g.guardianId,
+    }));
+
+    // Enrich enrollments with names
+    const enrichedEnrollments = enrollments.map(e => ({
+      ...e,
+      schoolYearName: schoolYearMap.get(e.schoolYearId) || e.schoolYearId,
+      sectionName: sectionMap.get(e.sectionId) || e.sectionId || '—',
+    }));
+
+    return {
+      student,
+      // Core
+      guardians: enrichedGuardians,
+      enrollments: enrichedEnrollments,
+      holds,
+      incidents,
+      healthRecords,
+      transfers,
+      promotions,
+      // Extended Documents
+      extendedDocuments,
+      // Health Module
+      immunizations,
+      medications,
+      carePlans,
+      allergies,
+      screenings,
+      // Special Education
+      ieps,
+      plans504,
+      evaluations,
+      accommodations,
+      // MTSS/Behavioral
+      disciplineIncidents,
+      interventions,
+      selAssessments,
+      // Cognitive/Learning
+      learningProfiles,
+      // Goals
+      goals,
+      // Family/Cultural Context
+      familyContexts,
+      // Communication
+      communicationLogs,
     };
   }
 
@@ -422,14 +607,14 @@ export class SisService {
     return this.holdsRepo.save(hold);
   }
 
-  // === Documents ===
+  // === Extended Documents ===
   async getStudentDocuments(studentId: string, tenantId: string) {
-    return this.documentsRepo.find({ where: { studentId, tenantId }, order: { createdAt: 'DESC' } });
+    return this.extendedDocumentsRepo.find({ where: { studentId, tenantId }, order: { createdAt: 'DESC' } });
   }
 
-  async createDocument(data: Partial<StudentDocument>) {
-    const doc = this.documentsRepo.create(data);
-    return this.documentsRepo.save(doc);
+  async createDocument(data: Partial<ExtendedStudentDocument>) {
+    const doc = this.extendedDocumentsRepo.create(data);
+    return this.extendedDocumentsRepo.save(doc);
   }
 
   // === Transfers ===

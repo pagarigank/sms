@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, DataSource } from 'typeorm';
 import { GradingSystem } from './entities/grading-system.entity';
 import { GradeComponent } from './entities/grade-component.entity';
 import { GradeEntry } from './entities/grade-entry.entity';
@@ -127,6 +127,7 @@ export class GradingService {
     private readonly ssaRepo: Repository<StudentSectionAssignment>,
     @InjectRepository(AuditEvent)
     private readonly auditRepo: Repository<AuditEvent>,
+    private readonly dataSource: DataSource,
   ) {}
 
   // ============================
@@ -314,7 +315,41 @@ export class GradingService {
   // Gradebook Entries
   // ============================
 
-  async getGradebook(tenantId: string, classOfferingId: string) {
+  async verifyFacultyAccess(userId: string, offeringId: string): Promise<void> {
+    if (!userId || userId === '00000000-0000-0000-0000-000000000000') return;
+
+    // Check if user is faculty only
+    const roles = await this.dataSource.query(
+      `SELECT r.name FROM "roles" r JOIN "user_roles" ur ON r.id = ur."roleId" WHERE ur."userId" = $1`,
+      [userId]
+    );
+    const roleNames = roles.map((r: any) => r.name.toLowerCase());
+    const isFaculty = roleNames.includes('faculty') || roleNames.includes('teacher');
+    const isAdmin = roleNames.includes('tenant admin') || roleNames.includes('platform admin') || roleNames.includes('registrar') || roleNames.includes('principal');
+    
+    if (isFaculty && !isAdmin) {
+      // Find employee ID for this user
+      const empRes = await this.dataSource.query(
+        `SELECT "personId" FROM "user_person_links" WHERE "userId" = $1 AND "personType" = 'employee' LIMIT 1`,
+        [userId]
+      );
+      const employeeId = empRes[0]?.personId;
+      if (!employeeId) {
+        throw new ForbiddenException('Faculty user has no linked employee profile');
+      }
+
+      // Check if offering is assigned to this employee
+      const offering = await this.classOfferingRepo.findOne({ where: { id: offeringId } });
+      if (!offering || offering.facultyEmployeeId !== employeeId) {
+        throw new ForbiddenException('You are not assigned to grade this class');
+      }
+    }
+  }
+
+  async getGradebook(tenantId: string, classOfferingId: string, userId?: string) {
+    if (userId) {
+      await this.verifyFacultyAccess(userId, classOfferingId);
+    }
     const offering = await this.classOfferingRepo.findOne({ where: { tenantId, id: classOfferingId } });
     if (!offering) return [];
 
@@ -345,6 +380,11 @@ export class GradingService {
 
   async enterGrade(tenantId: string, data: any, userId: string) {
     const { rawScore, maxScore, percentage: clientPct, transmutedGrade: clientTrans, descriptiveGrade, gradingMode, gradingSystemId, studentId, classOfferingId, termId, gradeComponentId } = data;
+    
+    if (userId) {
+      await this.verifyFacultyAccess(userId, classOfferingId);
+    }
+    
     const score = rawScore !== undefined ? rawScore : data.score;
 
     // === Descriptive KS1 path — no numeric computation ===
@@ -421,6 +461,10 @@ export class GradingService {
       const entry = await entryRepo.findOne({ where: { id, tenantId } });
       if (!entry) throw new NotFoundException('Grade entry not found');
       if (entry.locked) throw new BadRequestException('Grades are locked for this term — unlock before overriding');
+      
+      if (userId) {
+        await this.verifyFacultyAccess(userId, entry.classOfferingId);
+      }
 
       const before = {
         score: entry.score,

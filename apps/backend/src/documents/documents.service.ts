@@ -12,9 +12,20 @@ import { SchoolYear } from '../academic/school-year.entity';
 import { GradeLevel } from '../academic/grade-level.entity';
 import { EducationLevel } from '../education-levels/education-level.entity';
 import { Subject } from '../academic/subject.entity';
+import { Term } from '../academic/term.entity';
 import { ClassOffering } from '../scheduling/class-offering.entity';
 import { GradeEntry } from '../grading/entities/grade-entry.entity';
 import * as crypto from 'crypto';
+
+export interface ScholasticRecordGroup {
+  schoolYearId: string;
+  termId: string;
+  schoolYear: string;
+  term: string;
+  gradeLevel: string;
+  subjects: Array<{ code: string; title: string; finalRating: number | null }>;
+  generalAverage?: number | null;
+}
 
 @Injectable()
 export class DocumentsService {
@@ -200,7 +211,7 @@ export class DocumentsService {
 
     let fileUrl: string;
     if (template.documentType === 'form_137' || template.documentType === 'tor') {
-      const subjects = await this.collectSubjectRatings(data.tenantId, data.studentId);
+      const records = await this.collectScholasticRecords(data.tenantId, data.studentId);
       fileUrl = await this.pdf.renderRecordPdf({
         header: template.content?.header ?? template.name,
         student: {
@@ -209,10 +220,7 @@ export class DocumentsService {
           schoolYear: ctx.schoolYear,
           gradeLevel: ctx.gradeLevel,
         },
-        subjects,
-        generalAverage: subjects.length
-          ? subjects.reduce((s, r) => s + (r.finalRating ?? 0), 0) / subjects.length
-          : null,
+        records,
         footerLines: [
           `Issued ${date} • Verify at /documents/verify`,
           'This document is invalid if the verification code does not match.',
@@ -288,11 +296,11 @@ export class DocumentsService {
     return { student, gradeLevel, schoolYear };
   }
 
-  /** Per-subject finalized rating (mean of transmuted grades). */
-  private async collectSubjectRatings(
+  /** Groups scholastic records chronologically by School Year and Term. */
+  private async collectScholasticRecords(
     tenantId: string,
     studentId: string,
-  ): Promise<Array<{ code: string; title: string; finalRating: number | null }>> {
+  ): Promise<ScholasticRecordGroup[]> {
     const m = this.templatesRepo.manager;
 
     const entries = await m.getRepository(GradeEntry).find({
@@ -304,39 +312,137 @@ export class DocumentsService {
     const offerings = await m.getRepository(ClassOffering).find({
       where: { id: In(offeringIds), tenantId },
     });
+    const offeringById = new Map(offerings.map((o) => [o.id, o]));
+
     const subjectIds = [...new Set(offerings.map((o) => o.subjectId))];
     const subjects = subjectIds.length
       ? await m.getRepository(Subject).find({ where: { id: In(subjectIds) } })
       : [];
-
-    const offeringById = new Map(offerings.map((o) => [o.id, o]));
     const subjectById = new Map(subjects.map((s) => [s.id, s]));
 
-    // offering → subject → collected transmuted grades
-    const byOffering = new Map<string, number[]>();
+    const schoolYearIds = [...new Set(offerings.map((o) => o.schoolYearId))];
+    const schoolYears = schoolYearIds.length
+      ? await m.getRepository(SchoolYear).find({ where: { id: In(schoolYearIds) } })
+      : [];
+    const schoolYearById = new Map(schoolYears.map((sy) => [sy.id, sy]));
+
+    const termIds = [...new Set(offerings.map((o) => o.termId))];
+    const terms = termIds.length
+      ? await m.getRepository(Term).find({ where: { id: In(termIds) } })
+      : [];
+    const termById = new Map(terms.map((t) => [t.id, t]));
+
+    // Fetch enrollments to determine grade level per school year
+    const enrollments = await m.getRepository(Enrollment).find({
+      where: { studentId, tenantId, schoolYearId: In(schoolYearIds) },
+      order: { enrolledAt: 'ASC' },
+    });
+    
+    // We also need GradeLevel and EducationLevel to resolve names
+    const gradeLevelIds = [...new Set(enrollments.map(e => e.gradeLevelId).filter(Boolean) as string[])];
+    const gradeLevels = gradeLevelIds.length 
+      ? await m.getRepository(GradeLevel).find({ where: { id: In(gradeLevelIds) } })
+      : [];
+    const gradeLevelById = new Map(gradeLevels.map(gl => [gl.id, gl]));
+    
+    const edLevelIds = gradeLevelIds; // some enrollments store ed level id in gradeLevelId
+    const edLevels = edLevelIds.length
+      ? await m.getRepository(EducationLevel).find({ where: { id: In(edLevelIds) } })
+      : [];
+    const edLevelById = new Map(edLevels.map(el => [el.id, el]));
+
+    const gradeLevelBySyId = new Map<string, string>();
+    for (const enr of enrollments) {
+      if (enr.gradeLevelId) {
+        const name = gradeLevelById.get(enr.gradeLevelId)?.name ?? edLevelById.get(enr.gradeLevelId)?.name ?? 'Unknown Grade';
+        gradeLevelBySyId.set(enr.schoolYearId, name);
+      }
+    }
+
+    // Grouping structure: Map<syId, Map<termId, Map<subjectId, number[]>>>
+    const groups = new Map<string, Map<string, Map<string, number[]>>>();
+
     for (const e of entries) {
       if (e.transmutedGrade == null) continue;
-      const list = byOffering.get(e.classOfferingId) ?? [];
-      list.push(Number(e.transmutedGrade));
-      byOffering.set(e.classOfferingId, list);
+      const offering = offeringById.get(e.classOfferingId);
+      if (!offering) continue;
+
+      let termMap = groups.get(offering.schoolYearId);
+      if (!termMap) {
+        termMap = new Map();
+        groups.set(offering.schoolYearId, termMap);
+      }
+
+      let subMap = termMap.get(offering.termId);
+      if (!subMap) {
+        subMap = new Map();
+        termMap.set(offering.termId, subMap);
+      }
+
+      const grades = subMap.get(offering.subjectId) ?? [];
+      grades.push(Number(e.transmutedGrade));
+      subMap.set(offering.subjectId, grades);
     }
 
-    const bySubject = new Map<string, number[]>();
-    for (const [offeringId, grades] of byOffering) {
-      const subjectId = offeringById.get(offeringId)?.subjectId;
-      if (!subjectId) continue;
-      const list = bySubject.get(subjectId) ?? [];
-      list.push(...grades);
-      bySubject.set(subjectId, list);
+    const results: ScholasticRecordGroup[] = [];
+
+    // To sort properly, we should sort by School Year startDate, then Term sequence or startDate
+    for (const [syId, termMap] of groups.entries()) {
+      for (const [termId, subMap] of termMap.entries()) {
+        const sy = schoolYearById.get(syId);
+        const term = termById.get(termId);
+        
+        const syName = sy?.name ?? 'Unknown SY';
+        const termName = term?.name ?? 'Unknown Term';
+        const glName = gradeLevelBySyId.get(syId) ?? 'Unknown Grade';
+
+        const recordSubjects = [];
+        for (const [subId, grades] of subMap.entries()) {
+            const subject = subjectById.get(subId);
+            recordSubjects.push({
+                code: subject?.code ?? '—',
+                title: subject?.title ?? 'Unknown subject',
+                finalRating: grades.length ? grades.reduce((a,b)=>a+b,0)/grades.length : null
+            });
+        }
+        
+        // sort subjects by title
+        recordSubjects.sort((a,b) => a.title.localeCompare(b.title));
+
+        const avg = recordSubjects.length ? recordSubjects.reduce((a,b) => a + (b.finalRating ?? 0), 0) / recordSubjects.length : null;
+
+        results.push({
+            schoolYearId: syId,
+            termId,
+            schoolYear: syName,
+            term: termName,
+            gradeLevel: glName,
+            subjects: recordSubjects,
+            generalAverage: avg
+        });
+      }
     }
 
-    return [...bySubject.entries()].map(([subjectId, grades]) => ({
-      code: subjectById.get(subjectId)?.code ?? '—',
-      title: subjectById.get(subjectId)?.title ?? 'Unknown subject',
-      finalRating: grades.length
-        ? grades.reduce((a, b) => a + b, 0) / grades.length
-        : null,
-    }));
+    // Sort the results chronologically
+    results.sort((a, b) => {
+        const syA = schoolYearById.get(a.schoolYearId);
+        const syB = schoolYearById.get(b.schoolYearId);
+        
+        const dateA = syA?.startDate ? new Date(syA.startDate).getTime() : 0;
+        const dateB = syB?.startDate ? new Date(syB.startDate).getTime() : 0;
+        
+        if (dateA !== dateB) return dateA - dateB;
+
+        const termA = termById.get(a.termId);
+        const termB = termById.get(b.termId);
+        
+        const seqA = termA?.sequence ?? 0;
+        const seqB = termB?.sequence ?? 0;
+
+        return seqA - seqB;
+    });
+
+    return results;
   }
 
   /** Fallback certificate wording when the template carries no custom body. */

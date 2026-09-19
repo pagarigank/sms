@@ -23,6 +23,7 @@ const INITIAL_FORM: EducationFormData = {
   birthDate: '', sex: '', address: '', phone: '', email: '',
   priorSchool: '', lrn: '', educationLevelId: '', gradeLevelId: '',
   guardianFirstName: '', guardianLastName: '', guardianPhone: '', guardianEmail: '', guardianRelationship: '',
+  govIdType: '', govIdNumber: '', healthFlags: '', iepNotes: '',
 };
 
 export default function ApplicationFormPage() {

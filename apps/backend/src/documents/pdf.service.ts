@@ -115,8 +115,13 @@ export class PdfService {
     header: string;
     subheaderLines?: string[];
     student: { name: string; lrn?: string | null; schoolYear?: string | null; gradeLevel?: string | null };
-    subjects: Array<{ code: string; title: string; finalRating: number | null }>;
-    generalAverage?: number | null;
+    records: Array<{
+      schoolYear: string;
+      term: string;
+      gradeLevel: string;
+      subjects: Array<{ code: string; title: string; finalRating: number | null }>;
+      generalAverage?: number | null;
+    }>;
     footerLines?: string[];
     tenantName: string;
     verificationCode: string;
@@ -124,28 +129,35 @@ export class PdfService {
     branding?: PdfBranding;
   }): Promise<string> {
     const pdf = await PDFDocument.create();
-    const page = pdf.addPage([595.28, 841.89]);
     const font = await pdf.embedFont(StandardFonts.Helvetica);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const ink = rgb(0.1, 0.1, 0.12);
-    const W = page.getWidth();
     const M = 56;
 
-    const y = await this.drawBrandedHeader(pdf, page, { font, bold }, {
-      header: input.header,
-      subheaderLines: input.subheaderLines,
-      tenantName: input.tenantName,
-      branding: input.branding,
-    });
+    const createNewPage = async () => {
+      const page = pdf.addPage([595.28, 841.89]);
+      const W = page.getWidth();
+      const y = await this.drawBrandedHeader(pdf, page, { font, bold }, {
+        header: input.header,
+        subheaderLines: input.subheaderLines,
+        tenantName: input.tenantName,
+        branding: input.branding,
+      });
+      await this.drawVerificationFooter(pdf, page, { font, bold }, {
+        footerLines: input.footerLines,
+        footerText: input.branding?.footerText,
+        verificationCode: input.verificationCode,
+        qrPayload: input.qrPayload,
+      });
+      return { page, cursor: y - 10, W, limit: 120 };
+    };
 
-    let cursor = y - 10;
+    let { page, cursor, W, limit } = await createNewPage();
 
     // Identity block
     const id = [
       `Learner: ${input.student.name}`,
       input.student.lrn ? `LRN: ${input.student.lrn}` : null,
-      input.student.gradeLevel ? `Grade level: ${input.student.gradeLevel}` : null,
-      input.student.schoolYear ? `School year: ${input.student.schoolYear}` : null,
     ].filter(Boolean) as string[];
     for (const line of id) {
       page.drawText(this.sanitize(line), { x: M, y: cursor, size: 10.5, font, color: ink });
@@ -153,41 +165,60 @@ export class PdfService {
     }
     cursor -= 10;
 
-    // Grades table
     const colX = { code: M, title: M + 70, rating: W - M - 60 };
-    page.drawText('CODE', { x: colX.code, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
-    page.drawText('SUBJECT', { x: colX.title, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
-    page.drawText('FINAL', { x: colX.rating, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
-    cursor -= 6;
-    page.drawLine({ start: { x: M, y: cursor }, end: { x: W - M, y: cursor }, thickness: 0.8, color: rgb(0.78, 0.78, 0.82) });
-    cursor -= 16;
 
-    for (const s of input.subjects) {
-      page.drawText(this.sanitize(s.code), { x: colX.code, y: cursor, size: 10, font, color: ink });
-      page.drawText(this.sanitize(s.title).slice(0, 60), { x: colX.title, y: cursor, size: 10, font, color: ink });
-      page.drawText(s.finalRating != null ? s.finalRating.toFixed(0) : '—', {
-        x: colX.rating, y: cursor, size: 10, font, color: ink,
-      });
+    for (const record of input.records) {
+      if (cursor < limit + 50) {
+        ({ page, cursor, W, limit } = await createNewPage());
+      }
+
+      page.drawText(`${record.schoolYear} • ${record.term} • ${record.gradeLevel}`, { x: M, y: cursor, size: 10, font: bold, color: rgb(0.2, 0.2, 0.25) });
       cursor -= 15;
-    }
 
-    if (input.generalAverage != null) {
+      page.drawText('CODE', { x: colX.code, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
+      page.drawText('SUBJECT', { x: colX.title, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
+      page.drawText('FINAL', { x: colX.rating, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
       cursor -= 6;
-      page.drawLine({ start: { x: M, y: cursor }, end: { x: W - M, y: cursor }, thickness: 0.5, color: rgb(0.85, 0.85, 0.88) });
-      cursor -= 18;
-      page.drawText(this.sanitize(`General average: ${input.generalAverage.toFixed(2)}`), {
-        x: M, y: cursor, size: 11.5, font: bold, color: ink,
-      });
+      page.drawLine({ start: { x: M, y: cursor }, end: { x: W - M, y: cursor }, thickness: 0.8, color: rgb(0.78, 0.78, 0.82) });
+      cursor -= 16;
+
+      for (const s of record.subjects) {
+        if (cursor < limit + 15) {
+          ({ page, cursor, W, limit } = await createNewPage());
+          page.drawText('CODE', { x: colX.code, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
+          page.drawText('SUBJECT', { x: colX.title, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
+          page.drawText('FINAL', { x: colX.rating, y: cursor, size: 9, font: bold, color: rgb(0.35, 0.35, 0.4) });
+          cursor -= 6;
+          page.drawLine({ start: { x: M, y: cursor }, end: { x: W - M, y: cursor }, thickness: 0.8, color: rgb(0.78, 0.78, 0.82) });
+          cursor -= 16;
+        }
+
+        page.drawText(this.sanitize(s.code), { x: colX.code, y: cursor, size: 10, font, color: ink });
+        page.drawText(this.sanitize(s.title).slice(0, 50), { x: colX.title, y: cursor, size: 10, font, color: ink });
+        page.drawText(s.finalRating != null ? s.finalRating.toFixed(0) : '—', {
+          x: colX.rating, y: cursor, size: 10, font, color: ink,
+        });
+        cursor -= 15;
+      }
+
+      if (record.generalAverage != null) {
+        if (cursor < limit + 25) {
+          ({ page, cursor, W, limit } = await createNewPage());
+        }
+        cursor -= 6;
+        page.drawLine({ start: { x: M, y: cursor }, end: { x: W - M, y: cursor }, thickness: 0.5, color: rgb(0.85, 0.85, 0.88) });
+        cursor -= 18;
+        page.drawText(this.sanitize(`Term Average: ${record.generalAverage.toFixed(2)}`), {
+          x: M, y: cursor, size: 10.5, font: bold, color: ink,
+        });
+      }
+      
+      cursor -= 20;
     }
 
-    // Awaited: the QR embed is async, and pdf.save() below must serialize the
-    // document only after the footer (QR included) has been drawn.
-    await this.drawVerificationFooter(pdf, page, { font, bold }, {
-      footerLines: input.footerLines,
-      footerText: input.branding?.footerText,
-      verificationCode: input.verificationCode,
-      qrPayload: input.qrPayload,
-    });
+    if (input.records.length === 0) {
+      page.drawText('No scholastic records found.', { x: M, y: cursor, size: 10, font, color: ink });
+    }
 
     const bytes = await pdf.save();
     const relPath = this.newRelPath();
