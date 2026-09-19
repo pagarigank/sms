@@ -121,7 +121,7 @@ export const academicEndpoints = (client: ApiClient) => ({
   listSubjects: (params?: { limit?: number; search?: string; isCore?: boolean }) =>
     client.get<Subject[]>('/api/v1/academic/subjects', params as Record<string, string>),
 
-  createSubject: (data: { code: string; title: string; units: number; isCore?: boolean; isElective?: boolean; learningArea?: string; hoursPerWeek?: number }) =>
+  createSubject: (data: { code: string; title: string; units: number; isCore?: boolean; isElective?: boolean; learningArea?: string; hoursPerWeek?: number; pricePerUnit?: number; feeTypeId?: string | null }) =>
     client.post<Subject>('/api/v1/academic/subjects', data),
 
   updateSubject: (id: string, data: Partial<Subject>) =>

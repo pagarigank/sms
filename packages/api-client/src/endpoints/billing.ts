@@ -29,7 +29,7 @@ export function billingEndpoints(client: ApiClient) {
     getFeeStructureItems: (feeStructureId: string) =>
       client.get(`/api/v1/billing/fee-structures/${feeStructureId}/items`),
 
-    addFeeStructureItem: (feeStructureId: string, data: any) =>
+    addFeeStructureItem: (feeStructureId: string, data: { feeTypeId: string; amount: number; description?: string; isPerUnit?: boolean; tenantId: string }) =>
       client.post(`/api/v1/billing/fee-structures/${feeStructureId}/items`, data),
 
     updateFeeStructureItem: (id: string, data: any) =>

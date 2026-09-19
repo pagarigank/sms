@@ -230,6 +230,8 @@ export interface Subject {
   isCore: boolean;
   isElective: boolean;
   learningArea?: string;
+  pricePerUnit?: number;
+  feeTypeId?: string;
   createdAt: string;
 }
 

@@ -51,6 +51,7 @@ interface FeeStructureItem {
   amount: string;
   description?: string;
   isRequired: boolean;
+  isPerUnit: boolean;
   sortOrder: number;
 }
 
@@ -68,7 +69,7 @@ export default function FeeStructuresPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: '', schoolYearId: '' });
-  const [newItem, setNewItem] = useState({ feeTypeId: '', amount: '', description: '' });
+  const [newItem, setNewItem] = useState({ feeTypeId: '', amount: '', description: '', isPerUnit: false });
 
   const { data: structures, isLoading, error } = useQuery({
     queryKey: ['fee-structures', currentTenantId, currentBranchId],
@@ -134,7 +135,7 @@ export default function FeeStructuresPage() {
     mutationFn: (data: { name: string; schoolYearId: string }) =>
       apiClient.billing.createFeeStructure({
         ...data,
-        tenantId: currentTenantId,
+        tenantId: currentTenantId ?? '',
         branchId: currentBranchId ?? undefined,
         templateKey: crypto.randomUUID(),
         status: 'active',
@@ -149,15 +150,15 @@ export default function FeeStructuresPage() {
   });
 
   const addItemMutation = useMutation({
-    mutationFn: (data: { feeTypeId: string; amount: string; description: string }) =>
+    mutationFn: (data: { feeTypeId: string; amount: string; description: string; isPerUnit: boolean }) =>
       apiClient.billing.addFeeStructureItem(selectedId!, {
         ...data,
         amount: parseFloat(data.amount) || 0,
-        tenantId: currentTenantId,
+        tenantId: currentTenantId!,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fee-structure-items'] });
-      setNewItem({ feeTypeId: '', amount: '', description: '' });
+      setNewItem({ feeTypeId: '', amount: '', description: '', isPerUnit: false });
       toast({ title: 'Fee item added' });
     },
     onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
@@ -216,6 +217,7 @@ export default function FeeStructuresPage() {
                       <th className="pb-3 font-medium">Fee Type</th>
                       <th className="pb-3 font-medium">Description</th>
                       <th className="pb-3 font-medium">Amount</th>
+                      <th className="pb-3 font-medium">Pricing Type</th>
                       <th className="pb-3 font-medium">Required</th>
                       <th className="pb-3 font-medium"></th>
                     </tr>
@@ -228,6 +230,17 @@ export default function FeeStructuresPage() {
                           <td className="py-3 font-medium">{nameOf(feeTypes, item.feeTypeId, item.feeTypeId.slice(0, 8))}</td>
                           <td className="py-3 text-muted-foreground">{item.description || '—'}</td>
                           <td className="py-3">₱{Number(item.amount).toLocaleString()}</td>
+                          <td className="py-3">
+                            {item.isPerUnit ? (
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                Per Unit
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+                                Fixed
+                              </span>
+                            )}
+                          </td>
                           <td className="py-3">{item.isRequired ? 'Yes' : 'Optional'}</td>
                           <td className="py-3 text-right">
                             <Button
@@ -286,6 +299,18 @@ export default function FeeStructuresPage() {
                     onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                     placeholder="Optional note"
                   />
+                </div>
+                <div className="flex items-center pt-6 px-4">
+                  <input
+                    type="checkbox"
+                    id="isPerUnit"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    checked={newItem.isPerUnit}
+                    onChange={(e) => setNewItem({ ...newItem, isPerUnit: e.target.checked })}
+                  />
+                  <Label htmlFor="isPerUnit" className="ml-2 whitespace-nowrap">
+                    Per Unit
+                  </Label>
                 </div>
                 <div className="flex items-end">
                   <Button

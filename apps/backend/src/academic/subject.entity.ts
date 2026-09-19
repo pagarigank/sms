@@ -44,6 +44,12 @@ export class Subject {
   @Column({ nullable: true })
   versionLabel: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  pricePerUnit: number;
+
+  @Column({ nullable: true, type: 'uuid' })
+  feeTypeId: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }

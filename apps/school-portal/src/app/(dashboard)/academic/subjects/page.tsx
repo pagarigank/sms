@@ -41,6 +41,8 @@ interface Subject {
   isCore: boolean;
   isElective: boolean;
   learningArea?: string;
+  pricePerUnit?: number;
+  feeTypeId?: string;
   tenantId: string;
   createdAt: string;
 }
@@ -62,7 +64,15 @@ export default function SubjectsPage() {
     isCore: true,
     isElective: false,
     learningArea: '',
+    pricePerUnit: 0,
+    feeTypeId: 'none',
   });
+
+  const { data: feeTypesRes } = useQuery({
+    queryKey: ['fee-types'],
+    queryFn: () => apiClient.billing.listFeeTypes({ limit: 100 }),
+  });
+  const feeTypes = feeTypesRes?.data ?? [];
 
   const { data: subjectsRes, isLoading } = useQuery({
     queryKey: ['subjects', searchQuery, typeFilter],
@@ -80,11 +90,13 @@ export default function SubjectsPage() {
       ...data,
       units: data.units,
       hoursPerWeek: data.hoursPerWeek || undefined,
+      pricePerUnit: data.pricePerUnit || undefined,
+      feeTypeId: data.feeTypeId !== 'none' ? data.feeTypeId : null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
       setShowCreate(false);
-      setForm({ code: '', title: '', units: 0, hoursPerWeek: 0, isCore: true, isElective: false, learningArea: '' });
+      setForm({ code: '', title: '', units: 0, hoursPerWeek: 0, isCore: true, isElective: false, learningArea: '', pricePerUnit: 0, feeTypeId: 'none' });
       toast({ title: 'Subject created', description: 'Subject has been created successfully.' });
     },
     onError: (error: Error) => {
@@ -124,6 +136,8 @@ export default function SubjectsPage() {
       isCore: subject.isCore,
       isElective: subject.isElective,
       learningArea: subject.learningArea || '',
+      pricePerUnit: subject.pricePerUnit || 0,
+      feeTypeId: subject.feeTypeId || 'none',
     });
     setEditingSubject(subject);
   };
@@ -133,13 +147,18 @@ export default function SubjectsPage() {
     const unitsValue = form.units;
     const hoursValue = form.hoursPerWeek;
     if (editingSubject) {
-      updateMutation.mutate({ ...form, id: editingSubject.id, units: unitsValue, hoursPerWeek: hoursValue } as Subject);
+      updateMutation.mutate({ ...form, id: editingSubject.id, units: unitsValue, hoursPerWeek: hoursValue, pricePerUnit: form.pricePerUnit, feeTypeId: form.feeTypeId !== 'none' ? form.feeTypeId : null } as Subject);
     } else {
-      createMutation.mutate({ ...form, units: unitsValue, hoursPerWeek: hoursValue });
+      createMutation.mutate({ ...form, units: unitsValue, hoursPerWeek: hoursValue, pricePerUnit: form.pricePerUnit, feeTypeId: form.feeTypeId });
     }
   };
 
   const columns: ColumnDef<any, any>[] = [
+    {
+      accessorKey: 'pricePerUnit',
+      header: 'Price/Unit',
+      cell: ({ row }) => row.original.pricePerUnit ? <span className="font-medium text-emerald-600">₱{Number(row.original.pricePerUnit).toLocaleString()}</span> : <span className="text-muted-foreground">—</span>,
+    },
     {
       accessorKey: 'code',
       header: 'Code',
@@ -317,6 +336,31 @@ export default function SubjectsPage() {
                       onChange={(e) => setForm({ ...form, learningArea: e.target.value })}
                       placeholder="Mathematics, English, Science"
                     />
+                  </div>
+                                  <div>
+                    <Label htmlFor="pricePerUnit">Price per Unit (₱)</Label>
+                    <Input
+                      id="pricePerUnit"
+                      type="number"
+                      step="0.01"
+                      value={form.pricePerUnit}
+                      onChange={(e) => setForm({ ...form, pricePerUnit: parseFloat(e.target.value) || 0 })}
+                      placeholder="500.00"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="feeTypeId">Billing Fee Type</Label>
+                    <select
+                      id="feeTypeId"
+                      value={form.feeTypeId}
+                      onChange={(e) => setForm({ ...form, feeTypeId: e.target.value })}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="none">-- No Fee Type --</option>
+                      {feeTypes.map((ft: any) => (
+                        <option key={ft.id} value={ft.id}>{ft.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">

@@ -721,4 +721,246 @@ export class SisService {
 
     return duplicates;
   }
+
+  // === Extended Health CRUD ===
+  async addImmunization(tenantId: string, studentId: string, data: Partial<StudentImmunization>) {
+    const record = this.immunizationsRepo.create({ ...data, studentId });
+    return this.immunizationsRepo.save(record);
+  }
+  async updateImmunization(tenantId: string, id: string, data: Partial<StudentImmunization>) {
+    const record = await this.immunizationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.immunizationsRepo.save(record);
+  }
+  async deleteImmunization(tenantId: string, id: string) {
+    const record = await this.immunizationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.immunizationsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addMedication(tenantId: string, studentId: string, data: Partial<StudentMedication>) {
+    const record = this.medicationsRepo.create({ ...data, studentId });
+    return this.medicationsRepo.save(record);
+  }
+  async updateMedication(tenantId: string, id: string, data: Partial<StudentMedication>) {
+    const record = await this.medicationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.medicationsRepo.save(record);
+  }
+  async deleteMedication(tenantId: string, id: string) {
+    const record = await this.medicationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.medicationsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addCarePlan(tenantId: string, studentId: string, data: Partial<StudentCarePlan>) {
+    const record = this.carePlansRepo.create({ ...data, studentId });
+    return this.carePlansRepo.save(record);
+  }
+  async updateCarePlan(tenantId: string, id: string, data: Partial<StudentCarePlan>) {
+    const record = await this.carePlansRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.carePlansRepo.save(record);
+  }
+  async deleteCarePlan(tenantId: string, id: string) {
+    const record = await this.carePlansRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.carePlansRepo.remove(record);
+    return { success: true };
+  }
+
+  async addAllergy(tenantId: string, studentId: string, data: Partial<StudentAllergy>) {
+    const record = this.allergiesRepo.create({ ...data, studentId });
+    return this.allergiesRepo.save(record);
+  }
+  async updateAllergy(tenantId: string, id: string, data: Partial<StudentAllergy>) {
+    const record = await this.allergiesRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.allergiesRepo.save(record);
+  }
+  async deleteAllergy(tenantId: string, id: string) {
+    const record = await this.allergiesRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.allergiesRepo.remove(record);
+    return { success: true };
+  }
+
+  // === Special Education & Screenings CRUD ===
+  async addScreening(tenantId: string, studentId: string, data: Partial<StudentScreening>) {
+    const record = this.screeningsRepo.create({ ...data, studentId });
+    return this.screeningsRepo.save(record);
+  }
+  async updateScreening(tenantId: string, id: string, data: Partial<StudentScreening>) {
+    const record = await this.screeningsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.screeningsRepo.save(record);
+  }
+  async deleteScreening(tenantId: string, id: string) {
+    const record = await this.screeningsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.screeningsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addIEP(tenantId: string, studentId: string, data: Partial<StudentIEP>) {
+    const record = this.iepsRepo.create({ ...data, studentId });
+    return this.iepsRepo.save(record);
+  }
+  async updateIEP(tenantId: string, id: string, data: Partial<StudentIEP>) {
+    const record = await this.iepsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.iepsRepo.save(record);
+  }
+  async deleteIEP(tenantId: string, id: string) {
+    const record = await this.iepsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.iepsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addPlan504(tenantId: string, studentId: string, data: Partial<Student504Plan>) {
+    const record = this.plans504Repo.create({ ...data, studentId });
+    return this.plans504Repo.save(record);
+  }
+  async updatePlan504(tenantId: string, id: string, data: Partial<Student504Plan>) {
+    const record = await this.plans504Repo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.plans504Repo.save(record);
+  }
+  async deletePlan504(tenantId: string, id: string) {
+    const record = await this.plans504Repo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.plans504Repo.remove(record);
+    return { success: true };
+  }
+
+  async addEvaluation(tenantId: string, studentId: string, data: Partial<StudentEvaluation>) {
+    const record = this.evaluationsRepo.create({ ...data, studentId });
+    return this.evaluationsRepo.save(record);
+  }
+  async updateEvaluation(tenantId: string, id: string, data: Partial<StudentEvaluation>) {
+    const record = await this.evaluationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.evaluationsRepo.save(record);
+  }
+  async deleteEvaluation(tenantId: string, id: string) {
+    const record = await this.evaluationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.evaluationsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addAccommodation(tenantId: string, studentId: string, data: Partial<StudentAccommodation>) {
+    const record = this.accommodationsRepo.create({ ...data, studentId });
+    return this.accommodationsRepo.save(record);
+  }
+  async updateAccommodation(tenantId: string, id: string, data: Partial<StudentAccommodation>) {
+    const record = await this.accommodationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.accommodationsRepo.save(record);
+  }
+  async deleteAccommodation(tenantId: string, id: string) {
+    const record = await this.accommodationsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.accommodationsRepo.remove(record);
+    return { success: true };
+  }
+
+  // === MTSS/Behavioral & Learning CRUD ===
+
+  async addDisciplineIncident(tenantId: string, studentId: string, data: Partial<StudentDisciplineIncident>) {
+    const record = this.disciplineIncidentsRepo.create({ ...data, studentId });
+    return this.disciplineIncidentsRepo.save(record);
+  }
+  async updateDisciplineIncident(tenantId: string, id: string, data: Partial<StudentDisciplineIncident>) {
+    const record = await this.disciplineIncidentsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.disciplineIncidentsRepo.save(record);
+  }
+  async deleteDisciplineIncident(tenantId: string, id: string) {
+    const record = await this.disciplineIncidentsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.disciplineIncidentsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addIntervention(tenantId: string, studentId: string, data: Partial<StudentIntervention>) {
+    const record = this.interventionsRepo.create({ ...data, studentId });
+    return this.interventionsRepo.save(record);
+  }
+  async updateIntervention(tenantId: string, id: string, data: Partial<StudentIntervention>) {
+    const record = await this.interventionsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.interventionsRepo.save(record);
+  }
+  async deleteIntervention(tenantId: string, id: string) {
+    const record = await this.interventionsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.interventionsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addSELAssessment(tenantId: string, studentId: string, data: Partial<StudentSELAssessment>) {
+    const record = this.selAssessmentsRepo.create({ ...data, studentId });
+    return this.selAssessmentsRepo.save(record);
+  }
+  async updateSELAssessment(tenantId: string, id: string, data: Partial<StudentSELAssessment>) {
+    const record = await this.selAssessmentsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.selAssessmentsRepo.save(record);
+  }
+  async deleteSELAssessment(tenantId: string, id: string) {
+    const record = await this.selAssessmentsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.selAssessmentsRepo.remove(record);
+    return { success: true };
+  }
+
+  async addLearningProfile(tenantId: string, studentId: string, data: Partial<StudentLearningProfile>) {
+    const record = this.learningProfilesRepo.create({ ...data, studentId });
+    return this.learningProfilesRepo.save(record);
+  }
+  async updateLearningProfile(tenantId: string, id: string, data: Partial<StudentLearningProfile>) {
+    const record = await this.learningProfilesRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.learningProfilesRepo.save(record);
+  }
+  async deleteLearningProfile(tenantId: string, id: string) {
+    const record = await this.learningProfilesRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.learningProfilesRepo.remove(record);
+    return { success: true };
+  }
+
+  async addGoal(tenantId: string, studentId: string, data: Partial<StudentGoal>) {
+    const record = this.goalsRepo.create({ ...data, studentId });
+    return this.goalsRepo.save(record);
+  }
+  async updateGoal(tenantId: string, id: string, data: Partial<StudentGoal>) {
+    const record = await this.goalsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    Object.assign(record, data);
+    return this.goalsRepo.save(record);
+  }
+  async deleteGoal(tenantId: string, id: string) {
+    const record = await this.goalsRepo.findOne({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+    await this.goalsRepo.remove(record);
+    return { success: true };
+  }
 }

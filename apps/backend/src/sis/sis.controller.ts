@@ -323,5 +323,234 @@ export class SisController {
   async createMergeAudit(@Body() data: any, @Headers('x-tenant-id') tenantId: string) {
     return this.sisService.createMergeAudit({ ...data, tenantId });
   }
-}
 
+  // === Health Module CRUD (Extended) ===
+  
+  @Post('students/:studentId/immunizations')
+  @ApiOperation({ summary: 'Add an immunization record' })
+  async addImmunization(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addImmunization(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/immunizations/:id')
+  @ApiOperation({ summary: 'Update an immunization record' })
+  async updateImmunization(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateImmunization(tenantId, id, data);
+  }
+  @Delete('students/:studentId/immunizations/:id')
+  @ApiOperation({ summary: 'Delete an immunization record' })
+  async deleteImmunization(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteImmunization(tenantId, id);
+  }
+
+  @Post('students/:studentId/medications')
+  @ApiOperation({ summary: 'Add a medication record' })
+  async addMedication(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addMedication(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/medications/:id')
+  @ApiOperation({ summary: 'Update a medication record' })
+  async updateMedication(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateMedication(tenantId, id, data);
+  }
+  @Delete('students/:studentId/medications/:id')
+  @ApiOperation({ summary: 'Delete a medication record' })
+  async deleteMedication(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteMedication(tenantId, id);
+  }
+
+  @Post('students/:studentId/care-plans')
+  @ApiOperation({ summary: 'Add a care plan' })
+  async addCarePlan(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addCarePlan(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/care-plans/:id')
+  @ApiOperation({ summary: 'Update a care plan' })
+  async updateCarePlan(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateCarePlan(tenantId, id, data);
+  }
+  @Delete('students/:studentId/care-plans/:id')
+  @ApiOperation({ summary: 'Delete a care plan' })
+  async deleteCarePlan(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteCarePlan(tenantId, id);
+  }
+
+  @Post('students/:studentId/allergies')
+  @ApiOperation({ summary: 'Add an allergy record' })
+  async addAllergy(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addAllergy(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/allergies/:id')
+  @ApiOperation({ summary: 'Update an allergy record' })
+  async updateAllergy(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateAllergy(tenantId, id, data);
+  }
+    // === Special Education & Screenings CRUD ===
+  
+  @Post('students/:studentId/screenings')
+  @ApiOperation({ summary: 'Add a screening record' })
+  async addScreening(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addScreening(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/screenings/:id')
+  @ApiOperation({ summary: 'Update a screening record' })
+  async updateScreening(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateScreening(tenantId, id, data);
+  }
+  @Delete('students/:studentId/screenings/:id')
+  @ApiOperation({ summary: 'Delete a screening record' })
+  async deleteScreening(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteScreening(tenantId, id);
+  }
+
+  @Post('students/:studentId/ieps')
+  @ApiOperation({ summary: 'Add an IEP record' })
+  async addIEP(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addIEP(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/ieps/:id')
+  @ApiOperation({ summary: 'Update an IEP record' })
+  async updateIEP(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateIEP(tenantId, id, data);
+  }
+  @Delete('students/:studentId/ieps/:id')
+  @ApiOperation({ summary: 'Delete an IEP record' })
+  async deleteIEP(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteIEP(tenantId, id);
+  }
+
+  @Post('students/:studentId/504-plans')
+  @ApiOperation({ summary: 'Add a 504 Plan record' })
+  async addPlan504(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addPlan504(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/504-plans/:id')
+  @ApiOperation({ summary: 'Update a 504 Plan record' })
+  async updatePlan504(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updatePlan504(tenantId, id, data);
+  }
+  @Delete('students/:studentId/504-plans/:id')
+  @ApiOperation({ summary: 'Delete a 504 Plan record' })
+  async deletePlan504(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deletePlan504(tenantId, id);
+  }
+
+  @Post('students/:studentId/evaluations')
+  @ApiOperation({ summary: 'Add an evaluation record' })
+  async addEvaluation(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addEvaluation(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/evaluations/:id')
+  @ApiOperation({ summary: 'Update an evaluation record' })
+  async updateEvaluation(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateEvaluation(tenantId, id, data);
+  }
+  @Delete('students/:studentId/evaluations/:id')
+  @ApiOperation({ summary: 'Delete an evaluation record' })
+  async deleteEvaluation(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteEvaluation(tenantId, id);
+  }
+
+  @Post('students/:studentId/accommodations')
+  @ApiOperation({ summary: 'Add an accommodation record' })
+  async addAccommodation(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addAccommodation(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/accommodations/:id')
+  @ApiOperation({ summary: 'Update an accommodation record' })
+  async updateAccommodation(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateAccommodation(tenantId, id, data);
+  }
+  @Delete('students/:studentId/accommodations/:id')
+  @ApiOperation({ summary: 'Delete an accommodation record' })
+  async deleteAccommodation(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteAccommodation(tenantId, id);
+  }
+
+  @Delete('students/:studentId/allergies/:id')
+  @ApiOperation({ summary: 'Delete an allergy record' })
+  async deleteAllergy(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteAllergy(tenantId, id);
+  }
+
+  // === MTSS/Behavioral & Learning CRUD ===
+
+  @Post('students/:studentId/discipline-incidents')
+  @ApiOperation({ summary: 'Add a discipline incident record' })
+  async addDisciplineIncident(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addDisciplineIncident(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/discipline-incidents/:id')
+  @ApiOperation({ summary: 'Update a discipline incident record' })
+  async updateDisciplineIncident(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateDisciplineIncident(tenantId, id, data);
+  }
+  @Delete('students/:studentId/discipline-incidents/:id')
+  @ApiOperation({ summary: 'Delete a discipline incident record' })
+  async deleteDisciplineIncident(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteDisciplineIncident(tenantId, id);
+  }
+
+  @Post('students/:studentId/interventions')
+  @ApiOperation({ summary: 'Add an intervention record' })
+  async addIntervention(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addIntervention(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/interventions/:id')
+  @ApiOperation({ summary: 'Update an intervention record' })
+  async updateIntervention(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateIntervention(tenantId, id, data);
+  }
+  @Delete('students/:studentId/interventions/:id')
+  @ApiOperation({ summary: 'Delete an intervention record' })
+  async deleteIntervention(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteIntervention(tenantId, id);
+  }
+
+  @Post('students/:studentId/sel-assessments')
+  @ApiOperation({ summary: 'Add an SEL assessment record' })
+  async addSELAssessment(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addSELAssessment(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/sel-assessments/:id')
+  @ApiOperation({ summary: 'Update an SEL assessment record' })
+  async updateSELAssessment(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateSELAssessment(tenantId, id, data);
+  }
+  @Delete('students/:studentId/sel-assessments/:id')
+  @ApiOperation({ summary: 'Delete an SEL assessment record' })
+  async deleteSELAssessment(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteSELAssessment(tenantId, id);
+  }
+
+  @Post('students/:studentId/learning-profiles')
+  @ApiOperation({ summary: 'Add a learning profile record' })
+  async addLearningProfile(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addLearningProfile(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/learning-profiles/:id')
+  @ApiOperation({ summary: 'Update a learning profile record' })
+  async updateLearningProfile(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateLearningProfile(tenantId, id, data);
+  }
+  @Delete('students/:studentId/learning-profiles/:id')
+  @ApiOperation({ summary: 'Delete a learning profile record' })
+  async deleteLearningProfile(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteLearningProfile(tenantId, id);
+  }
+
+  @Post('students/:studentId/goals')
+  @ApiOperation({ summary: 'Add a goal record' })
+  async addGoal(@Param('studentId') studentId: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.addGoal(tenantId, studentId, data);
+  }
+  @Put('students/:studentId/goals/:id')
+  @ApiOperation({ summary: 'Update a goal record' })
+  async updateGoal(@Param('id') id: string, @Body() data: any, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.updateGoal(tenantId, id, data);
+  }
+  @Delete('students/:studentId/goals/:id')
+  @ApiOperation({ summary: 'Delete a goal record' })
+  async deleteGoal(@Param('id') id: string, @Headers('x-tenant-id') tenantId: string) {
+    return this.sisService.deleteGoal(tenantId, id);
+  }
+}

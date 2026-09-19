@@ -4,7 +4,11 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useTenantStore } from '@/lib/store';
-import { UserPlus, Search, Eye, AlertCircle, Edit2 } from 'lucide-react';
+import { UserPlus, Search, Eye, AlertCircle, Edit2, Plus, Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sms/ui';
+import { ImmunizationModal, MedicationModal, CarePlanModal, AllergyModal } from './components/ExtendedHealthModals';
+import { ScreeningModal, IEPModal, Plan504Modal, EvaluationModal, AccommodationModal } from './components/SpecialEdModals';
+import { DisciplineIncidentModal, InterventionModal, SELAssessmentModal, LearningProfileModal, GoalModal } from './components/BehavioralModals';
 import {
   Badge,
   // Import ColumnDef from @sms/ui so it matches the DataTable prop type
@@ -318,7 +322,24 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
   } = profile;
   const [activeTab, setActiveTab] = useState('info');
   const [showEdit, setShowEdit] = useState(false);
+  const [modalState, setModalState] = useState<{
+    immunization?: { isOpen: boolean; data?: any };
+    medication?: { isOpen: boolean; data?: any };
+    carePlan?: { isOpen: boolean; data?: any };
+    allergy?: { isOpen: boolean; data?: any };
+    screening?: { isOpen: boolean; data?: any };
+    iep?: { isOpen: boolean; data?: any };
+    plan504?: { isOpen: boolean; data?: any };
+    evaluation?: { isOpen: boolean; data?: any };
+    accommodation?: { isOpen: boolean; data?: any };
+    disciplineIncident?: { isOpen: boolean; data?: any };
+    intervention?: { isOpen: boolean; data?: any };
+    selAssessment?: { isOpen: boolean; data?: any };
+    learningProfile?: { isOpen: boolean; data?: any };
+    goal?: { isOpen: boolean; data?: any };
+  }>({});
   const [editForm, setEditForm] = useState({
+    studentNumber: student.studentNumber || '',
     firstName: student.firstName || '',
     lastName: student.lastName || '',
     middleName: student.middleName || '',
@@ -332,6 +353,7 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
     govIdNumber: student.govIdNumber || '',
     healthFlags: student.healthFlags || '',
     iepNotes: student.iepNotes || '',
+    status: student.status || 'active',
   });
   
   const queryClient = useQueryClient();
@@ -407,13 +429,46 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
 
       <div className="rounded-lg border bg-card p-6 shadow-sm">
         {activeTab === 'info' && (
-          <div className="grid grid-cols-2 gap-6">
-            <div><p className="text-sm text-muted-foreground">Full Name</p><p className="font-medium">{student.firstName} {student.middleName} {student.lastName} {student.suffix}</p></div>
-            <div><p className="text-sm text-muted-foreground">Birth Date</p><p>{student.birthDate || '—'}</p></div>
-            <div><p className="text-sm text-muted-foreground">Sex</p><p>{student.sex || '—'}</p></div>
-            <div><p className="text-sm text-muted-foreground">Address</p><p>{student.address || '—'}</p></div>
-            <div><p className="text-sm text-muted-foreground">Prior School</p><p>{student.priorSchool || '—'}</p></div>
-            <div><p className="text-sm text-muted-foreground">Gov ID</p><p>{student.govIdType ? `${student.govIdType}: ${student.govIdNumber}` : '—'}</p></div>
+          <div className="space-y-8">
+            {/* Personal Information */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Personal Information</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div><p className="text-sm text-muted-foreground">Full Name</p><p className="font-medium">{student.firstName} {student.middleName} {student.lastName} {student.suffix}</p></div>
+                <div><p className="text-sm text-muted-foreground">Birth Date</p><p className="font-medium">{student.birthDate ? new Date(student.birthDate).toLocaleDateString() : '—'}</p></div>
+                <div><p className="text-sm text-muted-foreground">Sex</p><p className="font-medium capitalize">{student.sex || '—'}</p></div>
+                <div className="col-span-2"><p className="text-sm text-muted-foreground">Address</p><p className="font-medium">{student.address || '—'}</p></div>
+              </div>
+            </div>
+            
+            {/* Academic Information */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 border-t pt-6">Academic Information</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div><p className="text-sm text-muted-foreground">Student Number</p><p className="font-medium">{student.studentNumber || '—'}</p></div>
+                <div><p className="text-sm text-muted-foreground">Status</p><p className="font-medium capitalize">{student.status || '—'}</p></div>
+                <div><p className="text-sm text-muted-foreground">LRN (Learner Ref. No.)</p><p className="font-medium">{student.lrn || '—'}</p></div>
+                <div><p className="text-sm text-muted-foreground">Prior School</p><p className="font-medium">{student.priorSchool || '—'}</p></div>
+              </div>
+            </div>
+
+            {/* Government Identification */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 border-t pt-6">Government Identification</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div><p className="text-sm text-muted-foreground">ID Type</p><p className="font-medium">{student.govIdType || '—'}</p></div>
+                <div><p className="text-sm text-muted-foreground">ID Number</p><p className="font-medium">{student.govIdNumber || '—'}</p></div>
+              </div>
+            </div>
+
+            {/* Health & Special Needs */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 border-t pt-6">Health & Special Needs</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div><p className="text-sm text-muted-foreground">Health Flags / Conditions</p><p className="font-medium">{student.healthFlags || '—'}</p></div>
+                <div><p className="text-sm text-muted-foreground">IEP / Special Education Notes</p><p className="font-medium">{student.iepNotes || '—'}</p></div>
+              </div>
+            </div>
           </div>
         )}
 {activeTab === 'guardians' && (
@@ -485,7 +540,12 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
             )
           )}
         {activeTab === 'immunizations' && (
-            immunizations.length === 0 ? <p className="text-muted-foreground py-4">No immunizations recorded</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Immunizations</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, immunization: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {immunizations.length === 0 ? <p className="text-muted-foreground py-4">No immunizations recorded</p> : (
               <div className="space-y-2">
                 {immunizations.map((i: any) => (
                   <div key={i.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -493,14 +553,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{i.vaccineName}</p>
                       <p className="text-sm text-muted-foreground">{new Date(i.administeredDate).toLocaleDateString()} · Dose: {i.doseNumber || '—'} · {i.status}</p>
                     </div>
-                    <Badge variant={i.nextDueDate ? 'warning' : 'success'}>{i.nextDueDate ? 'Due: ' + new Date(i.nextDueDate).toLocaleDateString() : 'Complete'}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={i.nextDueDate ? 'warning' : 'success'}>{i.nextDueDate ? 'Due: ' + new Date(i.nextDueDate).toLocaleDateString() : 'Complete'}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, immunization: { isOpen: true, data: i } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteImmunization(student.id, i.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'medications' && (
-            medications.length === 0 ? <p className="text-muted-foreground py-4">No medications</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Medications</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, medication: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {medications.length === 0 ? <p className="text-muted-foreground py-4">No medications</p> : (
               <div className="space-y-2">
                 {medications.map((m: any) => (
                   <div key={m.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -508,14 +580,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{m.medicationName}</p>
                       <p className="text-sm text-muted-foreground">{m.dosage} · {m.frequency} · {m.status}</p>
                     </div>
-                    <Badge variant={statusToVariant(m.status)}>{m.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(m.status)}>{m.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, medication: { isOpen: true, data: m } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteMedication(student.id, m.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'carePlans' && (
-            carePlans.length === 0 ? <p className="text-muted-foreground py-4">No care plans</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Care Plans</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, carePlan: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {carePlans.length === 0 ? <p className="text-muted-foreground py-4">No care plans</p> : (
               <div className="space-y-2">
                 {carePlans.map((c: any) => (
                   <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -523,14 +607,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{c.title}</p>
                       <p className="text-sm text-muted-foreground">{c.condition} · {c.status}</p>
                     </div>
-                    <Badge variant={statusToVariant(c.status)}>{c.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(c.status)}>{c.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, carePlan: { isOpen: true, data: c } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteCarePlan(student.id, c.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'allergies' && (
-            allergies.length === 0 ? <p className="text-muted-foreground py-4">No allergies recorded</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Allergies</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, allergy: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {allergies.length === 0 ? <p className="text-muted-foreground py-4">No allergies recorded</p> : (
               <div className="space-y-2">
                 {allergies.map((a: any) => (
                   <div key={a.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -538,16 +634,28 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{a.allergen}</p>
                       <p className="text-sm text-muted-foreground">Severity: {a.severity} · Reaction: {a.reaction || '—'}</p>
                     </div>
-                    <Badge variant={a.severity === 'severe' ? 'destructive' : a.severity === 'moderate' ? 'warning' : 'success'}>
-                      {a.severity || 'Mild'}
-                    </Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={a.severity === 'severe' ? 'destructive' : a.severity === 'moderate' ? 'warning' : 'success'}>
+                        {a.severity || 'Mild'}
+                      </Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, allergy: { isOpen: true, data: a } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteAllergy(student.id, a.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'screenings' && (
-            screenings.length === 0 ? <p className="text-muted-foreground py-4">No screenings recorded</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Screenings</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, screening: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {screenings.length === 0 ? <p className="text-muted-foreground py-4">No screenings recorded</p> : (
               <div className="space-y-2">
                 {screenings.map((s: any) => (
                   <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -555,14 +663,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{s.screeningName || s.screeningType}</p>
                       <p className="text-sm text-muted-foreground">{new Date(s.screeningDate).toLocaleDateString()} · Result: {s.result || '—'} · {s.status}</p>
                     </div>
-                    <Badge variant={s.followUpRequired ? 'warning' : 'success'}>{s.followUpRequired ? 'Follow-up Required' : 'Complete'}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={s.followUpRequired ? 'warning' : 'success'}>{s.followUpRequired ? 'Follow-up Required' : 'Complete'}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, screening: { isOpen: true, data: s } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteScreening(student.id, s.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'ieps' && (
-            ieps.length === 0 ? <p className="text-muted-foreground py-4">No IEPs</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">IEPs</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, iep: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {ieps.length === 0 ? <p className="text-muted-foreground py-4">No IEPs</p> : (
               <div className="space-y-2">
                 {ieps.map((i: any) => (
                   <div key={i.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -570,14 +690,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{i.iepNumber}</p>
                       <p className="text-sm text-muted-foreground">{new Date(i.startDate).toLocaleDateString()} - {new Date(i.endDate).toLocaleDateString()} · {i.primaryDisability}</p>
                     </div>
-                    <Badge variant={statusToVariant(i.status)}>{i.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(i.status)}>{i.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, iep: { isOpen: true, data: i } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteIEP(student.id, i.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'plans504' && (
-            plans504.length === 0 ? <p className="text-muted-foreground py-4">No 504 Plans</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">504 Plans</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, plan504: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {plans504.length === 0 ? <p className="text-muted-foreground py-4">No 504 Plans</p> : (
               <div className="space-y-2">
                 {plans504.map((p: any) => (
                   <div key={p.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -585,14 +717,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{p.planNumber}</p>
                       <p className="text-sm text-muted-foreground">{new Date(p.startDate).toLocaleDateString()} - {p.disability}</p>
                     </div>
-                    <Badge variant={statusToVariant(p.status)}>{p.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(p.status)}>{p.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, plan504: { isOpen: true, data: p } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.delete504Plan(student.id, p.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'evaluations' && (
-            evaluations.length === 0 ? <p className="text-muted-foreground py-4">No evaluations</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Evaluations</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, evaluation: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {evaluations.length === 0 ? <p className="text-muted-foreground py-4">No evaluations</p> : (
               <div className="space-y-2">
                 {evaluations.map((e: any) => (
                   <div key={e.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -600,14 +744,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{e.evaluationName || e.evaluationType}</p>
                       <p className="text-sm text-muted-foreground">{new Date(e.evaluationDate).toLocaleDateString()} · {e.status}</p>
                     </div>
-                    <Badge variant={statusToVariant(e.status)}>{e.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(e.status)}>{e.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, evaluation: { isOpen: true, data: e } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteEvaluation(student.id, e.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'accommodations' && (
-            accommodations.length === 0 ? <p className="text-muted-foreground py-4">No accommodations</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Accommodations</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, accommodation: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {accommodations.length === 0 ? <p className="text-muted-foreground py-4">No accommodations</p> : (
               <div className="space-y-2">
                 {accommodations.map((a: any) => (
                   <div key={a.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -615,14 +771,53 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{a.category}: {a.description}</p>
                       <p className="text-sm text-muted-foreground">{a.setting} · {a.status}</p>
                     </div>
-                    <Badge variant={statusToVariant(a.status)}>{a.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(a.status)}>{a.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, accommodation: { isOpen: true, data: a } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteAccommodation(student.id, a.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
+                {activeTab === 'discipline' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Discipline Incidents</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, disciplineIncident: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {disciplineIncidents.length === 0 ? <p className="text-muted-foreground py-4">No discipline incidents</p> : (
+              <div className="space-y-2">
+                {disciplineIncidents.map((d: any) => (
+                  <div key={d.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">Incident on {new Date(d.reportDate).toLocaleDateString()}</p>
+                      <p className="text-sm text-muted-foreground">Severity: {d.severity} · Status: {d.status}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(d.status)}>{d.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, disciplineIncident: { isOpen: true, data: d } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteDisciplineIncident(student.id, d.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'interventions' && (
-            interventions.length === 0 ? <p className="text-muted-foreground py-4">No interventions</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Interventions</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, intervention: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {interventions.length === 0 ? <p className="text-muted-foreground py-4">No interventions</p> : (
               <div className="space-y-2">
                 {interventions.map((i: any) => (
                   <div key={i.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -630,14 +825,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{i.interventionName}</p>
                       <p className="text-sm text-muted-foreground">Tier {i.tier} · {i.focusArea} · {i.status}</p>
                     </div>
-                    <Badge variant={statusToVariant(i.status)}>{i.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(i.status)}>{i.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, intervention: { isOpen: true, data: i } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteIntervention(student.id, i.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'selAssessments' && (
-            selAssessments.length === 0 ? <p className="text-muted-foreground py-4">No SEL assessments</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">SEL Assessments</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, selAssessment: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {selAssessments.length === 0 ? <p className="text-muted-foreground py-4">No SEL assessments</p> : (
               <div className="space-y-2">
                 {selAssessments.map((s: any) => (
                   <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -645,14 +852,26 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{s.assessmentName}</p>
                       <p className="text-sm text-muted-foreground">{new Date(s.assessmentDate).toLocaleDateString()} · {s.status}</p>
                     </div>
-                    <Badge variant={statusToVariant(s.status)}>{s.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(s.status)}>{s.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, selAssessment: { isOpen: true, data: s } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteSELAssessment(student.id, s.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'learningProfile' && (
-            learningProfiles.length === 0 ? <p className="text-muted-foreground py-4">No learning profile</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Learning Profile</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, learningProfile: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {learningProfiles.length === 0 ? <p className="text-muted-foreground py-4">No learning profile</p> : (
               <div className="space-y-2">
                 {learningProfiles.map((l: any) => (
                   <div key={l.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -660,14 +879,25 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">Primary Style: {l.primaryLearningStyle || '—'}</p>
                       <p className="text-sm text-muted-foreground">Assessed: {l.assessmentDate ? new Date(l.assessmentDate).toLocaleDateString() : '—'} · Next: {l.nextReassessmentDate ? new Date(l.nextReassessmentDate).toLocaleDateString() : '—'}</p>
                     </div>
-                    <Badge variant="outline">View Details</Badge>
+                    <div className="flex items-center gap-4">
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, learningProfile: { isOpen: true, data: l } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteLearningProfile(student.id, l.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
+        )}
         {activeTab === 'goals' && (
-            goals.length === 0 ? <p className="text-muted-foreground py-4">No goals</p> : (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Goals</h3>
+              <Button size="sm" onClick={() => setModalState({ ...modalState, goal: { isOpen: true } })}><Plus className="h-4 w-4 mr-2" /> Add Record</Button>
+            </div>
+            {goals.length === 0 ? <p className="text-muted-foreground py-4">No goals</p> : (
               <div className="space-y-2">
                 {goals.map((g: any) => (
                   <div key={g.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -675,13 +905,20 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
                       <p className="font-medium">{g.title}</p>
                       <p className="text-sm text-muted-foreground">{g.category} · Target: {g.targetDate ? new Date(g.targetDate).toLocaleDateString() : '—'} · {g.status}</p>
                     </div>
-                    <Badge variant={statusToVariant(g.status)}>{g.status}</Badge>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={statusToVariant(g.status)}>{g.status}</Badge>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setModalState({ ...modalState, goal: { isOpen: true, data: g } })}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete record?')) { apiClient.sis.deleteGoal(student.id, g.id).then(() => queryClient.invalidateQueries({ queryKey: ['student-profile', student.id] })) } }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )
-          )}
-        {activeTab === 'familyContext' && (
+            )}
+          </div>
+        )}
+{activeTab === 'familyContext' && (
             familyContexts.length === 0 ? <p className="text-muted-foreground py-4">No family context</p> : (
               <div className="space-y-2">
                 {familyContexts.map((f: any) => (
@@ -770,6 +1007,24 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Academic Information</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <Label htmlFor="edit-student-number">Student Number</Label>
+                  <Input id="edit-student-number" value={editForm.studentNumber} onChange={(e) => setEditForm({ ...editForm, studentNumber: e.target.value })} placeholder="e.g. 2024-0001" className="mt-1" />
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="graduated">Graduated</SelectItem>
+                      <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="expelled">Expelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label htmlFor="edit-lrn">LRN (Learner Ref. No.)</Label>
                   <Input id="edit-lrn" value={editForm.lrn} onChange={(e) => setEditForm({ ...editForm, lrn: e.target.value })} maxLength={12} placeholder="12 digits" className="mt-1" />
                   {editForm.lrn && !/^\d{12}$/.test(editForm.lrn) && (
@@ -838,6 +1093,48 @@ function StudentProfile360({ profile, onBack }: { profile: any; onBack: () => vo
           </form>
         </DialogContent>
       </Dialog>
+      {modalState.immunization?.isOpen && (
+        <ImmunizationModal isOpen={true} onClose={() => setModalState({ ...modalState, immunization: undefined })} studentId={student.id} initialData={modalState.immunization.data} />
+      )}
+      {modalState.medication?.isOpen && (
+        <MedicationModal isOpen={true} onClose={() => setModalState({ ...modalState, medication: undefined })} studentId={student.id} initialData={modalState.medication.data} />
+      )}
+      {modalState.carePlan?.isOpen && (
+        <CarePlanModal isOpen={true} onClose={() => setModalState({ ...modalState, carePlan: undefined })} studentId={student.id} initialData={modalState.carePlan.data} />
+      )}
+      {modalState.allergy?.isOpen && (
+        <AllergyModal isOpen={true} onClose={() => setModalState({ ...modalState, allergy: undefined })} studentId={student.id} initialData={modalState.allergy.data} />
+      )}
+      {modalState.screening?.isOpen && (
+        <ScreeningModal isOpen={true} onClose={() => setModalState({ ...modalState, screening: undefined })} studentId={student.id} initialData={modalState.screening.data} />
+      )}
+      {modalState.iep?.isOpen && (
+        <IEPModal isOpen={true} onClose={() => setModalState({ ...modalState, iep: undefined })} studentId={student.id} initialData={modalState.iep.data} />
+      )}
+      {modalState.plan504?.isOpen && (
+        <Plan504Modal isOpen={true} onClose={() => setModalState({ ...modalState, plan504: undefined })} studentId={student.id} initialData={modalState.plan504.data} />
+      )}
+      {modalState.evaluation?.isOpen && (
+        <EvaluationModal isOpen={true} onClose={() => setModalState({ ...modalState, evaluation: undefined })} studentId={student.id} initialData={modalState.evaluation.data} />
+      )}
+      {modalState.accommodation?.isOpen && (
+        <AccommodationModal isOpen={true} onClose={() => setModalState({ ...modalState, accommodation: undefined })} studentId={student.id} initialData={modalState.accommodation.data} />
+      )}
+      {modalState.disciplineIncident?.isOpen && (
+        <DisciplineIncidentModal isOpen={true} onClose={() => setModalState({ ...modalState, disciplineIncident: undefined })} studentId={student.id} initialData={modalState.disciplineIncident.data} />
+      )}
+      {modalState.intervention?.isOpen && (
+        <InterventionModal isOpen={true} onClose={() => setModalState({ ...modalState, intervention: undefined })} studentId={student.id} initialData={modalState.intervention.data} />
+      )}
+      {modalState.selAssessment?.isOpen && (
+        <SELAssessmentModal isOpen={true} onClose={() => setModalState({ ...modalState, selAssessment: undefined })} studentId={student.id} initialData={modalState.selAssessment.data} />
+      )}
+      {modalState.learningProfile?.isOpen && (
+        <LearningProfileModal isOpen={true} onClose={() => setModalState({ ...modalState, learningProfile: undefined })} studentId={student.id} initialData={modalState.learningProfile.data} />
+      )}
+      {modalState.goal?.isOpen && (
+        <GoalModal isOpen={true} onClose={() => setModalState({ ...modalState, goal: undefined })} studentId={student.id} initialData={modalState.goal.data} />
+      )}
     </div>
   );
 }

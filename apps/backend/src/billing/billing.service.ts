@@ -171,34 +171,54 @@ export class BillingService {
     const items = await this.getFeeStructureItems(bestMatch.id, tenantId);
 
     let totalUnits = 0;
+    let subjectLineItems: any[] = [];
+
     if (params.enrollmentId) {
       const enrolledSubjects = await this.enrollmentSubjectsRepo.find({
         where: { tenantId, enrollmentId: params.enrollmentId }
       });
       if (enrolledSubjects.length > 0) {
-        // Need to import In from typeorm at the top of the file, let me do that separately.
         const subjectIds = enrolledSubjects.map(es => es.subjectId);
         const subjects = await this.subjectsRepo.createQueryBuilder('subject')
           .where('subject.id IN (:...subjectIds)', { subjectIds })
           .andWhere('subject.tenantId = :tenantId', { tenantId })
           .getMany();
+        
         totalUnits = subjects.reduce((sum, s) => sum + Number(s.units || 0), 0);
+        
+        // Option B: Generate distinct line items for subjects that have their own pricePerUnit
+        subjectLineItems = subjects
+          .filter(s => s.pricePerUnit && s.feeTypeId)
+          .map(s => {
+            const units = Number(s.units || 0);
+            const price = Number(s.pricePerUnit || 0);
+            return {
+              id: 'subject-' + s.id,
+              feeStructureId: bestMatch.id,
+              feeTypeId: s.feeTypeId,
+              amount: price * units,
+              description: `${s.title} (${units} Units at ₱${price}/unit)`,
+              isRequired: true,
+              isPerUnit: false,
+              sortOrder: 0,
+            };
+          });
       }
     }
 
     const resolvedItems = items.map(item => {
       if (item.isPerUnit) {
-        // If they have 0 units (e.g. no subjects loaded yet but structure is resolved), default multiplier to 1 to show base rate, or maybe 0?
-        // Actually, if it's per-unit, and they have 0 units, they shouldn't be charged tuition. So multiply by totalUnits (even if 0).
         return { ...item, amount: Number(item.amount) * Math.max(totalUnits, 0) };
       }
       return item;
     });
 
+    const finalItems = [...resolvedItems, ...subjectLineItems];
+
     return {
       structure: bestMatch,
-      items: resolvedItems,
-      totalAmount: resolvedItems.reduce((sum, item) => sum + Number(item.amount), 0),
+      items: finalItems,
+      totalAmount: finalItems.reduce((sum, item) => sum + Number(item.amount), 0),
     };
   }
 
